@@ -4,7 +4,7 @@
 Write notesfiles to accompany main files
 """
 from __future__ import division, print_function, unicode_literals
-__version__ = '20200103'
+__version__ = '20200103.0'
 __author__ = 'Justin Winokur'
 
 import sys

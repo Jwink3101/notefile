@@ -465,7 +465,6 @@ def test_search_export():
     os.chdir(TESTDIR)
 if __name__ == '__main__': 
     test_search_export()
-    sys.exit()
     test_main_note()
     test_repairs('orphaned')
     test_repairs('metadata')
