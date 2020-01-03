@@ -69,6 +69,13 @@ to add tags.
     * Look for any file that is the same size then same hash --> repair
     * If it can't repair, look for same name
 
+## File Hashes
+
+By default, the SHA256 hash is computed. It is *highly* suggested that this be allowed since it greatly increases the integrity of the link between the basefile and the notefile sidecar. However, `--no-hash` can be passed to many of the functions and it will disable hashing.
+
+Note that `--no-hash` (or `--no-refresh`) must be passed *every time* that notefile is modified otherwise, depending on the opperation, it may get rehashed.
+
+When repairing an orphaned notefile, candidate files are first compared by filesize and then by SHA256. While not foolproof, this *greatly* reduces the number of SHA256 computations to be performed; especially on larger files where it becomes increasingly unlikely to be the exact same size.
 
 ## Tips
 

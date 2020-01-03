@@ -17,6 +17,7 @@ import hashlib
 import notefile # this *should* import the local version even if it is installed
 print('version',notefile.__version__)
 print('path',notefile.__file__)
+notefile.DEBUG = False
 
 import ruamel.yaml
 yaml = ruamel.yaml.YAML()
@@ -25,10 +26,12 @@ import pytest
 
 TESTDIR = os.path.abspath('testdirs')
 
-def ssplit(s):
+def call(s):
     if sys.version_info[0] == 2:
-        return shlex.split(s.encode('utf8'))
-    return shlex.split(s)
+        cmd =  shlex.split(s.encode('utf8'))
+    else:
+        cmd = shlex.split(s)
+    return notefile.cli(cmd)
 
 def cleanmkdir(dirpath):
     try:
@@ -50,30 +53,25 @@ def test_main_note():
         file.write('this is a\ntest file')
     
     ## Add
-    cmd = 'add main.txt "this is a note"'
-    notefile.cli(ssplit(cmd))
+    call('add main.txt "this is a note"')
     _,data = notefile.read_data('main.txt')
     assert "this is a note" == data['notes'].strip()
 
-    cmd = 'add main.txt "this is a note"'
-    notefile.cli(ssplit(cmd))
+    call('add main.txt "this is a note"')
     _,data = notefile.read_data('main.txt')
     assert "this is a note\n\nthis is a note" == data['notes'].strip()
 
-    cmd = 'add -r main.txt "this is a note"'
-    notefile.cli(ssplit(cmd))
+    call('add -r main.txt "this is a note"')
     _,data = notefile.read_data('main.txt')
     assert "this is a note" == data['notes'].strip()
     
     ## Tags
-    cmd = 'tag -t test -t "two words" main.txt'
-    notefile.cli(ssplit(cmd))
+    call('tag -t test -t "two words" main.txt')
     
     _,data = notefile.read_data('main.txt')
     assert {'test',"two words"} == set(data['tags'])
 
-    cmd = 'tag -t "two words" -t "another" -r main.txt'
-    notefile.cli(ssplit(cmd))
+    call('tag -t "two words" -t "another" -r main.txt')
     
     _,data = notefile.read_data('main.txt')
     assert {'test'} == set(data['tags'])
@@ -96,8 +94,7 @@ def test_odd_filenames():
             
         with open(filename,'wt') as file:
             file.write('this is a\ntest file')
-        cmd = 'add "{}" "this is a note"'.format(filename)
-        notefile.cli(ssplit(cmd))
+        call('add "{}" "this is a note"'.format(filename))
         _,data = notefile.read_data(filename)
         assert "this is a note" == data['notes'].strip()
     
@@ -123,15 +120,12 @@ def test_repairs(repair_type):
         file.write('repair orphanedDUPE')
     
     # Initial Data    
-    cmd = 'add repair_meta.txt "Metadata repair please"'
-    notefile.cli(ssplit(cmd))
+    call('add repair_meta.txt "Metadata repair please"')
     _,meta0 = notefile.read_data('repair_meta.txt')
 
-    cmd = 'add repair_orphaned.txt "orphaned repair please"'
-    notefile.cli(ssplit(cmd))
+    call('add repair_orphaned.txt "orphaned repair please"')
 
-    cmd = 'add repair_orphanedDUPE.txt "orphaned repair please DUPE"'
-    notefile.cli(ssplit(cmd))
+    call('add repair_orphanedDUPE.txt "orphaned repair please DUPE"')
 
     # Break them
     with open('repair_meta.txt','at') as file:
@@ -142,8 +136,7 @@ def test_repairs(repair_type):
     shutil.move('repair_orphanedDUPE.txt','repair_orphanedDUPE2.txt')
     
     # Repair the whole directory
-    cmd = 'repair --type {} .'.format(repair_type)
-    notefile.cli(ssplit(cmd))
+    call('repair --type {} .'.format(repair_type))
     
     _,meta1 = notefile.read_data('repair_meta.txt')
     
@@ -182,16 +175,12 @@ def test_links(link):
     
     # Need to test multiple commands that modify the note
     
-    cmd = '--link {} add link.txt "link note"'.format(link)
-    notefile.cli(ssplit(cmd))
+    call('add --link {} link.txt "link note"'.format(link))
     
-    cmd = '--link {} tag link.txt -t "link"'.format(link)
-    notefile.cli(ssplit(cmd))
+    call('tag --link {} link.txt -t "link"'.format(link))
 
-    cmd = 'add file.txt "file note"'
-    notefile.cli(ssplit(cmd))
-    cmd = 'tag file.txt -t file'
-    notefile.cli(ssplit(cmd))
+    call('add file.txt "file note"')
+    call('tag file.txt -t file')
     
     if link == 'both':
         assert os.path.exists('file.txt.notes.yaml')
@@ -236,18 +225,14 @@ def test_excludes_repair():
     with open('noenter/file3.txt','wt') as file:
         file.write('FILE 3')
 
-    cmd = 'add file1.txt "file note1"'
-    notefile.cli(ssplit(cmd))
+    call('add file1.txt "file note1"')
 
-    cmd = 'add file2.txt "file note2"'
-    notefile.cli(ssplit(cmd))
+    call('add file2.txt "file note2"')
 
-    cmd = 'add noenter/file3.txt "file note3"'
-    notefile.cli(ssplit(cmd))
+    call('add noenter/file3.txt "file note3"')
     
     shutil.move('file1.txt','noenter/moved_file1.txt')
-    cmd = 'repair'
-    notefile.cli(ssplit(cmd))
+    call('repair')
     
     assert os.path.exists('noenter/moved_file1.txt.notes.yaml')
     assert not os.path.exists('file1.txt.notes.yaml')
@@ -257,8 +242,7 @@ def test_excludes_repair():
     # and that the search for orphaned files (3) respects it too.
     shutil.move('file2.txt','noenter/moved_file2.txt')
     shutil.move('noenter/file3.txt','moved_file3.txt')
-    cmd = 'repair --exclude noEnter' # Case shouldn't matter unless set
-    notefile.cli(ssplit(cmd))
+    call('repair --exclude noEnter') # Case shouldn't matter unless set
     
     assert not os.path.exists('noenter/moved_file2.txt.notes.yaml')
     assert os.path.exists('file2.txt.notes.yaml')
@@ -294,63 +278,49 @@ def test_search_export():
         file.write('FILE 5')
 
 
-    cmd = 'add file1.txt "note for myfile 1"'
-    notefile.cli(ssplit(cmd))
-    cmd = 'tag file1.txt -t tag1 -t tag2'
-    notefile.cli(ssplit(cmd))
+    call('add file1.txt "note for myfile 1"')
+    call('tag file1.txt -t tag1 -t tag2')
 
-    cmd = 'add file2.txt "note\nfor MyFiLe 2"'
-    notefile.cli(ssplit(cmd))
+    call('add file2.txt "note\nfor MyFiLe 2"')
 
-    cmd = 'add noenter/file3.txt "myfile 3 but do not find me"'
-    notefile.cli(ssplit(cmd))
-    cmd = 'tag noenter/file3.txt -t tag1'
-    notefile.cli(ssplit(cmd))
+    call('add noenter/file3.txt "myfile 3 but do not find me"')
+    call('tag noenter/file3.txt -t tag1')
 
-    cmd = 'add file4.exc "myfile 4 but do not find me either"'
-    notefile.cli(ssplit(cmd))
-    cmd = 'tag file4.exc -t tag1'
-    notefile.cli(ssplit(cmd))
+    call('add file4.exc "myfile 4 but do not find me either"')
+    call('tag file4.exc -t tag1')
     
-    cmd = 'add file5.txt "yourfile 5"'
-    notefile.cli(ssplit(cmd))
+    call('add file5.txt "yourfile 5"')
   
     ## Searches
     
-    cmd = 'search -o out MyFiLe'
-    notefile.cli(ssplit(cmd))
+    call('search -o out MyFiLe')
     with open('out') as file:
         res = set(f.strip() for f in file.read().splitlines() if f.strip())
     assert {'./noenter/file3.txt', './file1.txt', './file4.exc', './file2.txt'} == res
 
-    cmd = 'search -o out MyFiLe --match-expr-case'
-    notefile.cli(ssplit(cmd))
+    call('search -o out MyFiLe --match-expr-case')
     with open('out') as file:
         res = set(f.strip() for f in file.read().splitlines() if f.strip())
     assert {'./file2.txt'} == res
     
-    cmd = 'search -o out MyFiLe --exclude "*.exc" --exclude noEnter'
-    notefile.cli(ssplit(cmd))
+    call('search -o out MyFiLe --exclude "*.exc" --exclude noEnter')
     with open('out') as file:
         res = set(f.strip() for f in file.read().splitlines() if f.strip())
     assert {'./file1.txt','./file2.txt'} == res
 
-    cmd = 'search -o out MyFiLe --exclude "*.exc" --exclude noEnter --match-exclude-case'
-    notefile.cli(ssplit(cmd))
+    call('search -o out MyFiLe --exclude "*.exc" --exclude noEnter --match-exclude-case')
     with open('out') as file:
         res = set(f.strip() for f in file.read().splitlines() if f.strip())
     assert {'./noenter/file3.txt','./file1.txt','./file2.txt'} == res
     
-    cmd = 'search -o out MyFiLe YouRFile'
-    notefile.cli(ssplit(cmd))
+    call('search -o out MyFiLe YouRFile')
     with open('out') as file:
         res = set(f.strip() for f in file.read().splitlines() if f.strip())
     assert {'./noenter/file3.txt', './file1.txt', './file4.exc', './file2.txt','./file5.txt'} == res
     
     ### Tags
     
-    cmd = 'list-tags -o out'
-    notefile.cli(ssplit(cmd))
+    call('list-tags -o out')
     with open('out') as file:
         res = yaml.load(file)
         # Convert to dict of sets for ordering
@@ -358,24 +328,21 @@ def test_search_export():
     assert {'tag1': {'./noenter/file3.txt', './file4.exc', './file1.txt'}, 'tag2': {'./file1.txt'}} == res
     
 
-    cmd = 'list-tags -o out tag1'
-    notefile.cli(ssplit(cmd))
+    call('list-tags -o out tag1')
     with open('out') as file:
         res = yaml.load(file)
         # Convert to dict of sets for ordering
         res = {k:set(v) for k,v in res.items()}
     assert {'tag1': {'./noenter/file3.txt', './file4.exc', './file1.txt'}} == res
     
-    cmd = 'list-tags -o out tag1 --exclude "*.EXC" --match-exclude-case'
-    notefile.cli(ssplit(cmd))
+    call('list-tags -o out tag1 --exclude "*.EXC" --match-exclude-case')
     with open('out') as file:
         res = yaml.load(file)
         # Convert to dict of sets for ordering
         res = {k:set(v) for k,v in res.items()}
     assert {'tag1': {'./noenter/file3.txt','./file4.exc','./file1.txt'}} == res   
 
-    cmd = 'list-tags -o out tag1 --exclude "*.EXC"'
-    notefile.cli(ssplit(cmd))
+    call('list-tags -o out tag1 --exclude "*.EXC"')
     with open('out') as file:
         res = yaml.load(file)
         # Convert to dict of sets for ordering
@@ -388,33 +355,27 @@ def test_search_export():
         file.write('FILE 6')
     os.symlink('file6.txt','link.txt')
     
-    cmd = '--link both add link.txt "this is a link"'
-    notefile.cli(ssplit(cmd))
-    cmd = '--link both tag link.txt -t link'
-    notefile.cli(ssplit(cmd))
+    call('add --link both  link.txt "this is a link"')
+    call('tag --link both link.txt -t link')
     
-    cmd = 'search -o out link'
-    notefile.cli(ssplit(cmd))
+    call('search -o out link')
     with open('out') as file:
         res = set(f.strip() for f in file.read().splitlines() if f.strip())
     assert {'./link.txt', './file6.txt'} == res
     
-    cmd = 'search -o out link --exclude-links'
-    notefile.cli(ssplit(cmd))
+    call('search -o out link --exclude-links')
     with open('out') as file:
         res = set(f.strip() for f in file.read().splitlines() if f.strip())
     assert {'./file6.txt'} == res
 
-    cmd = 'list-tags -o out link'
-    notefile.cli(ssplit(cmd))
+    call('list-tags -o out link')
     with open('out') as file:
         res = yaml.load(file)
         # Convert to dict of sets for ordering
         res = {k:set(v) for k,v in res.items()}
     assert {'link': {'./link.txt', './file6.txt'}} == res
 
-    cmd = 'list-tags -o out link --exclude-links'
-    notefile.cli(ssplit(cmd))
+    call('list-tags -o out link --exclude-links')
     with open('out') as file:
         res = yaml.load(file)
         # Convert to dict of sets for ordering
@@ -422,8 +383,7 @@ def test_search_export():
     assert {'link': {'./file6.txt'}} == res
     
     ## Export
-    cmd = 'export -o out'
-    notefile.cli(ssplit(cmd))
+    call('export -o out')
     with open('out') as file:
         res = yaml.load(file)
         # Just look at the files
@@ -432,8 +392,7 @@ def test_search_export():
             './noenter/file3.txt', './file2.txt', './file4.exc', 
             './file1.txt'} == res
 
-    cmd = 'export -o out --exclude-links'
-    notefile.cli(ssplit(cmd))
+    call('export -o out --exclude-links')
     with open('out') as file:
         res = yaml.load(file)
         # Just look at the files
@@ -442,8 +401,7 @@ def test_search_export():
             './noenter/file3.txt', './file2.txt', './file4.exc', 
             './file1.txt'} == res
 
-    cmd = 'export -o out --exclude "*.exC"'
-    notefile.cli(ssplit(cmd))
+    call('export -o out --exclude "*.exC"')
     with open('out') as file:
         res = yaml.load(file)
         # Just look at the files
@@ -452,8 +410,7 @@ def test_search_export():
             './noenter/file3.txt', './file2.txt', 
             './file1.txt'} == res
 
-    cmd = 'export -o out --exclude "*.exC" --match-exclude-case'
-    notefile.cli(ssplit(cmd))
+    call('export -o out --exclude "*.exC" --match-exclude-case')
     with open('out') as file:
         res = yaml.load(file)
         # Just look at the files
@@ -463,7 +420,65 @@ def test_search_export():
             './file1.txt'} == res
     
     os.chdir(TESTDIR)
+    
+
+def test_nohash():
+    os.chdir(TESTDIR)
+    dirpath = os.path.join(TESTDIR,'nohash')
+    cleanmkdir(dirpath)
+    os.chdir(dirpath)
+    
+    nohash = lambda filename: notefile.read_data(filename)[1]['sha256'] == notefile.NOHASH
+    
+    with open('file1.txt','wt') as file:
+        file.write('FILE 1')
+        
+    with open('file2.txt','wt') as file:
+        file.write('FILE 2')
+    
+    # make sure no hash is computed when read with nothing
+    assert nohash('file1.txt') 
+    assert nohash('file2.txt') 
+    
+    call('add file1.txt "testing" --no-hash') # Add note when none existed
+    assert nohash('file1.txt') 
+    
+    call('tag file2.txt file1.txt -t hi --no-hash') # Add tag to new and existing
+    assert nohash('file2.txt') 
+    
+    call('add file1.txt "append" --no-hash') # Add note to existing
+    assert nohash('file1.txt')
+    
+    ## NOTE: edit has to be tested manually! See bottom
+    
+    # Test that repair adds a hash as needed
+    
+    with open('file1.txt','at') as file:
+        file.write('FILE 1')
+        
+    with open('file2.txt','at') as file:
+        file.write('FILE 2')
+        
+    call('repair file1.txt')
+    assert not nohash('file1.txt') # SHOULD have a hash
+    
+    call('repair file2.txt --no-hash')
+    assert nohash('file2.txt') # still no hash
+    
+    # Test that we *can* repair file1.txt since it now has a hash but we cannot
+    # repair file2
+    shutil.move('file1.txt','fileA.txt')
+    shutil.move('file2.txt','fileB.txt')
+    
+    call('repair')
+    
+    
+    
+    
+    os.chdir(TESTDIR)
 if __name__ == '__main__': 
+    test_nohash()
+    sys.exit()
     test_search_export()
     test_main_note()
     test_repairs('orphaned')
@@ -486,7 +501,7 @@ if __name__ == '__main__':
 #     * regular
 #     * link modes (this is a different pathway than `add` but the link-logic
 #       goes through the same codes
-# 
+#     * --no-hash does not set a hash!
 
 
 

@@ -24,6 +24,7 @@ if sys.version_info[0] > 2:
     unicode = str
 
 NOTESTXT = '.notes.yaml'
+NOHASH = '** not computed **'
 
 DEBUG = False
 def debug(*args,**kwargs):
@@ -132,7 +133,7 @@ def read_data(filename,link='both'):
         stat = os.stat(filename)
         data = {'filename':filename,
                 'filesize': stat.st_size,
-                'sha256':sha256(filename),
+                'sha256':NOHASH,
                 'mtime':stat.st_mtime}
     else:
         debug('Loading {}'.format(notesfile))
@@ -145,7 +146,7 @@ def read_data(filename,link='both'):
         data['notes'] = ''
     return filename,data
 
-def write_data(filename,data,link='both'):
+def write_data(filename,data,link='both',hashfile=True):
     """
     Write/update the data for a given filename. 
     
@@ -163,6 +164,10 @@ def write_data(filename,data,link='both'):
     filename,notesfile = get_filenames(filename)
 
     data = pssdict(data,copy=True)
+    
+    if hashfile and data['sha256'] == NOHASH:
+        data['sha256'] = sha256(filename)
+    
     data['last-updated'] = now_string()
     data['notefile version'] = __version__
     try:
@@ -192,7 +197,7 @@ def write_data(filename,data,link='both'):
     debug('Wrote',notesfile)
 
 ###########
-def interactive_edit(filename,link='both'):
+def interactive_edit(filename,link='both',hashfile=True):
     filename,data = read_data(filename,link=link)
     editor_names = ['EDITOR','GIT_EDITOR','SVN_EDITOR','LOCAL_EDITOR']
     for editor_name in editor_names:
@@ -221,9 +226,9 @@ def interactive_edit(filename,link='both'):
         
     newtxt = '\n'.join(newtxt)
     data['notes'] = newtxt.strip()
-    write_data(filename,data,link=link)
+    write_data(filename,data,link=link,hashfile=hashfile)
 
-def add_note(filename,note,replace=False,link='both'):
+def add_note(filename,note,replace=False,link='both',hashfile=True):
     """
     Add notes to the file. 
     
@@ -234,6 +239,8 @@ def add_note(filename,note,replace=False,link='both'):
     
     link:
         How to handle the links. See write_data
+    
+    Does not repair. Call repair seperately
     """
     filename,data = read_data(filename,link=link)
     if replace or len(data['notes'].strip()) == 0:
@@ -241,9 +248,9 @@ def add_note(filename,note,replace=False,link='both'):
     else:
         data['notes'] += '\n\n' + note.strip()
             
-    write_data(filename,data,link=link)   
+    write_data(filename,data,link=link,hashfile=hashfile)   
     
-def modify_tags(filename,tags,remove=False,link='both'):
+def modify_tags(filename,tags,remove=False,link='both',hashfile=True):
     """Add (or remove) tag(s) for a file
     
     Options:
@@ -275,13 +282,13 @@ def modify_tags(filename,tags,remove=False,link='both'):
         if tag not in data['tags']:
             data['tags'].append(tag)
     if data != data0:
-        write_data(filename,data,link=link)
+        write_data(filename,data,link=link,hashfile=hashfile)
 
-def echo(filename,tags=False,link='both',stream=sys.stdout):
+def echo(filename,tags=False,stream=sys.stdout):
     """
     Echo the notes or tags for a given file
     """
-    _,data = read_data(filename,link=link)
+    _,data = read_data(filename)
     
     if tags:
         for tag in sorted(data['tags'],key=lambda s:s.lower()):
@@ -378,7 +385,7 @@ def exclude_in_place(mylist,excludes,isdir=False,matchcase=False):
             mylist.remove(item)
             continue
 
-def repair_metadata(filename,force=False,dry_run=False,link='both',):
+def repair_metadata(filename,force=False,dry_run=False,link='both',hashfile=True):
     """
     Update sha256 and size of filename
     """
@@ -393,15 +400,18 @@ def repair_metadata(filename,force=False,dry_run=False,link='both',):
             return True
         debug('Updated {}'.format(filename))
         data['filesize'] = size
-        data['sha256'] = sha256(filename)
+        if hashfile:
+            data['sha256'] = sha256(filename)
+        else:
+            data['sha256'] = NOHASH
         data['mtime'] = mtime
-        write_data(filename,data,link=link)
+        write_data(filename,data,link=link,hashfile=hashfile)
         
         return True
     return False
 
 def repair(path,repair_type='both',dry_run=False,force=False,link='both',
-           excludes=None,matchcase=False):
+           excludes=None,matchcase=False,hashfile=True):
     """
     Repair notes:
     
@@ -435,7 +445,9 @@ def repair(path,repair_type='both',dry_run=False,force=False,link='both',
     
     matchcase [False]
         Whether or not to match the case of the exclude file
-        
+    
+    hashfile [True]
+        Whether or not to ever compute the hash. Cannot repair orhaned if False
     """
     if os.path.isdir(path):
         filenames = find_notes(path,_return_both=True,
@@ -456,7 +468,7 @@ def repair(path,repair_type='both',dry_run=False,force=False,link='both',
         if repair_type == 'orphaned':
             continue
             
-        if repair_metadata(filename,force=force,dry_run=dry_run):
+        if repair_metadata(filename,force=force,dry_run=dry_run,hashfile=hashfile):
             print('{}Updated metadata for {}'.format('(DRY RUN) ' if dry_run else '',filename))
     
     if repair_type == 'metadata':
@@ -464,6 +476,10 @@ def repair(path,repair_type='both',dry_run=False,force=False,link='both',
     
     for orphaned in orphaneds:
         _,data = read_data(orphaned,link=link)
+        if not hashfile or data['sha256'] == NOHASH:
+            print('Cannot repair {} without hashes'.format(orphaned) )
+            continue
+            
         print("\norphaned basefile for '{}'".format(orphaned))
         
         candidates = find_by_size_hash('.',data['filesize'],data['sha256'],
@@ -583,18 +599,6 @@ Notes:
                 help='execute `%(prog)s <command> -h` for help')
     
     parsers['main'].add_argument('--debug',action='store_true',help=argparse.SUPPRESS)
-    
-    parsers['main'].add_argument('--force-refresh',action='store_true',
-        help='Force %(prog)s to refresh the metadata of files when the notefile is modified')
-    parsers['main'].add_argument('--link',choices=['source','symlink','both'],
-        default='both',
-        help=("['%(default)s'] Specify how to handle symlinks. "
-              "If 'source', will add the notefile to the source only (non-recursively). "
-              "If 'symlink', will add the notefile to *just* the symlink file. "
-              "If 'both', will add the notefile the source (non-recursivly) and then symlimk to that notefile"))
-    parsers['main'].add_argument('--no-refresh',action='store_true',
-        help='Never refresh file metadata when a notefile is modified')
-    
     parsers['main'].add_argument('--version', action='version', version='%(prog)s-' + __version__)
 
     ## Modifiers
@@ -658,7 +662,24 @@ Notes:
 
     
     ## Common arguments
+    # Could use various parent parsers but this is honestly just as easy!
     
+    # Modification Flags 
+    for name in ['add','edit','tag','repair']:
+        parsers[name].add_argument('--no-hash',action='store_false',dest='hashfile',
+            help='Do *not* compute the SHA256 of the basefile. Will not be able to repair orphaned notes')
+        parsers[name].add_argument('--no-refresh',action='store_true',
+            help='Never refresh file metadata when a notefile is modified')
+        parsers[name].add_argument('--force-refresh',action='store_true',
+            help='Force %(prog)s to refresh the metadata of files when the notefile is modified')
+        parsers[name].add_argument('--link',choices=['source','symlink','both'],
+            default='both',
+            help=("['%(default)s'] Specify how to handle symlinks. "
+                  "If 'source', will add the notefile to the source only (non-recursively). "
+                  "If 'symlink', will add the notefile to *just* the symlink file. "
+                  "If 'both', will add the notefile the source (non-recursivly) and then symlimk to that notefile"))
+
+
     # Add exclude options:
     for name in ['repair','search','list_tags','export']:
         parsers[name].add_argument('--exclude',action='append',default=[],
@@ -680,6 +701,7 @@ Notes:
     if args.debug:
         global DEBUG
         DEBUG = True
+    if DEBUG: # May have been set not at CLI
         debug('argv: {}'.format(repr(argv)))
         debug(args)
     
@@ -693,31 +715,44 @@ Notes:
     
 def _handoff(args):
 
-    if args.no_refresh == args.force_refresh == True:
+    if getattr(args,'no_refresh',0) == getattr(args,'force_refresh',1) == True:
         raise ValueError('Cannot have no-refresh and force-refresh')
     
-    ## Modification Actions
-    if args.command == 'tag':
-        for file in args.file:
-            modify_tags(file,args.tag,remove=args.remove,link=args.link)
-            if not args.no_refresh:
-                repair(file,repair_type='metadata',force=args.force_refresh)
-               
-    if args.command == 'edit':
-        interactive_edit(args.file,link=args.link)
-        if not args.no_refresh:
-            repair(args.file,repair_type='metadata',force=args.force_refresh,link=args.link)
+    if getattr(args,'no_refresh',False):
+        args.hashfile = False
     
+    ## Modification Actions
     if args.command == 'add':
         args.note = ' '.join(args.note)
         if args.note.strip() == '-':
             args.note = sys.stdin.read()
+        
         add_note(args.file,args.note,
                  replace=args.replace,
-                 link=args.link)
+                 link=args.link,
+                 hashfile=args.hashfile)
+        
         if not args.no_refresh:
-            repair(args.file,repair_type='metadata',force=args.force_refresh,link=args.link)
+            repair(args.file,repair_type='metadata',
+                   force=args.force_refresh,link=args.link,
+                   hashfile=args.hashfile)
 
+    if args.command == 'edit':
+        interactive_edit(args.file,link=args.link,hashfile=args.hashfile)
+        if not args.no_refresh:
+            repair(args.file,repair_type='metadata',
+                   force=args.force_refresh,link=args.link,
+                   hashfile=args.hashfile)
+
+            
+    if args.command == 'tag':
+        for file in args.file:
+            modify_tags(file,args.tag,remove=args.remove,link=args.link,hashfile=args.hashfile)
+            if not args.no_refresh:
+                repair(file,repair_type='metadata',
+                       force=args.force_refresh,link=args.link,
+                       hashfile=args.hashfile)
+               
     if args.command == 'repair':
         repair(args.path,
                repair_type=args.type,
@@ -725,14 +760,15 @@ def _handoff(args):
                force=args.force_refresh,
                link=args.link,
                excludes=args.exclude,
-               matchcase=args.match_case
+               matchcase=args.match_case,
+               hashfile=args.hashfile
                )
 
     ## Query Actions
     
     if args.command == 'echo':
         stream = sys.stdout if args.out_file is None else open(args.out_file,'wt') 
-        echo(args.file,tags=args.tags,link=args.link,stream=stream)
+        echo(args.file,tags=args.tags,stream=stream)
         if args.out_file is not None:
             stream.close()
         
