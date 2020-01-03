@@ -4,7 +4,7 @@
 Write notesfiles to accompany main files
 """
 from __future__ import division, print_function, unicode_literals
-__version__ = '20200103.0'
+__version__ = '20200103.1'
 __author__ = 'Justin Winokur'
 
 import sys
@@ -599,7 +599,7 @@ Notes:
                 help='execute `%(prog)s <command> -h` for help')
     
     parsers['main'].add_argument('--debug',action='store_true',help=argparse.SUPPRESS)
-    parsers['main'].add_argument('--version', action='version', version='%(prog)s-' + __version__)
+    parsers['main'].add_argument('-v','--version', action='version', version='%(prog)s-' + __version__)
 
     ## Modifiers
 
@@ -697,6 +697,19 @@ Notes:
         parsers[name].add_argument('--exclude-links',action='store_true',
             help='Do not include symlinked notefiles')
 
+    # This sorts the optional arguments or each parser.
+    # It is a bit of a hack. The biggest issue is that this happens on every 
+    # call but it takes about 10 microseconds
+    # Inspired by https://stackoverflow.com/a/12269358/3633154
+    for parser in parsers.values():
+        for action_group in parser._action_groups:
+            # Make sure it is the **OPTIONAL** ones
+            if not all(len(action.option_strings) > 0 for action in action_group._group_actions):
+                continue
+            action_group._group_actions.sort(key=lambda action: # lower of the longest key
+                                                        sorted(action.option_strings,
+                                                               key=lambda a:-len(a))[0].lower())
+    
     args = parsers['main'].parse_args(argv)
     if args.debug:
         global DEBUG
