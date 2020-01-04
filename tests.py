@@ -238,8 +238,8 @@ def test_excludes_repair():
     assert not os.path.exists('file1.txt.notes.yaml')
     
     
-    # Test that both the search for the missing base file (2) respects excludes
-    # and that the search for orphaned files (3) respects it too.
+    # Test that both the grep for the missing base file (2) respects excludes
+    # and that the grep for orphaned files (3) respects it too.
     shutil.move('file2.txt','noenter/moved_file2.txt')
     shutil.move('noenter/file3.txt','moved_file3.txt')
     call('repair --exclude noEnter') # Case shouldn't matter unless set
@@ -253,12 +253,12 @@ def test_excludes_repair():
     
     os.chdir(TESTDIR)
 
-def test_search_export():
+def test_grep_export():
     """
-    Tests searching including for tags
+    Tests greping including for tags
     """
     os.chdir(TESTDIR)
-    dirpath = os.path.join(TESTDIR,'search','noenter')
+    dirpath = os.path.join(TESTDIR,'grep','noenter')
     cleanmkdir(dirpath)
     os.chdir(dirpath + '/..')
     
@@ -293,27 +293,27 @@ def test_search_export():
   
     ## Searches
     
-    call('search -o out MyFiLe')
+    call('grep -o out MyFiLe')
     with open('out') as file:
         res = set(f.strip() for f in file.read().splitlines() if f.strip())
     assert {'./noenter/file3.txt', './file1.txt', './file4.exc', './file2.txt'} == res
 
-    call('search -o out MyFiLe --match-expr-case')
+    call('grep -o out MyFiLe --match-expr-case')
     with open('out') as file:
         res = set(f.strip() for f in file.read().splitlines() if f.strip())
     assert {'./file2.txt'} == res
     
-    call('search -o out MyFiLe --exclude "*.exc" --exclude noEnter')
+    call('grep -o out MyFiLe --exclude "*.exc" --exclude noEnter')
     with open('out') as file:
         res = set(f.strip() for f in file.read().splitlines() if f.strip())
     assert {'./file1.txt','./file2.txt'} == res
 
-    call('search -o out MyFiLe --exclude "*.exc" --exclude noEnter --match-exclude-case')
+    call('grep -o out MyFiLe --exclude "*.exc" --exclude noEnter --match-exclude-case')
     with open('out') as file:
         res = set(f.strip() for f in file.read().splitlines() if f.strip())
     assert {'./noenter/file3.txt','./file1.txt','./file2.txt'} == res
     
-    call('search -o out MyFiLe YouRFile')
+    call('grep -o out MyFiLe YouRFile')
     with open('out') as file:
         res = set(f.strip() for f in file.read().splitlines() if f.strip())
     assert {'./noenter/file3.txt', './file1.txt', './file4.exc', './file2.txt','./file5.txt'} == res
@@ -349,21 +349,38 @@ def test_search_export():
         res = {k:set(v) for k,v in res.items()}
     assert {'tag1': {'./noenter/file3.txt','./file1.txt'}} == res   
     
+    ## Fancy Queries
+    call('list-tags -o out "tag1 or tag2"')
+    with open('out') as file:
+        res = yaml.load(file)
+        # Convert to dict of sets for ordering
+        res = {k:set(v) for k,v in res.items()}
+    assert {'tag1 or tag2': {'./noenter/file3.txt', './file1.txt', './file4.exc'}} == res
+    
+    call('list-tags -o out "tag1 and not tag2"')
+    with open('out') as file:
+        res = yaml.load(file)
+        # Convert to dict of sets for ordering
+        res = {k:set(v) for k,v in res.items()}
+    assert {'tag1 and not tag2': {'./noenter/file3.txt', './file4.exc'}} == res
+    
     ## Link Excludes
     # Add this after the previous
     with open('file6.txt','wt') as file:
         file.write('FILE 6')
     os.symlink('file6.txt','link.txt')
     
-    call('add --link both  link.txt "this is a link"')
+    call('add --link both link.txt "this is a link"')
     call('tag --link both link.txt -t link')
+    call('tag file6.txt -t tag1')
+    call('tag file1.txt -t no_link')
     
-    call('search -o out link')
+    call('grep -o out link')
     with open('out') as file:
         res = set(f.strip() for f in file.read().splitlines() if f.strip())
     assert {'./link.txt', './file6.txt'} == res
     
-    call('search -o out link --exclude-links')
+    call('grep -o out link --exclude-links')
     with open('out') as file:
         res = set(f.strip() for f in file.read().splitlines() if f.strip())
     assert {'./file6.txt'} == res
@@ -381,6 +398,14 @@ def test_search_export():
         # Convert to dict of sets for ordering
         res = {k:set(v) for k,v in res.items()}
     assert {'link': {'./file6.txt'}} == res
+
+    # One more complex query
+    call('list-tags -o out "(tag1 or link) and not no_link"')
+    with open('out') as file:
+        res = yaml.load(file)
+        # Convert to dict of sets for ordering
+        res = {k:set(v) for k,v in res.items()}
+    assert {'(tag1 or link) and not no_link': {'./noenter/file3.txt', './link.txt', './file4.exc', './file6.txt'}} == res
     
     ## Export
     call('export -o out')
@@ -477,9 +502,9 @@ def test_nohash():
     
     os.chdir(TESTDIR)
 if __name__ == '__main__': 
-    test_nohash()
+    test_grep_export()
     sys.exit()
-    test_search_export()
+    test_nohash()
     test_main_note()
     test_repairs('orphaned')
     test_repairs('metadata')

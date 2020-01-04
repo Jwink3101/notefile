@@ -4,7 +4,7 @@
 Write notesfiles to accompany main files
 """
 from __future__ import division, print_function, unicode_literals
-__version__ = '20200103.1'
+__version__ = '20200103.2'
 __author__ = 'Justin Winokur'
 
 import sys
@@ -284,10 +284,17 @@ def modify_tags(filename,tags,remove=False,link='both',hashfile=True):
     if data != data0:
         write_data(filename,data,link=link,hashfile=hashfile)
 
-def echo(filename,tags=False,stream=sys.stdout):
+def echo(filename,tags=False,stream=sys.stdout,full=False):
     """
     Echo the notes or tags for a given file
     """
+    
+    if full:
+        _,notefile = get_filenames(filename)
+        with open(notefile,'rt') as F:
+            print(F.read(),file=stream)
+        return
+    
     _,data = read_data(filename)
     
     if tags:
@@ -505,7 +512,7 @@ def repair(path,repair_type='both',dry_run=False,force=False,link='both',
             shutil.move(orphaned,notesdest)
 ##### /repairs
 
-def search(path,expr,expr_matchcase=False,
+def grep(path,expr,expr_matchcase=False,
            excludes=None,matchcase=False,
            exclude_links=False,
            stream=sys.stdout):
@@ -531,12 +538,25 @@ def list_tags(path,tags,
     tags = [t.lower() for t in tags]
     
     notes = find_notes(path,excludes=excludes,matchcase=matchcase,exclude_links=exclude_links)
+    
     tagout = defaultdict(list)
-    for note in notes:
-        filename,data = read_data(note)
-        for tag in data['tags']:
-            if tag.lower() in tags or len(tags) == 0:
-                tagout[tag].append(filename)
+    
+    # Decide if this needs to be a query based on whether or not any tag has a space
+    if any(' ' in tag.strip() for tag in tags):
+        # Queries
+        query = ' or '.join(tags)
+        for note in notes:
+            filename,data = read_data(note)
+            dd = defaultdict(lambda: False,{tag.lower():True for tag in data['tags']})
+            if eval(query,dd):
+                tagout[query].append(filename)
+    else:
+        tags = set(tags)                
+        for note in notes:
+            filename,data = read_data(note)
+            for tag in data['tags']:
+                if tag.lower() in tags or len(tags) == 0:
+                    tagout[tag.lower()].append(filename)
 
     yaml.dump(dict(tagout),stream)
 
@@ -584,6 +604,10 @@ Notes:
     * If there exists *different* notefiles for a symlink and its source, 
       the notefile may be overwritten if `--link` is not set properly. 
       Use caution!
+      
+    * Tags should not be Python built-ins (e.g. "and", "or", "not") since
+      the queries will not work. They should be valid Python variables names
+      (i.e. should not contain spaces or characters like a "-")
     
 """
     
@@ -630,7 +654,7 @@ Notes:
     parsers['repair'].add_argument('path',nargs='?',default='.',
         help=("['.'] Specify the path to repair. If PATH specific file, will only "
               'repair that file. If PATH is a directory, will recursivly repair all items. '
-              'Will only search in or below the *current* directory for orphaned files.'))
+              'Will only grep in or below the *current* directory for orphaned files.'))
     parsers['repair'].add_argument('-d','--dry-run',action='store_true',
         help='Do not make any changes')
     parsers['repair'].add_argument('-t','--type',choices=['both','metadata','orphaned'],
@@ -644,20 +668,24 @@ Notes:
     parsers['echo'].add_argument('file',help='Specify file to echo')
     parsers['echo'].add_argument('-t','--tags',action='store_true',
         help='Print tags rather than notes') 
+    parsers['echo'].add_argument('-f','--full',action='store_true',
+        help='Prints the entire notefile') 
     
-    parsers['search'] = subpar.add_parser('search',help="Search notes for a given string")
-    parsers['search'].add_argument('expr',nargs='+',
+    
+    parsers['grep'] = subpar.add_parser('grep',help="Search notes for a given string")
+    parsers['grep'].add_argument('expr',nargs='+',
         help='Search expression. Follows python regex patterns. Specify as "" to list all files with notes')
-    parsers['search'].add_argument('--match-expr-case',action='store_true',dest='match_expr_case',
+    parsers['grep'].add_argument('--match-expr-case',action='store_true',dest='match_expr_case',
         help='Match case on expr')
-    parsers['search'].add_argument('-p','--path',default='.',help='[%(default)s] Specify path')
+    parsers['grep'].add_argument('-p','--path',default='.',help='[%(default)s] Specify path')
     
     parsers['list_tags'] = subpar.add_parser('list-tags',help="List all files with the specific tag(s) or all tags. Prints in YAML format")
     parsers['list_tags'].add_argument('tags',nargs='*',
-        help='Specify tag(s) to list. If empty, lists them all')
+        help=('Specify tag(s) to list. If empty, lists them all. If multiple, it is an "or" search. '
+              'Alternativly, specify a quoted query like "(tag1 or tag2) and not tag3"'))
     parsers['list_tags'].add_argument('-p','--path',default='.',help='[%(default)s] Specify path')
 
-    parsers['export'] = subpar.add_parser('export',help="Export all notesfiles")
+    parsers['export'] = subpar.add_parser('export',help="Export all notesfiles to YAML")
     parsers['export'].add_argument('-p','--path',default='.',help='[%(default)s] Specify path')
 
     
@@ -681,7 +709,7 @@ Notes:
 
 
     # Add exclude options:
-    for name in ['repair','search','list_tags','export']:
+    for name in ['repair','grep','list_tags','export']:
         parsers[name].add_argument('--exclude',action='append',default=[],
             help=('Specify a glob pattern to exclude when looking for notes. '
                   "Directories are also matched with a trailing '/'"))
@@ -689,11 +717,11 @@ Notes:
             dest='match_case',help='Match case on exclude patterns')
 
     # add outfiles
-    for name in ['list_tags','echo','search','export']:
+    for name in ['list_tags','echo','grep','export']:
         parsers[name].add_argument('-o','--out-file',help='Specify file rather than stdout')
 
     # exclude links
-    for name in ['list_tags','search','export']:
+    for name in ['list_tags','grep','export']:
         parsers[name].add_argument('--exclude-links',action='store_true',
             help='Do not include symlinked notefiles')
 
@@ -781,14 +809,14 @@ def _handoff(args):
     
     if args.command == 'echo':
         stream = sys.stdout if args.out_file is None else open(args.out_file,'wt') 
-        echo(args.file,tags=args.tags,stream=stream)
+        echo(args.file,tags=args.tags,stream=stream,full=args.full)
         if args.out_file is not None:
             stream.close()
         
-    if args.command == 'search':
+    if args.command == 'grep':
         stream = sys.stdout if args.out_file is None else open(args.out_file,'wt') 
 
-        search(args.path,'|'.join(args.expr),
+        grep(args.path,'|'.join(args.expr),
                expr_matchcase=args.match_expr_case,
                excludes=args.exclude,matchcase=args.match_case,
                exclude_links=args.exclude_links,
