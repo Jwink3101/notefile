@@ -4,7 +4,7 @@
 Write notesfiles to accompany main files
 """
 from __future__ import division, print_function, unicode_literals
-__version__ = '20200103.2'
+__version__ = '20200104.0'
 __author__ = 'Justin Winokur'
 
 import sys
@@ -131,7 +131,7 @@ def read_data(filename,link='both'):
     if not os.path.exists(notesfile):
         debug('{} does not exist. New dict'.format(notesfile))
         stat = os.stat(filename)
-        data = {'filename':filename,
+        data = {'filename': os.path.basename(filename),
                 'filesize': stat.st_size,
                 'sha256':NOHASH,
                 'mtime':stat.st_mtime}
