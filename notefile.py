@@ -4,7 +4,7 @@
 Write notesfiles to accompany main files
 """
 from __future__ import division, print_function, unicode_literals
-__version__ = '20200104.0'
+__version__ = '20200105.0'
 __author__ = 'Justin Winokur'
 
 import sys
@@ -40,16 +40,22 @@ try:
 except ImportError:
     pass # This is only done when setting up
 
-def pssdict(mydict,copy=True):
-    """Recursivly convert strings with '\n' to PreservedScalarString"""
-    if copy:
-        mydict = mydict.copy()
-    for key,val in mydict.items():
-        if isinstance(val,dict):
-            mydict[key] = pssdict(val,copy=copy)
-        elif isinstance(val,(str,unicode)) and '\n' in val:
-            mydict[key] = PSS(val)
-    return mydict
+def pss(item):
+    """
+    Convert strings with '\n' to PreservedScalarString
+    and recurse into dicts and lists
+    """
+    if isinstance(item,list): # Is actually a list
+        return [pss(i) for i in item]
+    elif isinstance(item,dict):
+        item = item.copy()
+        for key,val in item.items():
+            item[key] = pss(val)
+        return item
+    elif isinstance(item,(str,unicode)) and '\n' in item:
+        return PSS(item)
+    else:
+        return item
 
 #### /Set up YAML
 
@@ -163,7 +169,7 @@ def write_data(filename,data,link='both',hashfile=True):
         raise ValueError("'link' must be in {'both','symlink','source'}")
     filename,notesfile = get_filenames(filename)
 
-    data = pssdict(data,copy=True)
+    data = pss(data) # Will recurse into lists and dicts too
     
     if hashfile and data['sha256'] == NOHASH:
         data['sha256'] = sha256(filename)
@@ -576,7 +582,7 @@ def export(path,
     
     for note in notes:
         filename,data = read_data(note)
-        res['notes'][filename] = pssdict(data)
+        res['notes'][filename] = pss(data)
     
     try:
         res = ruamel.yaml.comments.CommentedMap(res)
