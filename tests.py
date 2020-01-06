@@ -158,6 +158,31 @@ def test_repairs(repair_type):
 
     os.chdir(TESTDIR)
 
+def test_repairs_searchpath():
+    os.chdir(TESTDIR)
+    dirpath = os.path.join(TESTDIR,'repairs-search','deeper')
+    cleanmkdir(dirpath)
+    os.chdir(dirpath)
+    
+    with open('file.txt','wt') as file:
+        file.write('New File')
+    
+    call('tag file.txt -t new')
+    
+    shutil.move('file.txt','../filemoved.txt')
+    
+    # Should not work
+    call('repair')
+    assert os.path.exists('file.txt.notes.yaml')
+
+    # Should work
+    call('repair --search-path ../')
+    assert not os.path.exists('file.txt.notes.yaml')
+    assert os.path.exists('../filemoved.txt.notes.yaml')
+    
+    
+    os.chdir(TESTDIR)
+
 @pytest.mark.parametrize("link", ['both','symlink','source'])
 def test_links(link):
     """
@@ -502,18 +527,18 @@ def test_nohash():
     
     os.chdir(TESTDIR)
 if __name__ == '__main__': 
-    test_grep_export()
-    sys.exit()
-    test_nohash()
     test_main_note()
-    test_repairs('orphaned')
-    test_repairs('metadata')
-    test_repairs('both')
     test_odd_filenames()
-    test_links('symlink')
-    test_links('source')
-    test_links('both')
+    test_repairs(both)
+    test_repairs(orphaned)
+    test_repairs(metadata)
+    test_repairs_searchpath()
+    test_links(both)
+    test_links(symlink)
+    test_links(source)
     test_excludes_repair()
+    test_grep_export()
+    test_nohash()
 
 ## Manual Testing
 # Not everything gets tested automatically but it should be easy enough to test

@@ -4,7 +4,7 @@
 Write notesfiles to accompany main files
 """
 from __future__ import division, print_function, unicode_literals
-__version__ = '20200105.0'
+__version__ = '20200106.0'
 __author__ = 'Justin Winokur'
 
 import sys
@@ -290,9 +290,9 @@ def modify_tags(filename,tags,remove=False,link='both',hashfile=True):
     if data != data0:
         write_data(filename,data,link=link,hashfile=hashfile)
 
-def echo(filename,tags=False,stream=sys.stdout,full=False):
+def cat(filename,tags=False,stream=sys.stdout,full=False):
     """
-    Echo the notes or tags for a given file
+    cat the notes or tags for a given file
     """
     
     if full:
@@ -424,7 +424,7 @@ def repair_metadata(filename,force=False,dry_run=False,link='both',hashfile=True
     return False
 
 def repair(path,repair_type='both',dry_run=False,force=False,link='both',
-           excludes=None,matchcase=False,hashfile=True):
+           excludes=None,matchcase=False,hashfile=True,search_path='.'):
     """
     Repair notes:
     
@@ -461,6 +461,9 @@ def repair(path,repair_type='both',dry_run=False,force=False,link='both',
     
     hashfile [True]
         Whether or not to ever compute the hash. Cannot repair orhaned if False
+    
+    search_path ['.']
+        Where to search for missiung files
     """
     if os.path.isdir(path):
         filenames = find_notes(path,_return_both=True,
@@ -495,7 +498,7 @@ def repair(path,repair_type='both',dry_run=False,force=False,link='both',
             
         print("\norphaned basefile for '{}'".format(orphaned))
         
-        candidates = find_by_size_hash('.',data['filesize'],data['sha256'],
+        candidates = find_by_size_hash(search_path,data['filesize'],data['sha256'],
                                        excludes=excludes,matchcase=matchcase)
         if len(candidates) == 0:
             print('No candidates found. Try running from a higher directory')
@@ -669,13 +672,18 @@ Notes:
               "metadata for the base file (and only checks the hash if other metadata "
               "is wrong or if `--force-refresh`). Orphaned repairs look (in the "
               "current directory and below) for an orphaned basefile."))
+    parsers['repair'].add_argument('--search-path',default='.',metavar='PATH',
+        help=('[%(default)s] Specify the path to search for the basefile for '
+              'orphaned notefiles. WARNING: Will recurse the _entire_ path '
+              'which may be very slow for large directories'))
+    
     ## Queries
-    parsers['echo'] = subpar.add_parser('echo',help="Echo the notes")
-    parsers['echo'].add_argument('file',help='Specify file to echo')
-    parsers['echo'].add_argument('-t','--tags',action='store_true',
+    parsers['cat'] = subpar.add_parser('cat',help="Print the notes")
+    parsers['cat'].add_argument('file',help='Specify file to cat')
+    parsers['cat'].add_argument('-t','--tags',action='store_true',
         help='Print tags rather than notes') 
-    parsers['echo'].add_argument('-f','--full',action='store_true',
-        help='Prints the entire notefile') 
+    parsers['cat'].add_argument('-f','--full',action='store_true',
+        help='Prints the entire YAML notefile') 
     
     
     parsers['grep'] = subpar.add_parser('grep',help="Search notes for a given string")
@@ -723,7 +731,7 @@ Notes:
             dest='match_case',help='Match case on exclude patterns')
 
     # add outfiles
-    for name in ['list_tags','echo','grep','export']:
+    for name in ['list_tags','cat','grep','export']:
         parsers[name].add_argument('-o','--out-file',help='Specify file rather than stdout')
 
     # exclude links
@@ -808,14 +816,15 @@ def _handoff(args):
                link=args.link,
                excludes=args.exclude,
                matchcase=args.match_case,
-               hashfile=args.hashfile
+               hashfile=args.hashfile,
+               search_path=args.search_path,
                )
 
     ## Query Actions
     
-    if args.command == 'echo':
+    if args.command == 'cat':
         stream = sys.stdout if args.out_file is None else open(args.out_file,'wt') 
-        echo(args.file,tags=args.tags,stream=stream,full=args.full)
+        cat(args.file,tags=args.tags,stream=stream,full=args.full)
         if args.out_file is not None:
             stream.close()
         

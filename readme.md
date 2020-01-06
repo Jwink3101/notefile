@@ -59,15 +59,16 @@ which will launch `$EDITOR` (or try other global variables) to edit the notes. Y
 to add tags.
 
 
-## Repairable Issues:
+## Repairs
 
-* Mismatched Hash:
-    * This means it is still `filename.ext` and `filename.ext.note.txt` but the hash is wrong. 
-        * Check size first. If size is wrong, then hash has to be wrong. Otherwise, hash it
-* Missing filename:
-    * `filename.ext.note.txt` exists but `filename.ext` is missing. 
-    * Look for any file that is the same size then same hash --> repair
-    * If it can't repair, look for same name
+It is possible for the sidecar notefiles to get out of sync with the basefile. The two possible issues are:
+
+* **metadata**: The basefile has been modified thereby changing its size, sha256, and mtime
+* **orphaned**: The basefile has been renamed thereby orphaning the notefile
+
+The `repair` function can repair either (but *not* both) types of issues. To repair metadata, the notefile is simply updated with the new file.
+
+To repair an orphaned notefile, it will search in and below the current directory for the file. It will first compare file sizes and then compare sha256 values. If more than one possible file is the original, it will *not* repair it and instead provide a warning.
 
 ## File Hashes
 
@@ -81,7 +82,7 @@ When repairing an orphaned notefile, candidate files are first compared by files
 
 ### Scripts
 
-Includes are some [scripts](scripts/readme.md) that may prove useful. As noted before, the goal of `notefile` is to be capable but it doesn't have to do everything! 
+Includes are some [scripts](scripts/) that may prove useful. As noted before, the goal of `notefile` is to be capable but it doesn't have to do everything! 
 
 In those scripts (and the tests), actions are often performed by calling the `cli()`. While less efficient, `notefile` is *really* designed with CLI in mind so some of the other functions are less robust.
 
@@ -101,5 +102,6 @@ If using it on its own, you can tell git to only track notes files with the foll
 !.gitignore
 ```
 
+Alternatively, the `export` command can be used.
 
 
