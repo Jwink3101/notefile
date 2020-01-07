@@ -316,7 +316,7 @@ def test_grep_export():
     
     call('add file5.txt "yourfile 5"')
   
-    ## Searches
+    ## Greps
     
     call('grep -o out MyFiLe')
     with open('out') as file:
@@ -342,6 +342,21 @@ def test_grep_export():
     with open('out') as file:
         res = set(f.strip() for f in file.read().splitlines() if f.strip())
     assert {'./noenter/file3.txt', './file1.txt', './file4.exc', './file2.txt','./file5.txt'} == res
+    
+    # Test grep with full
+    _,data = notefile.read_data('file1.txt')
+    data['new_field'] = "this is a special field"
+    notefile.write_data('file1.txt',data)
+
+    call('grep special -o out')
+    with open('out') as file:
+        res = set(f.strip() for f in file.read().splitlines() if f.strip())
+    assert len(res) == 0
+    
+    call('grep special -f -o out')
+    with open('out') as file:
+        res = set(f.strip() for f in file.read().splitlines() if f.strip())
+    assert res == {'./file1.txt'}
     
     ### Tags
     

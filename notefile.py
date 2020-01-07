@@ -4,7 +4,7 @@
 Write notesfiles to accompany main files
 """
 from __future__ import division, print_function, unicode_literals
-__version__ = '20200106.0'
+__version__ = '20200107.0'
 __author__ = 'Justin Winokur'
 
 import sys
@@ -116,7 +116,7 @@ def sha256(filepath,blocksize=2**20):
             buf = afile.read(blocksize)
     return hasher.hexdigest()
 
-def read_data(filename,link='both'):
+def read_data(filename,link='both',notetxt=False):
     """
     Read the data for a given filename and return 
     filename,data (where filename has been cleaned with `get_filenames`.
@@ -124,6 +124,9 @@ def read_data(filename,link='both'):
     link ['both']
         Where to read the data. For 'both' or 'symlink', will read the linked
         note setting. For 'source', will find the source file and read that note
+    
+    notetxt [False]
+        If True, returns the text of the notefile and not the dict
     
     """
     if not link in {'both','symlink','source'}:
@@ -136,6 +139,8 @@ def read_data(filename,link='both'):
     
     if not os.path.exists(notesfile):
         debug('{} does not exist. New dict'.format(notesfile))
+        if notetxt:
+            return filename,''
         stat = os.stat(filename)
         data = {'filename': os.path.basename(filename),
                 'filesize': stat.st_size,
@@ -144,6 +149,8 @@ def read_data(filename,link='both'):
     else:
         debug('Loading {}'.format(notesfile))
         with open(notesfile,'rt') as file:
+            if notetxt:
+                return filename,file.read()
             data  = yaml.load(file)
     if 'tags' not in data:
         data['tags'] = []
@@ -331,8 +338,7 @@ def find_by_size_hash(path,size,sha,excludes=None,matchcase=False):
     return possible
 
 def find_notes(path,excludes=None,matchcase=False,
-               exclude_links=False,
-               _return_orphaned=False,_return_both=False):
+               exclude_links=False,include_orphaned=False):
     """
     find notes recurisvly starting in `path`
     
@@ -347,15 +353,19 @@ def find_notes(path,excludes=None,matchcase=False,
         Whether or not to match the case of the exclude file
     
     """
-    notes = set()
-    orphaned = set()
     for root, dirs, files in os.walk(path):        
         exclude_in_place(files,excludes,matchcase=matchcase,isdir=False)
         exclude_in_place(dirs,excludes,matchcase=matchcase,isdir=True)
 
+        files.sort(key=lambda s:s.lower())
+        dirs.sort(key=lambda s:s.lower())
+        
         notefiles = set(file for file in files if file.endswith(NOTESTXT))
 
         for file in files:
+            if not file.lower().endswith(NOTESTXT):
+                continue
+                
             file,notefile = get_filenames(file)
 
             if exclude_links and os.path.islink(os.path.join(root,notefile)):
@@ -364,15 +374,11 @@ def find_notes(path,excludes=None,matchcase=False,
             if not notefile in notefiles:
                 continue # Not a note or doesn't have a note
             
-            if file not in files:
-                orphaned.add(os.path.join(root,notefile))
+            if file not in files: # Orphaned
+                if include_orphaned:
+                    yield os.path.join(root,notefile)
             else:
-                notes.add(os.path.join(root,notefile))
-    if _return_both:
-        return sorted(orphaned.union(notes))
-    if _return_orphaned:
-        return sorted(orphaned)
-    return sorted(notes)
+                yield os.path.join(root,notefile)
 
 
 def exclude_in_place(mylist,excludes,isdir=False,matchcase=False):
@@ -466,7 +472,7 @@ def repair(path,repair_type='both',dry_run=False,force=False,link='both',
         Where to search for missiung files
     """
     if os.path.isdir(path):
-        filenames = find_notes(path,_return_both=True,
+        filenames = find_notes(path,include_orphaned=True,
                                excludes=excludes,matchcase=matchcase)
     else:
         filenames = [path]
@@ -523,7 +529,8 @@ def repair(path,repair_type='both',dry_run=False,force=False,link='both',
 
 def grep(path,expr,expr_matchcase=False,
            excludes=None,matchcase=False,
-           exclude_links=False,
+           exclude_links=False,include_orphaned=False,
+           full_note=False,
            stream=sys.stdout):
     """
     Search notes for expr
@@ -532,21 +539,35 @@ def grep(path,expr,expr_matchcase=False,
     if not expr_matchcase:
         flags = flags | re.IGNORECASE
     requery = re.compile(expr,flags=flags)
-    notes = find_notes(path,excludes=excludes,matchcase=matchcase,exclude_links=exclude_links)
+    notes = find_notes(path,
+                       excludes=excludes,
+                       matchcase=matchcase,
+                       exclude_links=exclude_links,
+                       include_orphaned=include_orphaned)
     for note in notes:
-        filename,data = read_data(note)
-        if len(requery.findall(data['notes'])):
+        if full_note:
+            filename,notetxt = read_data(note,notetxt=True)
+            query = requery.findall(notetxt)
+        else:
+            filename,data = read_data(note)
+            query = requery.findall(data['notes'])
+        
+        if len(query) > 0:
             print(filename,file=stream)
 
 
 def list_tags(path,tags,
               excludes=None,matchcase=False,
               exclude_links=False,
-              stream=sys.stdout):
+              stream=sys.stdout,include_orphaned=False):
    
     tags = [t.lower() for t in tags]
     
-    notes = find_notes(path,excludes=excludes,matchcase=matchcase,exclude_links=exclude_links)
+    notes = find_notes(path,
+                       excludes=excludes,
+                       matchcase=matchcase,
+                       exclude_links=exclude_links,
+                       include_orphaned=include_orphaned)
     
     tagout = defaultdict(list)
     
@@ -573,9 +594,14 @@ def export(path,
            excludes=None,
            matchcase=False,
            exclude_links=False,
+           include_orphaned=False,
            stream=sys.stdout):
        
-    notes = find_notes(path,excludes=excludes,matchcase=matchcase,exclude_links=exclude_links)
+    notes = find_notes(path,
+                       excludes=excludes,
+                       matchcase=matchcase,
+                       exclude_links=exclude_links,
+                       include_orphaned=include_orphaned)
     
     res = {}
     res['description'] = 'notefile export'
@@ -692,6 +718,8 @@ Notes:
     parsers['grep'].add_argument('--match-expr-case',action='store_true',dest='match_expr_case',
         help='Match case on expr')
     parsers['grep'].add_argument('-p','--path',default='.',help='[%(default)s] Specify path')
+    parsers['grep'].add_argument('-f','--full',action='store_true',
+        help='Search all fields of the note rather than just the "notes" field')
     
     parsers['list_tags'] = subpar.add_parser('list-tags',help="List all files with the specific tag(s) or all tags. Prints in YAML format")
     parsers['list_tags'].add_argument('tags',nargs='*',
@@ -835,6 +863,7 @@ def _handoff(args):
                expr_matchcase=args.match_expr_case,
                excludes=args.exclude,matchcase=args.match_case,
                exclude_links=args.exclude_links,
+               full_note=args.full,
                stream=stream)
         if args.out_file is not None:
             stream.close()
