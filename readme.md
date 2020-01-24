@@ -1,7 +1,5 @@
 # Notefile
 
-(Beta Software)
-
 notefile is a tool to quickly and easily manage metadata files ("notefiles") along with the file itself as associated YAML files.
 
 It is not a perfect solution but it does address many main concerns and issues.

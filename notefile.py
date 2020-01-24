@@ -4,7 +4,7 @@
 Write notesfiles to accompany main files
 """
 from __future__ import division, print_function, unicode_literals
-__version__ = '20200107.0'
+__version__ = '20200124.0'
 __author__ = 'Justin Winokur'
 
 import sys
@@ -338,6 +338,7 @@ def find_by_size_hash(path,size,sha,excludes=None,matchcase=False):
     return possible
 
 def find_notes(path,excludes=None,matchcase=False,
+               maxdepth=None,
                exclude_links=False,include_orphaned=False):
     """
     find notes recurisvly starting in `path`
@@ -352,10 +353,25 @@ def find_notes(path,excludes=None,matchcase=False,
     matchcase [False]
         Whether or not to match the case of the exclude file
     
+    maxdepth [None]
+        Specify a maximum depth. The current directory is 0
+    
+    exclude_links [ False ] 
+        If True, will *not* return symlinked notes
+    
+    include_orphaned [ False ]
+        If True, will INCLUDE orphaned notes. Otherwise, they are excluded    
+    
     """
     for root, dirs, files in os.walk(path):        
         exclude_in_place(files,excludes,matchcase=matchcase,isdir=False)
         exclude_in_place(dirs,excludes,matchcase=matchcase,isdir=True)
+
+        rel = os.path.relpath(root,path)
+        depth = rel.count('/') + 1 if rel != '.' else 0
+        if maxdepth is not None and depth > maxdepth:
+            del dirs[:] # Do not go deeper
+            continue
 
         files.sort(key=lambda s:s.lower())
         dirs.sort(key=lambda s:s.lower())
@@ -430,7 +446,8 @@ def repair_metadata(filename,force=False,dry_run=False,link='both',hashfile=True
     return False
 
 def repair(path,repair_type='both',dry_run=False,force=False,link='both',
-           excludes=None,matchcase=False,hashfile=True,search_path='.'):
+           excludes=None,matchcase=False,maxdepth=None,
+           hashfile=True,search_path='.'):
     """
     Repair notes:
     
@@ -464,7 +481,11 @@ def repair(path,repair_type='both',dry_run=False,force=False,link='both',
     
     matchcase [False]
         Whether or not to match the case of the exclude file
-    
+
+    maxdepth [None]
+        Specify a maximum depth. The current directory is 0. Only applies if
+        path is a dir.
+
     hashfile [True]
         Whether or not to ever compute the hash. Cannot repair orhaned if False
     
@@ -472,7 +493,7 @@ def repair(path,repair_type='both',dry_run=False,force=False,link='both',
         Where to search for missiung files
     """
     if os.path.isdir(path):
-        filenames = find_notes(path,include_orphaned=True,
+        filenames = find_notes(path,include_orphaned=True,maxdepth=maxdepth,
                                excludes=excludes,matchcase=matchcase)
     else:
         filenames = [path]
@@ -529,6 +550,7 @@ def repair(path,repair_type='both',dry_run=False,force=False,link='both',
 
 def grep(path,expr,expr_matchcase=False,
            excludes=None,matchcase=False,
+           maxdepth=None,
            exclude_links=False,include_orphaned=False,
            full_note=False,
            stream=sys.stdout):
@@ -542,6 +564,7 @@ def grep(path,expr,expr_matchcase=False,
     notes = find_notes(path,
                        excludes=excludes,
                        matchcase=matchcase,
+                       maxdepth=maxdepth,
                        exclude_links=exclude_links,
                        include_orphaned=include_orphaned)
     for note in notes:
@@ -558,6 +581,7 @@ def grep(path,expr,expr_matchcase=False,
 
 def list_tags(path,tags,
               excludes=None,matchcase=False,
+              maxdepth=None,
               exclude_links=False,
               stream=sys.stdout,include_orphaned=False):
    
@@ -566,6 +590,7 @@ def list_tags(path,tags,
     notes = find_notes(path,
                        excludes=excludes,
                        matchcase=matchcase,
+                       maxdepth=maxdepth,
                        exclude_links=exclude_links,
                        include_orphaned=include_orphaned)
     
@@ -593,6 +618,7 @@ def list_tags(path,tags,
 def export(path,
            excludes=None,
            matchcase=False,
+           maxdepth=None,
            exclude_links=False,
            include_orphaned=False,
            stream=sys.stdout):
@@ -600,6 +626,7 @@ def export(path,
     notes = find_notes(path,
                        excludes=excludes,
                        matchcase=matchcase,
+                       maxdepth=maxdepth,
                        exclude_links=exclude_links,
                        include_orphaned=include_orphaned)
     
@@ -757,10 +784,14 @@ Notes:
                   "Directories are also matched with a trailing '/'"))
         parsers[name].add_argument('--match-exclude-case',action='store_true',
             dest='match_case',help='Match case on exclude patterns')
+        parsers[name].add_argument('--max-depth',
+            type=int,metavar='N',default=None,dest='maxdepth',
+            help='Specify the maximum depth to search for notefiles. The current directory is 0')
+        
 
     # add outfiles
     for name in ['list_tags','cat','grep','export']:
-        parsers[name].add_argument('-o','--out-file',help='Specify file rather than stdout')
+        parsers[name].add_argument('-o','--out-file',help='Specify file rather than stdout',metavar='FILE')
 
     # exclude links
     for name in ['list_tags','grep','export']:
@@ -844,6 +875,7 @@ def _handoff(args):
                link=args.link,
                excludes=args.exclude,
                matchcase=args.match_case,
+               maxdepth=args.maxdepth,
                hashfile=args.hashfile,
                search_path=args.search_path,
                )
@@ -864,6 +896,7 @@ def _handoff(args):
                excludes=args.exclude,matchcase=args.match_case,
                exclude_links=args.exclude_links,
                full_note=args.full,
+               maxdepth=args.maxdepth,
                stream=stream)
         if args.out_file is not None:
             stream.close()
@@ -874,6 +907,7 @@ def _handoff(args):
         list_tags(args.path,args.tags,
               excludes=args.exclude,matchcase=args.match_case,
               exclude_links=args.exclude_links,
+              maxdepth=args.maxdepth,
               stream=stream)
         
         if args.out_file is not None:
@@ -885,6 +919,7 @@ def _handoff(args):
         export(args.path,
               excludes=args.exclude,
               matchcase=args.match_case,
+              maxdepth=args.maxdepth,
               exclude_links=args.exclude_links,
               stream=stream)
         

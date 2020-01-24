@@ -233,7 +233,7 @@ def test_links(link):
 
 def test_excludes_repair():
     """
-    Test exclusions in repair, etx
+    Test exclusions in repair, etc
     """
     os.chdir(TESTDIR)
     dirpath = os.path.join(TESTDIR,'excl_repair','noenter')
@@ -275,6 +275,78 @@ def test_excludes_repair():
     assert os.path.exists('noenter/file3.txt.notes.yaml')
     assert not os.path.exists('moved_file3.txt.notes.yaml')
     
+    os.chdir(TESTDIR)
+
+def test_maxdepth():
+    """
+    Test the use of the --maxdepth flag
+    in ['repair','grep','list_tags','export']
+    """
+    os.chdir(TESTDIR)
+    dirpath = os.path.join(TESTDIR,'maxdepth')
+    cleanmkdir(dirpath)
+    os.chdir(dirpath)
+    
+    depths = ['', 'A', 'B', 'C', 'D']
+    
+    cleanmkdir('/'.join(depths[1:]))
+    
+    filepaths = []
+    notepaths = []
+    
+    for id,_ in enumerate(depths):
+        p = '/'.join(depths[1:(id+1)])
+        name = 'file' + ''.join(depths[1:(id+1)]) + '.txt'
+        filepath = os.path.join(p,name)
+        with open(filepath,'wt') as file:
+            file.write(filepath)
+        call('add {} "a note on {}"'.format(filepath,name))
+        call('tag {} -t "{}"'.format(filepath,name))
+        
+        # Damage the note
+        notepath = notefile.get_filenames(filepath)[1]
+        a,b = os.path.split(notepath)
+        shutil.move(notepath,os.path.join(a,'BLA' + b))
+        
+        filepaths.append('./' + filepath)
+        notepaths.append(notepath)
+
+    # Do repairs first
+    for depth,_ in enumerate(depths):
+        call('repair --max-depth {}'.format(depth))
+
+        # make sure *only* notepaths[:(depth+1)] exist
+        # and the rest do not!
+        for note in notepaths[:(depth+1)]:
+            assert os.path.exists(note)
+        for note in notepaths[(depth+1):]:
+            assert not os.path.exists(note)
+    
+    # The rest
+    for depth,_ in enumerate(depths):
+        gold = set(filepaths[:(depth+1)])
+    
+        # grep
+        call('grep -o out --max-depth {} -- ""'.format(depth))
+        with open('out') as file:
+            res = set(f.strip() for f in file.read().splitlines() if f.strip())
+        assert res == gold
+
+        # list-tags
+        call('list-tags -o out --max-depth {}'.format(depth))
+        with open('out') as file:
+            _res = yaml.load(file)
+            res = set()
+            for v in _res.values():
+                res.update(v)
+        assert res == gold
+
+        # export
+        call('export -o out --max-depth {}'.format(depth))
+        with open('out') as file:
+            _res = yaml.load(file)
+            res = set(_res['notes'])  
+        assert res == gold
     
     os.chdir(TESTDIR)
 
@@ -538,9 +610,8 @@ def test_nohash():
     call('repair')
     
     
-    
-    
     os.chdir(TESTDIR)
+    
 if __name__ == '__main__': 
     test_main_note()
     test_odd_filenames()
@@ -554,6 +625,7 @@ if __name__ == '__main__':
     test_excludes_repair()
     test_grep_export()
     test_nohash()
+    test_maxdepth()
 
 ## Manual Testing
 # Not everything gets tested automatically but it should be easy enough to test
