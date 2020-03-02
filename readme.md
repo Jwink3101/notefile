@@ -1,8 +1,8 @@
 # Notefile
 
-notefile is a tool to quickly and easily manage metadata files ("notefiles") along with the file itself as associated YAML files.
+notefile is a tool to quickly and easily manage sidecar metadata files ("notefiles") along with the file itself as YAML files.
 
-It is not a perfect solution but it does address many main concerns and issues.
+It is not a perfect solution but it does address many main needs as well as concerns I have with alternative tools.
 
 Notefile is designed to assist in keeping associated notes and to perform the most basic opperations. However, it is not designed to do all possible things. Notes can be modified (in YAML) as needed with other tools including those included here.
 
@@ -32,7 +32,7 @@ Any other data can be added and will be preserved.
 
 Install right from github:
 
-    $ pip install git+https://github.com/Jwink3101/notefile.git
+    $ python -m pip install git+https://github.com/Jwink3101/notefile.git
 
 ### Usage
 

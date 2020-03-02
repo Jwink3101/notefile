@@ -230,7 +230,45 @@ def test_links(link):
 
     os.chdir(TESTDIR)
 
-
+@pytest.mark.parametrize("link", ['both','symlink','source'])
+def test_link_overwrite(link):
+    os.chdir(TESTDIR)
+    dirpath = os.path.join(TESTDIR,'link_overwrite')
+    cleanmkdir(dirpath)
+    os.chdir(dirpath)   
+    
+    with open('file.txt','wt') as file:
+        file.write('Main File')
+    
+    os.symlink('file.txt','link.txt')
+    
+    call('add --link {} file.txt "file note"'.format(link))
+    call('add --link {} link.txt "link note"'.format(link))
+    
+    gold = 'file note\n\nlink note'
+    try:
+        filetxt = notefile.read_data('file.txt',link=link)[1]['notes'].strip()
+    except:
+        filetxt = ''
+    
+    try:
+        linktxt = notefile.read_data('link.txt',link=link)[1]['notes'].strip()
+    except:
+        linktxt = ''
+    
+    # The `test_links` makes sure this all works. *just* test for overwrite
+    if link in ['both','source']: # source will read the source note
+        assert filetxt == linktxt == gold
+    
+    if link == 'source':
+        assert not os.path.exists('link.txt.notes.yaml')
+        
+    if link == 'symlink':
+        assert filetxt == 'file note'
+        assert linktxt == 'link note'
+    
+    os.chdir(TESTDIR)
+    
 def test_excludes_repair():
     """
     Test exclusions in repair, etc
@@ -615,13 +653,16 @@ def test_nohash():
 if __name__ == '__main__': 
     test_main_note()
     test_odd_filenames()
-    test_repairs(both)
-    test_repairs(orphaned)
-    test_repairs(metadata)
+    test_repairs('both')
+    test_repairs('orphaned')
+    test_repairs('metadata')
     test_repairs_searchpath()
-    test_links(both)
-    test_links(symlink)
-    test_links(source)
+    test_links('both')
+    test_links('symlink')
+    test_links('source')
+    test_link_overwrite('both')
+    test_link_overwrite('symlink')
+    test_link_overwrite('source')
     test_excludes_repair()
     test_grep_export()
     test_nohash()

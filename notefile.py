@@ -4,7 +4,7 @@
 Write notesfiles to accompany main files
 """
 from __future__ import division, print_function, unicode_literals
-__version__ = '20200124.0'
+__version__ = '20200302.0'
 __author__ = 'Justin Winokur'
 
 import sys
@@ -133,7 +133,7 @@ def read_data(filename,link='both',notetxt=False):
         raise ValueError("'link' must be in {'both','symlink','source'}")
     filename,notesfile = get_filenames(filename)
     
-    if os.path.islink(filename) and link == 'source':
+    if os.path.islink(filename) and link in ['both','source']:
         destfile = os.readlink(filename)
         _,notesfile = get_filenames(destfile)
     
@@ -696,7 +696,7 @@ Notes:
               "Multiple arguments will be joined. Specify as a *single* '-' to "
               "read from stdin"))
     parsers['add'].add_argument('-r','--replace',action='store_true',
-        help='Replace ratherthan append the new note')
+        help='Replace rather than append the new note')
         
     parsers['edit'] = subpar.add_parser('edit',
         help="Launch $EDITOR to interactivly edit the notes for a file") 
