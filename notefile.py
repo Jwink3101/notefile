@@ -4,7 +4,7 @@
 Write notesfiles to accompany main files
 """
 from __future__ import division, print_function, unicode_literals
-__version__ = '20200302.0'
+__version__ = '20200406.0'
 __author__ = 'Justin Winokur'
 
 import sys
@@ -135,6 +135,8 @@ def read_data(filename,link='both',notetxt=False):
     
     if os.path.islink(filename) and link in ['both','source']:
         destfile = os.readlink(filename)
+        # Make it absolute
+        destfile = os.path.abspath(os.path.join(os.path.dirname(filename),destfile))
         _,notesfile = get_filenames(destfile)
     
     if not os.path.exists(notesfile):
@@ -199,7 +201,12 @@ def write_data(filename,data,link='both',hashfile=True):
         # Write to the source file
         destfile = os.readlink(filename)
         _,destnotesfile = get_filenames(destfile)
-        shutil.move(file.name,destnotesfile)
+        
+        # resolve destnotesfile for writing the file
+        # but keep relative path for notesfiles
+        absdestnotesfile = os.path.abspath(os.path.join(os.path.dirname(filename),destnotesfile))
+        shutil.move(file.name,absdestnotesfile)
+        
         if link == 'both':
             try:
                 os.remove(notesfile)

@@ -232,6 +232,10 @@ def test_links(link):
 
 @pytest.mark.parametrize("link", ['both','symlink','source'])
 def test_link_overwrite(link):
+    """
+    Test for writing notes on links, etc. Also tests for using relative
+    paths
+    """
     os.chdir(TESTDIR)
     dirpath = os.path.join(TESTDIR,'link_overwrite')
     cleanmkdir(dirpath)
@@ -239,11 +243,12 @@ def test_link_overwrite(link):
     
     with open('file.txt','wt') as file:
         file.write('Main File')
+    os.makedirs('sub')
     
-    os.symlink('file.txt','link.txt')
+    os.symlink('../file.txt','sub/link.txt')
     
     call('add --link {} file.txt "file note"'.format(link))
-    call('add --link {} link.txt "link note"'.format(link))
+    call('add --link {} sub/link.txt "link note"'.format(link))
     
     gold = 'file note\n\nlink note'
     try:
@@ -252,7 +257,7 @@ def test_link_overwrite(link):
         filetxt = ''
     
     try:
-        linktxt = notefile.read_data('link.txt',link=link)[1]['notes'].strip()
+        linktxt = notefile.read_data('sub/link.txt',link=link)[1]['notes'].strip()
     except:
         linktxt = ''
     
@@ -261,7 +266,7 @@ def test_link_overwrite(link):
         assert filetxt == linktxt == gold
     
     if link == 'source':
-        assert not os.path.exists('link.txt.notes.yaml')
+        assert not os.path.exists('sub/link.txt.notes.yaml')
         
     if link == 'symlink':
         assert filetxt == 'file note'
