@@ -16,7 +16,7 @@ import hashlib
 
 import notefile # this *should* import the local version even if it is installed
 print('version',notefile.__version__)
-print('path',notefile.__file__)
+print('path',notefile.__file__) # This is just to see that it imported the right now
 notefile.DEBUG = False
 
 import ruamel.yaml
@@ -393,7 +393,7 @@ def test_maxdepth():
     
     os.chdir(TESTDIR)
 
-def test_grep_export():
+def test_grep_and_listtags_and_export():
     """
     Tests greping including for tags
     """
@@ -600,7 +600,39 @@ def test_grep_export():
             './file1.txt'} == res
     
     os.chdir(TESTDIR)
+
+def test_grep_w_multiple_expr():
+    os.chdir(TESTDIR)
+    dirpath = os.path.join(TESTDIR,'multi-grep')
+    cleanmkdir(dirpath)
+    os.chdir(dirpath)
     
+    with open('file1.txt','wt') as file:
+        file.write('FILE 1')
+        
+    with open('file2.txt','wt') as file:
+        file.write('FILE 2')
+    
+    with open('file3.txt','wt') as file:
+        file.write('FILE 3')
+
+
+    call('add file1.txt "match me or you"')
+    call('add file2.txt "match you"')
+    call('add file3.txt "what about me"')
+    
+    # tests
+    call('grep -o out me you')
+    with open('out') as file:
+        res = set(f.strip() for f in file.read().splitlines() if f.strip())
+    assert {'./file1.txt', './file2.txt', './file3.txt'} == res
+
+    call('grep -o out --all me you')
+    with open('out') as file:
+        res = set(f.strip() for f in file.read().splitlines() if f.strip())
+    assert {'./file1.txt'} == res
+    
+    os.chdir(TESTDIR)
 
 def test_nohash():
     os.chdir(TESTDIR)
@@ -669,7 +701,8 @@ if __name__ == '__main__':
     test_link_overwrite('symlink')
     test_link_overwrite('source')
     test_excludes_repair()
-    test_grep_export()
+    test_grep_and_listtags_and_export()
+    test_grep_w_multiple_expr()
     test_nohash()
     test_maxdepth()
 

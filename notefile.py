@@ -4,7 +4,7 @@
 Write notesfiles to accompany main files
 """
 from __future__ import division, print_function, unicode_literals
-__version__ = '20200406.0'
+__version__ = '20200506.0'
 __author__ = 'Justin Winokur'
 
 import sys
@@ -20,6 +20,10 @@ import fnmatch
 import re
 from collections import defaultdict,OrderedDict
 
+# Third-Party
+import ruamel.yaml
+from ruamel.yaml.scalarstring import PreservedScalarString 
+
 if sys.version_info[0] > 2:
     unicode = str
 
@@ -29,23 +33,17 @@ NOHASH = '** not computed **'
 DEBUG = False
 def debug(*args,**kwargs):
     if DEBUG:
-        s = ', '.join('{}'.format(a) for a in args)
-        print('DEBUG: {}'.format(s),**kwargs)
+        print('DEBUG:',*args,**kwargs)
 
 #### Set up YAML
-try:
-    import ruamel.yaml
-    from ruamel.yaml.scalarstring import PreservedScalarString as PSS
-    yaml = ruamel.yaml.YAML()
-except ImportError:
-    pass # This is only done when setting up
+yaml = ruamel.yaml.YAML()
 
 def pss(item):
     """
     Convert strings with '\n' to PreservedScalarString
-    and recurse into dicts and lists
+    and recurse into dicts and lists (and tuples which are converted to lists).
     """
-    if isinstance(item,list): # Is actually a list
+    if isinstance(item,(list,tuple)):
         return [pss(i) for i in item]
     elif isinstance(item,dict):
         item = item.copy()
@@ -53,7 +51,7 @@ def pss(item):
             item[key] = pss(val)
         return item
     elif isinstance(item,(str,unicode)) and '\n' in item:
-        return PSS(item)
+        return PreservedScalarString(item)
     else:
         return item
 
@@ -230,21 +228,14 @@ def interactive_edit(filename,link='both',hashfile=True):
         raise ValueError(('Must specify an editor. Possible enviormental variables: '
                          (', '.join("'{}'".format(e) for e in editor_names))))
 
-    header= "# Add or edit any notes below. This line will be removed\n\n"
     with tempfile.NamedTemporaryFile(delete=False,mode='wt') as file:
-        file.write(header + data.get('notes',''))
+        file.write(data.get('notes',''))
 
     subprocess.check_call([editor,file.name])
 
     with open(file.name,'rt') as f:
         newtxt = f.read()
 
-    newtxt = newtxt.strip().splitlines()
-    
-    if len(newtxt) >0 and newtxt[0].startswith(header[:10]):
-        newtxt.pop(0)
-        
-    newtxt = '\n'.join(newtxt)
     data['notes'] = newtxt.strip()
     write_data(filename,data,link=link,hashfile=hashfile)
 
@@ -499,9 +490,13 @@ def repair(path,repair_type='both',dry_run=False,force=False,link='both',
     search_path ['.']
         Where to search for missiung files
     """
+    debug('REPAIR',path)
     if os.path.isdir(path):
+        debug('REPAIR',"path is a dir")
         filenames = find_notes(path,include_orphaned=True,maxdepth=maxdepth,
                                excludes=excludes,matchcase=matchcase)
+        filenames = list(filenames)
+        debug('REPAIR',"Found {} files".format(len(filenames)))      
     else:
         filenames = [path]
     
@@ -560,6 +555,7 @@ def grep(path,expr,expr_matchcase=False,
            maxdepth=None,
            exclude_links=False,include_orphaned=False,
            full_note=False,
+           match_any=True,
            stream=sys.stdout):
     """
     Search notes for expr
@@ -567,7 +563,12 @@ def grep(path,expr,expr_matchcase=False,
     flags = re.MULTILINE | re.UNICODE
     if not expr_matchcase:
         flags = flags | re.IGNORECASE
-    requery = re.compile(expr,flags=flags)
+    if not isinstance(expr,tuple):
+        expr = (expr,)
+    
+    match = any if match_any else all
+    requeries = [re.compile(e,flags=flags) for e in expr]
+    
     notes = find_notes(path,
                        excludes=excludes,
                        matchcase=matchcase,
@@ -576,13 +577,12 @@ def grep(path,expr,expr_matchcase=False,
                        include_orphaned=include_orphaned)
     for note in notes:
         if full_note:
-            filename,notetxt = read_data(note,notetxt=True)
-            query = requery.findall(notetxt)
+            filename,qtext = read_data(note,notetxt=True)
         else:
             filename,data = read_data(note)
-            query = requery.findall(data['notes'])
+            qtext = data['notes']
         
-        if len(query) > 0:
+        if match(len(requery.findall(qtext)) > 0 for requery in requeries):
             print(filename,file=stream)
 
 
@@ -748,7 +748,11 @@ Notes:
     
     parsers['grep'] = subpar.add_parser('grep',help="Search notes for a given string")
     parsers['grep'].add_argument('expr',nargs='+',
-        help='Search expression. Follows python regex patterns. Specify as "" to list all files with notes')
+        help=('Search expression. Follows python regex patterns. '
+              'Multiple arguments are considered an ANY query unless --all is set. '
+              'Use advanced regex strings for more control.'))
+    parsers['grep'].add_argument('--all',action='store_false',dest='match_any',
+        help='Match ALL expressions')
     parsers['grep'].add_argument('--match-expr-case',action='store_true',dest='match_expr_case',
         help='Match case on expr')
     parsers['grep'].add_argument('-p','--path',default='.',help='[%(default)s] Specify path')
@@ -898,12 +902,13 @@ def _handoff(args):
     if args.command == 'grep':
         stream = sys.stdout if args.out_file is None else open(args.out_file,'wt') 
 
-        grep(args.path,'|'.join(args.expr),
+        grep(args.path,tuple(args.expr),
                expr_matchcase=args.match_expr_case,
                excludes=args.exclude,matchcase=args.match_case,
                exclude_links=args.exclude_links,
                full_note=args.full,
                maxdepth=args.maxdepth,
+               match_any=args.match_any,
                stream=stream)
         if args.out_file is not None:
             stream.close()

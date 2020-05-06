@@ -102,4 +102,9 @@ If using it on its own, you can tell git to only track notes files with the foll
 
 Alternatively, the `export` command can be used.
 
+## Change Log:
 
+* **20200506.0**: 
+    * Add `--all` mode to `grep` (and internally handle multiple expressions differently).
+    * Remove header in interactive edit
+    * Minor cleanup and additions to debug mode. Still WIP
