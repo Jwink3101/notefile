@@ -72,7 +72,7 @@ To repair an orphaned notefile, it will search in and below the current director
 
 By default, the SHA256 hash is computed. It is *highly* suggested that this be allowed since it greatly increases the integrity of the link between the basefile and the notefile sidecar. However, `--no-hash` can be passed to many of the functions and it will disable hashing.
 
-Note that `--no-hash` (or `--no-refresh`) must be passed *every time* that notefile is modified otherwise, depending on the opperation, it may get rehashed.
+Note that when using `--no-hash`, the file may still be rehashed in subsequent runs with `--no-hash` depending on the state of the file.
 
 When repairing an orphaned notefile, candidate files are first compared by filesize and then by SHA256. While not foolproof, this *greatly* reduces the number of SHA256 computations to be performed; especially on larger files where it becomes increasingly unlikely to be the exact same size.
 
@@ -104,6 +104,14 @@ Alternatively, the `export` command can be used.
 
 ## Change Log:
 
+* WIP:
+    * Major rewrite under the hood to be more object oriented and better design. Also better non-CLI usage
+    * Compatibility Issues:
+        * Removed fancy tag queries. Now just `or` unless `--all`. Use the module functions (`find_notes`,`Notefile(filename).read().data['tags']`)
+        * Any non-CLI usage is probably broken now. Sorry. But it *should* be easier to fix!
+        * By the new design, if the note is created with `--no-hash`, it won't get a hash unless repaired with `--force-refresh` or the underlying file has been modified (This behavior is now tested)
+        
+    
 * **20200506.0**: 
     * Add `--all` mode to `grep` (and internally handle multiple expressions differently).
     * Remove header in interactive edit

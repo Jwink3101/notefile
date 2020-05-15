@@ -7,7 +7,6 @@ Tests are run as if from the CLI but run in Python for the sake of test coverage
 """
 from __future__ import division, print_function, unicode_literals
 
-
 import os
 import sys
 import shutil
@@ -43,6 +42,11 @@ def cleanmkdir(dirpath):
 cleanmkdir(TESTDIR)
 os.chdir(TESTDIR)
 
+def read_note(filepath,**kwargs):
+    note = notefile.Notefile(filepath,**kwargs)
+    note.read()
+    return note.data
+
 def test_main_note():
     os.chdir(TESTDIR)
     dirpath = os.path.join(TESTDIR,'main')
@@ -53,27 +57,27 @@ def test_main_note():
         file.write('this is a\ntest file')
     
     ## Add
-    call('add main.txt "this is a note"')
-    _,data = notefile.read_data('main.txt')
+    call('--debug add main.txt "this is a note"')
+    data = read_note('main.txt')
     assert "this is a note" == data['notes'].strip()
 
     call('add main.txt "this is a note"')
-    _,data = notefile.read_data('main.txt')
-    assert "this is a note\n\nthis is a note" == data['notes'].strip()
+    data = read_note('main.txt')
+    assert "this is a note\nthis is a note" == data['notes'].strip()
 
     call('add -r main.txt "this is a note"')
-    _,data = notefile.read_data('main.txt')
+    data = read_note('main.txt')
     assert "this is a note" == data['notes'].strip()
     
     ## Tags
     call('tag -t test -t "two words" main.txt')
     
-    _,data = notefile.read_data('main.txt')
+    data = read_note('main.txt')
     assert {'test',"two words"} == set(data['tags'])
 
     call('tag -t "two words" -t "another" -r main.txt')
     
-    _,data = notefile.read_data('main.txt')
+    data = read_note('main.txt')
     assert {'test'} == set(data['tags'])
 
     os.chdir(TESTDIR)
@@ -95,7 +99,7 @@ def test_odd_filenames():
         with open(filename,'wt') as file:
             file.write('this is a\ntest file')
         call('add "{}" "this is a note"'.format(filename))
-        _,data = notefile.read_data(filename)
+        data = read_note(filename)
         assert "this is a note" == data['notes'].strip()
     
     os.chdir(TESTDIR)
@@ -121,7 +125,7 @@ def test_repairs(repair_type):
     
     # Initial Data    
     call('add repair_meta.txt "Metadata repair please"')
-    _,meta0 = notefile.read_data('repair_meta.txt')
+    meta0 = read_note('repair_meta.txt')
 
     call('add repair_orphaned.txt "orphaned repair please"')
 
@@ -138,7 +142,7 @@ def test_repairs(repair_type):
     # Repair the whole directory
     call('repair --type {} .'.format(repair_type))
     
-    _,meta1 = notefile.read_data('repair_meta.txt')
+    meta1 = read_note('repair_meta.txt')
     
     if repair_type in ['both','metadata']:
         assert meta1['sha256'] != meta0['sha256']
@@ -152,7 +156,6 @@ def test_repairs(repair_type):
     else:
         assert not os.path.exists('repair_orphaned_moved.txt.notes.yaml')
         assert os.path.exists('repair_orphaned.txt.notes.yaml')
-    
     # Should *not* have been fixed either way
     assert os.path.exists('repair_orphanedDUPE.txt.notes.yaml') 
 
@@ -239,7 +242,8 @@ def test_link_overwrite(link):
     os.chdir(TESTDIR)
     dirpath = os.path.join(TESTDIR,'link_overwrite')
     cleanmkdir(dirpath)
-    os.chdir(dirpath)   
+    os.chdir(dirpath) 
+    #notefile.DEBUG = True  
     
     with open('file.txt','wt') as file:
         file.write('Main File')
@@ -250,14 +254,14 @@ def test_link_overwrite(link):
     call('add --link {} file.txt "file note"'.format(link))
     call('add --link {} sub/link.txt "link note"'.format(link))
     
-    gold = 'file note\n\nlink note'
+    gold = 'file note\nlink note'
     try:
-        filetxt = notefile.read_data('file.txt',link=link)[1]['notes'].strip()
+        filetxt = read_note('file.txt',link=link)['notes'].strip()
     except:
         filetxt = ''
     
     try:
-        linktxt = notefile.read_data('sub/link.txt',link=link)[1]['notes'].strip()
+        linktxt = read_note('sub/link.txt',link=link)['notes'].strip()
     except:
         linktxt = ''
     
@@ -375,8 +379,8 @@ def test_maxdepth():
             res = set(f.strip() for f in file.read().splitlines() if f.strip())
         assert res == gold
 
-        # list-tags
-        call('list-tags -o out --max-depth {}'.format(depth))
+        # search-tags
+        call('search-tags -o out --max-depth {}'.format(depth))
         with open('out') as file:
             _res = yaml.load(file)
             res = set()
@@ -459,10 +463,11 @@ def test_grep_and_listtags_and_export():
     assert {'./noenter/file3.txt', './file1.txt', './file4.exc', './file2.txt','./file5.txt'} == res
     
     # Test grep with full
-    _,data = notefile.read_data('file1.txt')
-    data['new_field'] = "this is a special field"
-    notefile.write_data('file1.txt',data)
-
+    nf = notefile.Notefile('file1.txt')
+    nf.read()
+    nf.data['new_field'] = "this is a special field"
+    nf.write()
+    
     call('grep special -o out')
     with open('out') as file:
         res = set(f.strip() for f in file.read().splitlines() if f.strip())
@@ -475,7 +480,7 @@ def test_grep_and_listtags_and_export():
     
     ### Tags
     
-    call('list-tags -o out')
+    call('search-tags -o out')
     with open('out') as file:
         res = yaml.load(file)
         # Convert to dict of sets for ordering
@@ -483,21 +488,21 @@ def test_grep_and_listtags_and_export():
     assert {'tag1': {'./noenter/file3.txt', './file4.exc', './file1.txt'}, 'tag2': {'./file1.txt'}} == res
     
 
-    call('list-tags -o out tag1')
+    call('search-tags -o out tag1')
     with open('out') as file:
         res = yaml.load(file)
         # Convert to dict of sets for ordering
         res = {k:set(v) for k,v in res.items()}
     assert {'tag1': {'./noenter/file3.txt', './file4.exc', './file1.txt'}} == res
     
-    call('list-tags -o out tag1 --exclude "*.EXC" --match-exclude-case')
+    call('search-tags -o out tag1 --exclude "*.EXC" --match-exclude-case')
     with open('out') as file:
         res = yaml.load(file)
         # Convert to dict of sets for ordering
         res = {k:set(v) for k,v in res.items()}
     assert {'tag1': {'./noenter/file3.txt','./file4.exc','./file1.txt'}} == res   
 
-    call('list-tags -o out tag1 --exclude "*.EXC"')
+    call('search-tags -o out tag1 --exclude "*.EXC"')
     with open('out') as file:
         res = yaml.load(file)
         # Convert to dict of sets for ordering
@@ -505,19 +510,20 @@ def test_grep_and_listtags_and_export():
     assert {'tag1': {'./noenter/file3.txt','./file1.txt'}} == res   
     
     ## Fancy Queries
-    call('list-tags -o out "tag1 or tag2"')
+    call('search-tags -o out "tag1" "tag2"')
     with open('out') as file:
         res = yaml.load(file)
         # Convert to dict of sets for ordering
         res = {k:set(v) for k,v in res.items()}
-    assert {'tag1 or tag2': {'./noenter/file3.txt', './file1.txt', './file4.exc'}} == res
+    assert {'tag1': {'./file1.txt', './file4.exc', './noenter/file3.txt'}, 
+            'tag2': {'./file1.txt'}} == res
     
-    call('list-tags -o out "tag1 and not tag2"')
+    call('search-tags -o out --all "tag1" "tag2"')
     with open('out') as file:
         res = yaml.load(file)
         # Convert to dict of sets for ordering
         res = {k:set(v) for k,v in res.items()}
-    assert {'tag1 and not tag2': {'./noenter/file3.txt', './file4.exc'}} == res
+    assert {'tag1': {'./file1.txt'}, 'tag2': {'./file1.txt'}} == res
     
     ## Link Excludes
     # Add this after the previous
@@ -540,27 +546,19 @@ def test_grep_and_listtags_and_export():
         res = set(f.strip() for f in file.read().splitlines() if f.strip())
     assert {'./file6.txt'} == res
 
-    call('list-tags -o out link')
+    call('search-tags -o out link')
     with open('out') as file:
         res = yaml.load(file)
         # Convert to dict of sets for ordering
         res = {k:set(v) for k,v in res.items()}
     assert {'link': {'./link.txt', './file6.txt'}} == res
 
-    call('list-tags -o out link --exclude-links')
+    call('search-tags -o out link --exclude-links')
     with open('out') as file:
         res = yaml.load(file)
         # Convert to dict of sets for ordering
         res = {k:set(v) for k,v in res.items()}
     assert {'link': {'./file6.txt'}} == res
-
-    # One more complex query
-    call('list-tags -o out "(tag1 or link) and not no_link"')
-    with open('out') as file:
-        res = yaml.load(file)
-        # Convert to dict of sets for ordering
-        res = {k:set(v) for k,v in res.items()}
-    assert {'(tag1 or link) and not no_link': {'./noenter/file3.txt', './link.txt', './file4.exc', './file6.txt'}} == res
     
     ## Export
     call('export -o out')
@@ -640,13 +638,23 @@ def test_nohash():
     cleanmkdir(dirpath)
     os.chdir(dirpath)
     
-    nohash = lambda filename: notefile.read_data(filename)[1]['sha256'] == notefile.NOHASH
+    nohash = lambda filename: read_note(filename,hashfile=False).get('sha256',notefile.NOHASH) == notefile.NOHASH
     
     with open('file1.txt','wt') as file:
         file.write('FILE 1')
         
     with open('file2.txt','wt') as file:
         file.write('FILE 2')
+    
+    with open('file3.txt','wt') as file:
+        file.write('FILE 3')
+    
+    with open('file4.txt','wt') as file:
+        file.write('FILE 4')
+
+    with open('file5.txt','wt') as file:
+        file.write('FILE 5')
+    
     
     # make sure no hash is computed when read with nothing
     assert nohash('file1.txt') 
@@ -684,6 +692,50 @@ def test_nohash():
     
     call('repair')
     
+    ## Test edits and repairs with and without --no-hash or --
+    
+    # Add again to a no-hashed file
+    call('add --no-hash file3.txt Comment 1')
+    call('add file3.txt Comment 2') # Notice no --no-hash
+    assert nohash('file3.txt')
+    
+    # Modify the file and then add again with --nohash
+    with open('file3.txt','at') as file: file.write('new line')
+    call('add --no-hash file3.txt Comment 3')
+    assert nohash('file3.txt')
+    
+    # Modify the file and then add again withOUT --nohash. Should get hashed
+    with open('file3.txt','at') as file: file.write('new line2')
+    call('add file3.txt Comment 4')
+    assert not nohash('file3.txt')
+    
+    # Test repairs after --no-hash
+    call('add --no-hash file4.txt Comment 1')
+    call('repair --type metadata file4.txt') # Will not rehash since unmodified
+    assert nohash('file4.txt')
+    
+    # Edit the file then repair with --no-hash
+    with open('file4.txt','at') as file: file.write('new line2')
+    call('repair --type metadata --no-hash file4.txt') # Will not rehash since unmodified
+    assert nohash('file4.txt')
+    
+    # Repair again withOUT --no-hash but NON-edited file
+    call('repair --type metadata file4.txt') # Will not rehash since unmodified
+    assert nohash('file4.txt')
+    
+    # Edit the file then repair withOUT --no-hash
+    with open('file4.txt','at') as file: file.write('new line3')
+    call('repair --type metadata  file4.txt') # Will not rehash since unmodified
+    assert not nohash('file4.txt')
+    
+    # Test that repair with --force-refresh WILL rehash missing ones
+    call('add --no-hash file5.txt Comment 1')
+    call('repair --type metadata --force-refresh --dry-run file5.txt') # Make sure this doesn't add it
+    assert nohash('file5.txt')
+    call('repair --type metadata --force-refresh file5.txt') # Make sure this doesn't add it
+    assert not nohash('file5.txt')
+    
+    
     
     os.chdir(TESTDIR)
     
@@ -705,6 +757,7 @@ if __name__ == '__main__':
     test_grep_w_multiple_expr()
     test_nohash()
     test_maxdepth()
+    pass
 
 ## Manual Testing
 # Not everything gets tested automatically but it should be easy enough to test
