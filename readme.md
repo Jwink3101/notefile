@@ -76,6 +76,16 @@ Note that when using `--no-hash`, the file may still be rehashed in subsequent r
 
 When repairing an orphaned notefile, candidate files are first compared by filesize and then by SHA256. While not foolproof, this *greatly* reduces the number of SHA256 computations to be performed; especially on larger files where it becomes increasingly unlikely to be the exact same size.
 
+## Hidden Notefiles
+
+Notefiles can be either visible sidecar files as `<filename>.<ext>.notes.yaml` or can be hidden as `.<filename>.<ext>.notes.yaml`. They are visible by default but can be made to default to hidden by setting the environmental variable `NOTEFILE_HIDDEN=true` (any other value will be false). Regardless of the default, each note can be created as hidden or visible with `-V, --visible` or `-H, --hidden` flags.
+
+Note that the flags *only* apply to creating a *new* note. For example if a visible note already exists, it will always go to that even if `-V` is set.
+
+To hide or unhide a note, use `notefile vis hide` or `notefile vis show` on either file(s) or dir(s). If specified as dir, will apply to all items following exclusion flags.
+
+Changing the visibility of a symlinked referent will cause the symlinked note to be broken. However, by design it will still properly read the note and will be fixed when editing (note: will *not* respect prior visibility setting though). (this is actually the behavior for *any* broken symlink to a note)
+
 ## Tips
 
 ### Scripts
@@ -104,8 +114,9 @@ Alternatively, the `export` command can be used.
 
 ## Change Log:
 
-* WIP:
+* DATE:
     * Major rewrite under the hood to be more object oriented and better design. Also better non-CLI usage
+    * Add the ability to hide notes and, as such, adds the `--hidden` and `--visible` flags as well as `set-viz` functionality
     * Compatibility Issues:
         * Removed fancy tag queries. Now just `or` unless `--all`. Use the module functions (`find_notes`,`Notefile(filename).read().data['tags']`)
         * Any non-CLI usage is probably broken now. Sorry. But it *should* be easier to fix!

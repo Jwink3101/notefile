@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python2
 # -*- coding: utf-8 -*-
 """
 Write notesfiles to accompany main files
@@ -14,7 +14,7 @@ import fnmatch
 import random
 import warnings
 # Many imports are done lazily since they aren't always needed
-
+    
 # Third-Party
 import ruamel.yaml
 from ruamel.yaml.scalarstring import PreservedScalarString 
@@ -272,6 +272,9 @@ class Notefile(object):
     Most methods also return itself for convenience 
     """
     def __init__(self,filename,hidden=HIDDEN,link='both',hashfile=True):
+        ## Notation: 
+        #   _0 names re the original file for a link (or when 'symlink' mode).
+        #   When not a link, it doesn't matter!
         self.hashfile = hashfile
         self.link = link
         
@@ -306,7 +309,14 @@ class Notefile(object):
         self.ishidden = self.destnote == self.hid_note
         debug('Hidden setting: {}. Is hidden: {}'.format(self.hidden,self.ishidden))
         
-        self.orphaned = not os.path.exists(self.filename)
+        # Check if orphhaned on original file and also consider broken
+        # links (this can be improved)
+        if os.path.islink(self.filename0): 
+            self.orphaned = False
+        elif not os.path.exists(self.filename0):
+            self.orphaned = True
+        else:
+            self.orphaned = False
         
         self.txt = None
         self.data = None
@@ -322,7 +332,13 @@ class Notefile(object):
             self.data = yaml.load(self.txt)
         else:
             debug('New notefile')
-            stat = os.stat(self.filename) 
+            try:
+                stat = os.stat(self.filename) 
+            except Exception as E:
+                if os.path.islink(self.filename0):
+                    raise type(E)('Broken Link')
+                raise # Shouldn't be here!!!
+                
             self.data = {'filename': os.path.basename(self.filename),
                          'filesize': stat.st_size,
                          'mtime':stat.st_mtime}
@@ -345,6 +361,8 @@ class Notefile(object):
         if self.data is None:
             raise ValueError('Cannot write empty data. Use read() or set data attribute')
         
+        if 'notes' in self.data:
+            self.data['notes'] = self.data['notes'].strip() 
         data = pss(self.data) # Will recurse into lists and dicts too
         data['last-updated'] = now_string()
         data['notefile version'] = __version__
@@ -465,9 +483,16 @@ class Notefile(object):
         """
         Fills the text attribute
         """
-        import io
         if self.txt is None and not force:
             return 
+            
+        if sys.version_info[0] == 2: # Issues with the io.StringIO in py2
+            debug('Dammit! Switch to python3 already/. Writing then reading')
+            self.write()
+            self.read()
+            return
+        
+        import io
         f = io.StringIO()
         yaml.dump(self.data,f)
         self.txt = f.getvalue()
@@ -550,6 +575,11 @@ def find_notes(path='.',
     
     noteopts [{}]
         Options for the notefile created and returned
+    
+    Yields:
+    -------
+    note
+        Either filename or Notefile object
     
     """
     if noteopts is None:
@@ -806,6 +836,87 @@ def export(path='.',
     
     return res
 
+def change_visibility(mode,
+                      path='.',
+                      dry_run=False,
+                      excludes=None,matchcase=False,
+                      maxdepth=None,
+                      exclude_links=False,
+                      include_orphaned=False):
+    """
+    Inputs:
+    --------
+    mode 
+        Specify 'hide' or 'show'
+    
+    path ['.']
+        Where to look
+    
+    dry_run [False]:
+        Do not actually repair
+        
+    excludes []
+        Specify excludes in glob-style. Will be checked against
+        both filenames and directories. Will also be checked against
+        directorys with "/" appended
+    
+    matchcase [False]
+        Whether or not to match the case of the exclude file
+    
+    maxdepth [None]
+        Specify a maximum depth. The current directory is 0
+
+    exclude_links [ False ] 
+        If True, will *not* return symlinked notes
+    
+    include_orphaned [ False ]
+        If True, will ALSO return orphaned notes. 
+        Otherwise, they are excluded     
+    
+    Yields:
+    ------
+    name of changed noted if and only if the mode was changed
+        
+    Note: This is a generator so must be iterated to perform actions
+    """      
+    if mode not in {'hide','show'}:
+        raise ValueError("Mode must be 'hidden','visible'")
+        
+    notes = find_notes(path=path,
+                       excludes=excludes,
+                       matchcase=matchcase,
+                       maxdepth=maxdepth,
+                       exclude_links=exclude_links,
+                       include_orphaned=False,
+                       return_note=True) # no need to send noteopts)
+    
+    for note in notes:
+        # Use the _0 versions since we want the link itself
+        # if given
+        vis_note,hid_note = note.vis_note0,note.hid_note0
+        
+        # This will raise an error *no matter the current state*
+        # by design
+        if os.path.exists(vis_note) and os.path.exists(hid_note):
+            warnings.warn("Both hidden and visible notes exist for '{}'. Not changing mode".format(note.filename0))
+            continue
+        if mode == 'hide':
+            src_note = vis_note
+            dst_note = hid_note
+        else:
+            src_note = hid_note
+            dst_note = vis_note
+        
+        if not dry_run:
+            try:
+                shutil.move(src_note,dst_note)
+            except (OSError,IOError): 
+                continue
+        yield note.filename0
+        
+        
+    
+
 ################################################################################   
 ################################### Repair #####################################
 ################################################################################ 
@@ -854,6 +965,12 @@ def repair_orphaned(path='.',
         
     noteopts [{}]
         Options passed to Notefile
+    
+    Yields:
+    ------
+    prev,new,<whether it actually was moved>
+    
+    Note: This is a generator so must be iterated to perform actions
     """
     if search_path is None:
         search_path = path
@@ -945,6 +1062,11 @@ def repair_metadata(path='.',
     noteopts [{}]
         Options passed to Notefile
     
+    Yields:
+    -------
+    Name of repaired notes    
+    
+    Note: This is a generator so must be iterated to perform actions
     """
     if noteopts is None:
         noteopts = {}
@@ -958,7 +1080,12 @@ def repair_metadata(path='.',
                        noteopts=noteopts)
    
     for note in notes:
-        note.read()
+        try:
+            note.read()
+        except (OSError,IOError):
+            warnings.warn("Cannot stat '{}'. Likely a broken link. Repair manually!".format(note.filename0))
+            continue
+            
         try:
             r = note.repair_metadata(dry_run=dry_run,force=force)
         except ValueError:
@@ -1037,8 +1164,6 @@ Notes:
         help=("['.'] Specify the path to repair. If PATH specific file, will only "
               'repair that file. If PATH is a directory, will recursivly repair all items. '
               'Will only grep in or below the *current* directory for orphaned files.'))
-    parsers['repair'].add_argument('-d','--dry-run',action='store_true',
-        help='Do not make any changes')
     parsers['repair'].add_argument('-t','--type',choices=['both','metadata','orphaned'],
         default='both',
         help=("['both'] Specify the type of repairs to make. Metadata repairs only fix the "
@@ -1078,7 +1203,11 @@ Notes:
     parsers['export'] = subpar.add_parser('export',help="Export all notesfiles to YAML")
     parsers['export'].add_argument('-p','--path',default='.',help='[%(default)s] Specify path')
 
-    
+    parsers['vis'] = subpar.add_parser('vis',help='Change the visibility of file(s)/dir(s)')
+    parsers['vis'].add_argument('mode',choices=['hide', 'show'],
+        help='Visibility mode for file(s)/dir(s) ')
+    parsers['vis'].add_argument('path',default=['.'],nargs='*',help='[.] files(s)/dir(s)')
+
     ## Common arguments
     # Could use various parent parsers but this is honestly just as easy!
     
@@ -1103,8 +1232,9 @@ Notes:
             continue
         parsers[name].add_argument('--no-refresh',action='store_true',
             help='Never refresh file metadata when a notefile is modified')
+    
     # Add exclude options:
-    for name in ['repair','grep','search_tags','export']:
+    for name in ['repair','grep','search_tags','export','vis']:
         parsers[name].add_argument('--exclude',action='append',default=[],
             help=('Specify a glob pattern to exclude when looking for notes. '
                   "Directories are also matched with a trailing '/'"))
@@ -1124,9 +1254,14 @@ Notes:
         parsers[name].add_argument('-o','--out-file',help='Specify file rather than stdout',metavar='FILE')
 
     # exclude links
-    for name in ['search_tags','grep','export']:
+    for name in ['search_tags','grep','export','vis']:
         parsers[name].add_argument('--exclude-links',action='store_true',
             help='Do not include symlinked notefiles')
+    
+    # dry run
+    for name in ['repair','vis']:
+        parsers[name].add_argument('-d','--dry-run',action='store_true',
+            help='Do not make any changes')
 
     # This sorts the optional arguments or each parser.
     # It is a bit of a hack. The biggest issue is that this happens on every 
@@ -1217,25 +1352,30 @@ def cliactions(args):
             note.write()
                
     if args.command == 'repair':
+        t = '(DRYRUN) ' if args.dry_run else ''
         if args.type in ['both','metadata']:
             for res in repair_metadata(dry_run=args.dry_run,
                                        force=args.force_refresh,
                                        noteopts=noteopts,
                                        **findopts):
-                t = '(DRYRUN) ' if args.dry_run else ''
                 print("{}Updated Metadata '{}'".format(t,res))
         
         if args.type in ['both','orphaned']:
-            
             for old,new,_ in repair_orphaned(dry_run=args.dry_run,
                                              search_path=args.search_path,
                                              search_maxdepth=args.maxdepth,
                                              hidden=args.hidden,
                                              noteopts=noteopts,
                                              **findopts):
-                t = '(DRYRUN) ' if args.dry_run else ''
                 print("{}Moved '{}' --> '{}'".format(t,old,new))
             
+    if args.command == 'vis':
+        t = '(DRYRUN) ' if args.dry_run else ''
+        for path in args.path:
+            newfindopts = findopts.copy()
+            newfindopts['path'] = path
+            for note in change_visibility(args.mode,dry_run=args.dry_run,**newfindopts):            
+                print("{}Set '{}' to {}".format(t,note,args.mode))
             
     ## Query Actions
     args.out_file = getattr(args,'out_file',None) # Make sure it's set

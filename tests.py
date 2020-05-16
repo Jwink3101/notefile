@@ -12,6 +12,7 @@ import sys
 import shutil
 import shlex
 import hashlib
+import glob
 
 import notefile # this *should* import the local version even if it is installed
 print('version',notefile.__version__)
@@ -230,6 +231,19 @@ def test_links(link):
         # Make sure they are different
         assert hashlib.sha1(open('file.txt.notes.yaml','rb').read()).digest() != \
                hashlib.sha1(open('link.txt.notes.yaml','rb').read()).digest()
+
+    # Test repair on broken links. The notefile itself should still be
+    # okay
+    call('add link.txt "new note" --link {}'.format(link))
+    shutil.move('file.txt','moved.txt')
+    call('repair')
+
+    # Should repair file.txt.notes.yaml but should NOT repair the symlinked note
+    assert os.path.exists('moved.txt.notes.yaml') # Repaired
+    # NOT moved even if broken. exists required non-broken link so use islink too
+    if link != 'source':
+        assert os.path.exists('link.txt.notes.yaml') or os.path.islink('link.txt.notes.yaml') 
+    
 
     os.chdir(TESTDIR)
 
@@ -735,28 +749,171 @@ def test_nohash():
     call('repair --type metadata --force-refresh file5.txt') # Make sure this doesn't add it
     assert not nohash('file5.txt')
     
+    os.chdir(TESTDIR)
+
+@pytest.mark.parametrize("link", ['both','symlink','source'])
+def test_hidden(link):
+    os.chdir(TESTDIR)
+    dirpath = os.path.join(TESTDIR,'hidden')
+    cleanmkdir(dirpath)
+    os.chdir(dirpath)
+    
+    def ishidden(filename,check_dupe=True):
+        """
+        returns whether a file exists and is hidden.
+        Will assert that (a) the file exists and (b) there
+        aren't a hidden and visible if check_dupe
+        """
+        _,viz,hid = notefile.get_filenames(filename)
+        if check_dupe and os.path.exists(viz) and os.path.exists(hid):
+            assert False, "Duplicate hidden and visible"
+        
+        check_viz = os.path.exists(viz) or os.path.islink(viz) # broken links still are fine
+        check_hid = os.path.exists(hid) or os.path.islink(hid) # broken links still are fine
+        if not (check_hid or check_viz):
+            assert False, "Neither file exists"
+        
+        return check_hid
+    
+    with open('file1.txt','wt') as file: file.write('file1')
+    with open('file2.txt','wt') as file: file.write('file2')
+    with open('file3.txt','wt') as file: file.write('file3')
+    
+    # test when and when not specified and make sire the mode doesn't change
+    call('add --hidden file1.txt "note 1"')
+    assert ishidden('file1.txt')
+    
+    call('add --hidden file1.txt "note 2"')
+    assert ishidden('file1.txt')
+    
+    call('add file1.txt "note 3"') # Doesn't change hide mode
+    assert ishidden('file1.txt')
+    
+    call('tag --hidden -t t1 file1.txt')
+    assert ishidden('file1.txt')
+    
+    call('tag -t t2 file1.txt')
+    assert ishidden('file1.txt')
+    
+    call('tag -t file2 file2.txt --visible')
+    assert not ishidden('file2.txt')
+    
+    # Test linking
+    os.symlink('file1.txt','link1.txt')
+    os.symlink('file2.txt','link2.txt')
+    os.symlink('file3.txt','link3.txt')
+    call('tag -t link1 link1.txt --visible --link {}'.format(link)) # make sure it doesn't change visibility
+    call('tag -t link2 link2.txt --hidden  --link {}'.format(link))
+    
+    if link in ['both','symlink']:
+        assert os.path.exists('link1.txt.notes.yaml')
+        assert os.path.exists('.link2.txt.notes.yaml')
+    else:
+        assert len(glob.glob('*link*.txt.notes.yaml')) == 0
+    
+    call('vis show link2.txt')
+    call('vis hide link1.txt')
+    # Make sure the refferents haven't changed
+    assert os.path.exists('.file1.txt.notes.yaml')
+    assert os.path.exists('file2.txt.notes.yaml')
+    
+    if link in ['both','symlink']:
+        # The link should have changed
+        assert os.path.exists('.link1.txt.notes.yaml')
+        assert os.path.exists('link2.txt.notes.yaml')
+    else:
+        assert len(glob.glob('*link*.txt.notes.yaml')) == 0
+    
+    
+    # Flip the links again to make sure the refferent hasn't changed
+    call('vis hide link2.txt')
+    call('vis show link1.txt')
+    # Make sure the refferents haven't changed
+    assert os.path.exists('.file1.txt.notes.yaml')
+    assert os.path.exists('file2.txt.notes.yaml')
+    if link in ['both','symlink']:
+        assert os.path.exists('link1.txt.notes.yaml')
+        assert os.path.exists('.link2.txt.notes.yaml')
+    else:
+        assert len(glob.glob('*link*.txt.notes.yaml')) == 0
+    
+    # Conflicts on show and hide
+    shutil.copy2('file2.txt.notes.yaml','.file2.txt.notes.yaml')
+    call('vis hide file2.txt')
+    assert os.path.exists('.file2.txt.notes.yaml') # Both still exist
+    assert os.path.exists('file2.txt.notes.yaml')
+    call('vis show file2.txt')
+    assert os.path.exists('.file2.txt.notes.yaml') # Both still exist
+    assert os.path.exists('file2.txt.notes.yaml')
+    
+    # This part tests broken links due to hiding and unhiding
+    # From the docs (as of testing):
+    #
+    # > Changing the visibility of a symlinked referent will cause the 
+    # > symlinked note to be broken. However, by design it will still 
+    # > properly read the note and will be fixed when editing (note: 
+    # > will *not* respect prior visibility setting though).
+    
+    if link == 'both': # Doesn't apply to the others since they don't symlink the note
+        with open('file4.txt','wt') as file: file.write('file4')
+        os.symlink('file4.txt','link4.txt')
+        call('add --link {} -V link4.txt note'.format(link))
+        
+        # Make the file4 note hidden
+        call('vis hide file4.txt')
+        
+        assert os.path.islink('link4.txt.notes.yaml') # Still there (visible)
+        assert not os.path.exists('link4.txt.notes.yaml') # Broken will be False
+        assert not os.path.exists('.link4.txt.notes.yaml') # did not get hidden
+        
+        # Still can be read
+        call('cat -o out link4.txt')
+        with open('out','rt') as file:
+            assert file.read().strip() == 'note'
+        
+        # Can still be hidden with OUT repair
+        call('vis hide link4.txt')
+        assert ishidden('link4.txt')
+        
+        # Editing should (a) still work, (b) fix it, and (c) reset vis to new call
+        # (by design of sorts. See copy of doc)
+        call('add --link {} -rV link4.txt notenew'.format(link))
+        assert os.path.islink('link4.txt.notes.yaml') # Still there (visible) (c)
+        assert os.path.exists('link4.txt.notes.yaml') # No longer broken
+        
+        
+    """
+    To Test
+    
+    
+    """
+    
+    
     
     
     os.chdir(TESTDIR)
     
 if __name__ == '__main__': 
-    test_main_note()
-    test_odd_filenames()
-    test_repairs('both')
-    test_repairs('orphaned')
-    test_repairs('metadata')
-    test_repairs_searchpath()
-    test_links('both')
-    test_links('symlink')
-    test_links('source')
-    test_link_overwrite('both')
-    test_link_overwrite('symlink')
-    test_link_overwrite('source')
-    test_excludes_repair()
-    test_grep_and_listtags_and_export()
-    test_grep_w_multiple_expr()
-    test_nohash()
-    test_maxdepth()
+#     test_main_note()
+#     test_odd_filenames()
+#     test_repairs('both')
+#     test_repairs('orphaned')
+#     test_repairs('metadata')
+#     test_repairs_searchpath()
+#     test_links('both')
+#     test_links('symlink')
+#     test_links('source')
+#     test_link_overwrite('both')
+#     test_link_overwrite('symlink')
+#     test_link_overwrite('source')
+#     test_excludes_repair()
+#     test_grep_and_listtags_and_export()
+#     test_grep_w_multiple_expr()
+#     test_nohash()
+#     test_maxdepth()
+    test_hidden('both')
+#     test_hidden('symlink')
+#     test_hidden('source')
     pass
 
 ## Manual Testing
