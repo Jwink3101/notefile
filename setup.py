@@ -1,7 +1,18 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
-import notefile
+# Cannot import notefile if the user doesn't have `install_requires`
+# so instead read it from the the file itself. This is a bit hacky but works
+
+with open('notefile.py','rt') as file:
+    for line in file:
+        line = line.strip()
+        if line.startswith('__version__'):
+            __version__ = line.split('=',1)[1].strip()
+            break
+    else:
+        raise ValueError('Could not find __version__ in source')
+#import notefile
 
 from setuptools import setup
 
@@ -15,10 +26,10 @@ setup(
     entry_points = {
         'console_scripts': ['notefile=notefile:cli'],
     },
-    version=notefile.__version__,
-    description='Create associated notefiles',
+    version=__version__,
+    description='Create associated notefiles (sidecar files)',
     url='https://github.com/Jwink3101/notefile',
-    author=notefile.__author__,
+    author="Justin Winokur",
     author_email='Jwink3101@@users.noreply.github.com',
     license='MIT',
 )

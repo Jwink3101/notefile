@@ -4,7 +4,7 @@
 Write notesfiles to accompany main files
 """
 from __future__ import division, print_function, unicode_literals
-__version__ = 'WIP'
+__version__ = '20200516.0'
 __author__ = 'Justin Winokur'
 
 import sys
@@ -69,7 +69,13 @@ def touni(s):
     return s
 def randstr(N=10):
     return ''.join(random.choice('abcefghijklmnopqrstuvwxyz0123456789') for _ in range(N))
-    
+
+def exists_or_link(filename):
+    """
+    exists will return false if a broken link. This will NOT
+    """
+    return os.path.isfile(filename) or os.path.islink(filename)
+
 def now_string(pm=False):
     """
     print the current time with time zone
@@ -99,28 +105,28 @@ def get_filenames(filename):
     NOT hidden. 
     
     returns:
-        filename,notesname,hnotename
+        filename,vis_note,hid_note
     """
     filename = touni(filename)
     base,name = os.path.split(filename)
     
     if name.endswith(NOTESTXT): # Given a notefile path
         if name.startswith('.'): # Given a HIDDEN file
-            notename = name[1:]
-            hnotename = name
+            vis_note = name[1:]
+            hid_note = name
             name = name[1:-len(NOTESTXT)] # Assume *NOT* hidden
         else:
-            notename = name
-            hnotename = '.' + name
+            vis_note = name
+            hid_note = '.' + name
             name = name[:-len(NOTESTXT)]
     else:
         if name.startswith('.'): # file itself is hidden
-            notename = hnotename = name + NOTESTXT
+            vis_note = hid_note = name + NOTESTXT
         else:
-            notename = name + NOTESTXT
-            hnotename = '.' + notename
+            vis_note = name + NOTESTXT
+            hid_note = '.' + vis_note
         
-    return os.path.join(base,name),os.path.join(base,notename),os.path.join(base,hnotename)
+    return os.path.join(base,name),os.path.join(base,vis_note),os.path.join(base,hid_note)
 
 def sha256(filepath,blocksize=2**20):
     """
@@ -154,7 +160,6 @@ def hidden_chooser(notesfile,hnotesfile,hidden):
         if os.path.exists(testfile):
             return testfile,True
     return testfiles[0],False # first one from hidden
-
 
 def tmpfileinpath(dirpath):
     if not os.path.isdir(dirpath):
@@ -262,7 +267,7 @@ class Notefile(object):
         Whether or not to *prefer* the hidden notefile
     
     link ['both']
-        How to handle symlinks
+        How to handle symlinks.
     
     hashfile [True]
         Whether or not to hash the file    
@@ -285,7 +290,8 @@ class Notefile(object):
         for attr in ['filename','vis_note','hid_note']:
             setattr(self,attr+'0',getattr(self,attr))
         
-        # Handle links. If both or source, reset to the referent
+        ## Handle links. If both or source, reset to the referent if the link
+        # mode cannot be deduced. If it can, use that!        
         if not link in {'both','symlink','source'}:
             raise ValueError("'link' must be in {'both','symlink','source'}")
         
@@ -293,14 +299,21 @@ class Notefile(object):
         self.islink = os.path.islink(self.filename) and link in ['both','source'] 
         
         if self.islink:
-            dest0 = os.readlink(self.filename)
-            dest = os.path.abspath(os.path.join(os.path.dirname(self.filename),dest0))
+            # Edge Case: Note created in symlink mode but isn't being modified
+            # as such
+            if os.path.isfile(self.destnote0) and not os.path.islink(self.destnote0):
+                debug("'symlink' mode deduced. Changing mode")
+                self.islink = False
+            else:            
+                dest0 = os.readlink(self.filename)
+                dest = os.path.abspath(os.path.join(os.path.dirname(self.filename),dest0))
             
-            self.islinkabs = dest == dest0
+                self.islinkabs = dest == dest0
             
-            debug("Linked Note: '{}' --> '{}'".format(self.filename,dest0))
+                debug("Linked Note: '{}' --> '{}'".format(self.filename,dest0))
             
-            self.filename,self.vis_note,self.hid_note = get_filenames(dest)
+                self.filename,self.vis_note,self.hid_note = get_filenames(dest)
+        
         
         # Get the actual notefile path (destnote) regardless of hidden settings
         # And whether it exisst
@@ -309,14 +322,8 @@ class Notefile(object):
         self.ishidden = self.destnote == self.hid_note
         debug('Hidden setting: {}. Is hidden: {}'.format(self.hidden,self.ishidden))
         
-        # Check if orphhaned on original file and also consider broken
-        # links (this can be improved)
-        if os.path.islink(self.filename0): 
-            self.orphaned = False
-        elif not os.path.exists(self.filename0):
-            self.orphaned = True
-        else:
-            self.orphaned = False
+        # Check if orphhaned on original file (broken links are still NOT orphaned)
+        self.orphaned = not exists_or_link(self.filename0)
         
         self.txt = None
         self.data = None
@@ -537,6 +544,41 @@ class Notefile(object):
 ################################################################################   
 ################################## functions ###################################
 ################################################################################   
+def copy_note(src,dst,
+              noteopts=None):
+    """
+    copy from src to dst
+    
+    Inputs:
+    -------
+    src,dst
+        Source and Dest. Dest must not have ANY notes
+    
+    noteopts [{}]
+        Options for the new note
+    """
+    if noteopts is None:
+        noteopts = {}
+    dst_note = Notefile(dst,**noteopts)
+    if exists_or_link(dst_note.destnote0) or exists_or_link(dst_note.destnote):
+        raise ValueError("Cannot copy notes to '{}' since it has notes already".format(dst_note.filename0)) 
+    dst_note.read() # Will set metadata, etc
+    
+    src_note = Notefile(src) # SRC is assumed to have it's OWN notefile (symlink or file)
+    src_note.read()
+    
+    # Copy all NEW keys from src and dst. Delete notes and tags so they are
+    # also copied
+    del dst_note.data['tags']
+    del dst_note.data['notes']
+    
+    for key,val in src_note.data.items():
+        if key in dst_note.data or key == 'sha256':
+            continue # things like metadata
+        dst_note.data[key] = val
+    
+    dst_note.write()
+
 def find_notes(path='.',
                excludes=None,matchcase=False,
                maxdepth=None,
@@ -1014,8 +1056,8 @@ def repair_orphaned(path='.',
             
         newfile = candidates[0]
         
-        filename,notesname,hnotename = get_filenames(newfile)
-        newnote,_ = hidden_chooser(notesname,hnotename,hidden)
+        filename,notesname,hid_note = get_filenames(newfile)
+        newnote,_ = hidden_chooser(notesname,hid_note,hidden)
         
         if dry_run:
             yield note.destnote0,newnote,False
@@ -1157,6 +1199,14 @@ Notes:
         help='Specify tag to add or remove. Must specify at least one. Tags are made lowercase.')
     parsers['tag'].add_argument('file',help='File(s) to tag',nargs='+')
 
+    parsers['copy'] = subpar.add_parser('copy',
+        help="Copy the notes from SRC to DST. DST must NOT have any notes.") 
+    parsers['copy'].add_argument('SRC',
+        help=("Source file. If a link, must have it's OWN notefile or link to a "
+              "notefile (i.e. not created with 'source' mode)"))
+    parsers['copy'].add_argument('DST',help='Destination file. Must not have ANY notes')
+    
+        
     parsers['repair'] = subpar.add_parser('repair',
         help=("Verify basefile and metadata. Note that unless `--force-refresh`, "
               "files with matching mtime and size are *NOT* rehashed. "))
@@ -1211,12 +1261,10 @@ Notes:
     ## Common arguments
     # Could use various parent parsers but this is honestly just as easy!
     
-    # Modification Flags 
-    for name in ['add','edit','tag','repair']:
+    # Modification Flags. 
+    for name in ['add','edit','tag','repair','copy']:
         parsers[name].add_argument('--no-hash',action='store_false',dest='hashfile',
             help='Do *not* compute the SHA256 of the basefile. Will not be able to repair orphaned notes')
-        parsers[name].add_argument('--force-refresh',action='store_true',
-            help='Force %(prog)s to refresh the metadata of files when the notefile is modified')
         parsers[name].add_argument('--link',choices=['source','symlink','both'],
             default='both',
             help=("['%(default)s'] Specify how to handle symlinks. "
@@ -1228,8 +1276,15 @@ Notes:
         parsers[name].add_argument('-V','--visible',action='store_false',dest='hidden',
             help='Override default and make new notes visible')
         
+        if name == 'copy': # Neither of these make sense with copy
+            continue
+        
+        parsers[name].add_argument('--force-refresh',action='store_true',
+            help='Force %(prog)s to refresh the metadata of files when the notefile is modified')
+        
         if name == 'repair': # no-refresh doesn't make sense with repair
             continue
+        
         parsers[name].add_argument('--no-refresh',action='store_true',
             help='Never refresh file metadata when a notefile is modified')
     
@@ -1305,7 +1360,7 @@ def cliactions(args):
         raise ValueError('Cannot have no-refresh and force-refresh')
     
     if getattr(args,'no_refresh',False):
-        args.hashfile = False
+        args.hashfile = False # Reset this!
     
     # Store common settings with sensible defaults
     noteopts = dict(hidden=getattr(args,'hidden',None),
@@ -1368,7 +1423,10 @@ def cliactions(args):
                                              noteopts=noteopts,
                                              **findopts):
                 print("{}Moved '{}' --> '{}'".format(t,old,new))
-            
+    
+    if args.command == 'copy':
+        copy_note(args.SRC,args.DST,noteopts=noteopts)
+         
     if args.command == 'vis':
         t = '(DRYRUN) ' if args.dry_run else ''
         for path in args.path:

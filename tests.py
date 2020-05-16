@@ -13,6 +13,7 @@ import shutil
 import shlex
 import hashlib
 import glob
+import itertools
 
 import notefile # this *should* import the local version even if it is installed
 print('version',notefile.__version__)
@@ -34,6 +35,7 @@ def call(s):
     return notefile.cli(cmd)
 
 def cleanmkdir(dirpath):
+    notefile.DEBUG = False # Reset this
     try:
         shutil.rmtree(dirpath)
     except:
@@ -47,6 +49,25 @@ def read_note(filepath,**kwargs):
     note = notefile.Notefile(filepath,**kwargs)
     note.read()
     return note.data
+
+def ishidden(filename,check_dupe=True):
+    """
+    returns whether a file exists and is hidden.
+    Will assert that (a) the file exists and (b) there
+    aren't a hidden and visible if check_dupe
+    """
+    _,vis,hid = notefile.get_filenames(filename)
+    if check_dupe and os.path.exists(vis) and os.path.exists(hid):
+        assert False, "Duplicate hidden and visible"
+
+    check_vis = os.path.exists(vis) or os.path.islink(vis) # broken links still are fine
+    check_hid = os.path.exists(hid) or os.path.islink(hid) # broken links still are fine
+    if not (check_hid or check_vis):
+        assert False, "Neither file exists"
+
+    return check_hid
+
+##########################
 
 def test_main_note():
     os.chdir(TESTDIR)
@@ -758,23 +779,6 @@ def test_hidden(link):
     cleanmkdir(dirpath)
     os.chdir(dirpath)
     
-    def ishidden(filename,check_dupe=True):
-        """
-        returns whether a file exists and is hidden.
-        Will assert that (a) the file exists and (b) there
-        aren't a hidden and visible if check_dupe
-        """
-        _,viz,hid = notefile.get_filenames(filename)
-        if check_dupe and os.path.exists(viz) and os.path.exists(hid):
-            assert False, "Duplicate hidden and visible"
-        
-        check_viz = os.path.exists(viz) or os.path.islink(viz) # broken links still are fine
-        check_hid = os.path.exists(hid) or os.path.islink(hid) # broken links still are fine
-        if not (check_hid or check_viz):
-            assert False, "Neither file exists"
-        
-        return check_hid
-    
     with open('file1.txt','wt') as file: file.write('file1')
     with open('file2.txt','wt') as file: file.write('file2')
     with open('file3.txt','wt') as file: file.write('file3')
@@ -880,40 +884,144 @@ def test_hidden(link):
         call('add --link {} -rV link4.txt notenew'.format(link))
         assert os.path.islink('link4.txt.notes.yaml') # Still there (visible) (c)
         assert os.path.exists('link4.txt.notes.yaml') # No longer broken
-        
-        
-    """
-    To Test
-    
-    
-    """
-    
-    
-    
-    
     os.chdir(TESTDIR)
+
+@pytest.mark.parametrize("hide_flag,hash_flag", [('-H', ''), ('-H', '--no-hash'), ('-V', ''), ('-V', '--no-hash')])
+def test_copy_flags(hide_flag,hash_flag):
+    os.chdir(TESTDIR)
+    dirpath = os.path.join(TESTDIR,'copy_flags')
+    cleanmkdir(dirpath)
+    os.chdir(dirpath)
+
+    with open('file1.txt','wt') as file: file.write('file1')
+    with open('file2.txt','wt') as file: file.write('file2')
     
+    call('add file1.txt "A Note"')
+    call('tag -t mytag file1.txt')
+    
+    # Add a new non-standard field and make sure that gets copied too
+    src = notefile.Notefile('file1.txt').read()
+    src.data['arb'] = {'my':'data'}
+    src.write()
+    
+    src_data = read_note('file1.txt')
+    
+    call('copy {} {} file1.txt file2.txt'.format(hide_flag,hash_flag))
+        
+    dst_data = read_note('file2.txt')
+    for key in ['notes','tags','arb']:
+        assert src_data[key] == dst_data[key]
+    
+    dhash = dst_data.get('sha256','')
+    if hash_flag == '--no-hash':
+        assert len(dhash) != 64
+    else:
+        assert len(dhash) == 64 
+    
+    if hide_flag == '-H':
+        assert     os.path.exists('.file2.txt.notes.yaml')
+        assert not os.path.exists('file2.txt.notes.yaml')
+    else:
+        assert not os.path.exists('.file2.txt.notes.yaml')
+        assert     os.path.exists('file2.txt.notes.yaml')
+    
+    # Test that you cannot copy again
+    try:
+        print('Expect exception or exit depending on debug flag')
+        call('copy {} {} file1.txt file2.txt'.format(hide_flag,hash_flag))
+        assert False, "expected error"
+    except BaseException: # BaseException includes SystemExit
+        pass
+
+    os.chdir(TESTDIR)   
+
+@pytest.mark.parametrize("link", ['both','symlink','source'])
+def test_copy_with_links(link):
+    os.chdir(TESTDIR)
+    dirpath = os.path.join(TESTDIR,'copy_link')
+    cleanmkdir(dirpath)
+    os.chdir(dirpath)
+    
+    with open('src1.txt','wt') as file: file.write('src1')
+    with open('src2.txt','wt') as file: file.write('src2')
+    with open('dst1.txt','wt') as file: file.write('dst1')
+    with open('dst2.txt','wt') as file: file.write('dst2')
+    os.symlink('src1.txt','linksrc.txt')
+    os.symlink('dst2.txt','linkdst.txt')
+    
+    ## SRC is a link
+    # Skip for 'source' mode since it is supposed to have its own notefile
+    if link in ['both','symlink']:
+        call('add --link {} linksrc.txt "my source"'.format(link))
+        call('tag --link {} -t mytag linksrc.txt'.format(link))
+    
+        # Add a new non-standard field and make sure that gets copied too
+        src = notefile.Notefile('linksrc.txt',link=link).read()
+        src.data['arb'] = {'my':'data'}
+        src.write()
+        src_data = read_note('linksrc.txt',link=link)
+
+        # --link flag is meaningless since dst isn't a link
+        call('copy linksrc.txt dst1.txt')
+        dst_data = read_note('dst1.txt')
+        for key in ['notes','tags','arb']:
+            assert src_data[key] == dst_data[key]
+    
+    ## DST is a link
+    call('add src2.txt "my source2"')
+    call('tag -t mytag2 src2.txt')
+    
+    # Add a new non-standard field and make sure that gets copied too
+    src = notefile.Notefile('src2.txt').read()
+    src.data['arb'] = {'my':'data'}
+    src.write()
+    src_data = read_note('src2.txt',link=link)
+      
+    call('copy --link {} src2.txt linkdst.txt'.format(link))
+    dst_data = read_note('linkdst.txt',link=link)
+    for key in ['notes','tags','arb']:
+        assert src_data[key] == dst_data[key]
+    
+    if link in ['both','symlink']:
+        assert os.path.exists('linkdst.txt.notes.yaml')
+    if link in ['both','source']:
+        assert os.path.exists('src2.txt.notes.yaml')
+    
+    if link == 'source':
+        assert not os.path.exists('linkdst.txt.notes.yaml')
+    
+    
+    os.chdir(TESTDIR)   
+
+
 if __name__ == '__main__': 
-#     test_main_note()
-#     test_odd_filenames()
-#     test_repairs('both')
-#     test_repairs('orphaned')
-#     test_repairs('metadata')
-#     test_repairs_searchpath()
-#     test_links('both')
-#     test_links('symlink')
-#     test_links('source')
-#     test_link_overwrite('both')
-#     test_link_overwrite('symlink')
-#     test_link_overwrite('source')
-#     test_excludes_repair()
-#     test_grep_and_listtags_and_export()
-#     test_grep_w_multiple_expr()
-#     test_nohash()
-#     test_maxdepth()
+    test_main_note()
+    test_odd_filenames()
+    test_repairs('both')
+    test_repairs('orphaned')
+    test_repairs('metadata')
+    test_repairs_searchpath()
+    test_links('both')
+    test_links('symlink')
+    test_links('source')
+    test_link_overwrite('both')
+    test_link_overwrite('symlink')
+    test_link_overwrite('source')
+    test_excludes_repair()
+    test_grep_and_listtags_and_export()
+    test_grep_w_multiple_expr()
+    test_nohash()
+    test_maxdepth()
     test_hidden('both')
-#     test_hidden('symlink')
-#     test_hidden('source')
+    test_hidden('symlink')
+    test_hidden('source')
+    for hide_flag,hash_flag in [('-H', ''), ('-H', '--no-hash'), ('-V', ''), ('-V', '--no-hash')]:
+        test_copy_flags(hide_flag,hash_flag)
+    test_copy_with_links('both')
+    test_copy_with_links('symlink')
+    test_copy_with_links('source')
+    
+    print('ALL TESTS PASS') # In case we do not get to this from a sys.exit()
     pass
 
 ## Manual Testing

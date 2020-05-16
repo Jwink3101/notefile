@@ -4,7 +4,7 @@ notefile is a tool to quickly and easily manage sidecar metadata files ("notefil
 
 It is not a perfect solution but it does address many main needs as well as concerns I have with alternative tools.
 
-Notefile is designed to assist in keeping associated notes and to perform the most basic opperations. However, it is not designed to do all possible things. Notes can be modified (in YAML) as needed with other tools including those included here.
+Notefile is designed to assist in keeping associated notes and to perform the most basic operations. However, it is not designed to do all possible things. Notes can be modified (in YAML) as needed with other tools including those included here.
 
 It is also worth noting that while notefile can be used as a Python module, it is really design to be primarily a CLI.
 
@@ -114,13 +114,15 @@ Alternatively, the `export` command can be used.
 
 ## Change Log:
 
-* DATE:
+* **20200516.0**:
     * Major rewrite under the hood to be more object oriented and better design. Also better non-CLI usage
-    * Add the ability to hide notes and, as such, adds the `--hidden` and `--visible` flags as well as `set-viz` functionality
+    * Add the ability to hide notes and, as such, adds the `--hidden` and `--visible` flags as well as `vis` functionality
+    * Adds a `copy` mode (and associated tests)
     * Compatibility Issues:
         * Removed fancy tag queries. Now just `or` unless `--all`. Use the module functions (`find_notes`,`Notefile(filename).read().data['tags']`)
         * Any non-CLI usage is probably broken now. Sorry. But it *should* be easier to fix!
         * By the new design, if the note is created with `--no-hash`, it won't get a hash unless repaired with `--force-refresh` or the underlying file has been modified (This behavior is now tested)
+    * Other minor bug fixes and improvements
         
     
 * **20200506.0**: 
