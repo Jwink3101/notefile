@@ -114,6 +114,10 @@ Alternatively, the `export` command can be used.
 
 ## Change Log:
 
+* **20200517.0**:
+    * Adds `-F` for grep (i.e. `re.escape` the query)
+    * Fixes shebang (I left `python2` for testing but python2 support will go away soon)
+
 * **20200516.0**:
     * Major rewrite under the hood to be more object oriented and better design. Also better non-CLI usage
     * Add the ability to hide notes and, as such, adds the `--hidden` and `--visible` flags as well as `vis` functionality

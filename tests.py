@@ -665,6 +665,24 @@ def test_grep_w_multiple_expr():
         res = set(f.strip() for f in file.read().splitlines() if f.strip())
     assert {'./file1.txt'} == res
     
+    
+    ## Test grep with regex
+    with open('file4.txt','wt') as file:file.write('FILE 4')
+    with open('file5.txt','wt') as file:file.write('FILE 5')
+    
+    call('add file4.txt "this is a te.*st"')
+    call('add file5.txt "This is a teblablabast"')
+    
+    call('grep -o out "te.*st"') 
+    with open('out') as file:
+        res = set(f.strip() for f in file.read().splitlines() if f.strip())
+    assert {'./file4.txt','./file5.txt'} == res
+    
+    call('grep -o out -F "te.*st"')
+    with open('out') as file:
+        res = set(f.strip() for f in file.read().splitlines() if f.strip())
+    assert {'./file4.txt'} == res
+    
     os.chdir(TESTDIR)
 
 def test_nohash():

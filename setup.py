@@ -9,6 +9,7 @@ with open('notefile.py','rt') as file:
         line = line.strip()
         if line.startswith('__version__'):
             __version__ = line.split('=',1)[1].strip()
+            __version__ = eval(__version__)
             break
     else:
         raise ValueError('Could not find __version__ in source')

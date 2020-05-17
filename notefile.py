@@ -1,10 +1,10 @@
-#!/usr/bin/env python2
+#!/usr/bin/env python
 # -*- coding: utf-8 -*-
 """
 Write notesfiles to accompany main files
 """
 from __future__ import division, print_function, unicode_literals
-__version__ = '20200516.0'
+__version__ = '20200517.0'
 __author__ = 'Justin Winokur'
 
 import sys
@@ -669,6 +669,7 @@ def grep(path='.',expr='',
          maxdepth=None,
          exclude_links=False,include_orphaned=False,
          full_note=False,
+         fixed_strings=False,
          match_any=True):
     """
     Search the content of notes for expr
@@ -705,6 +706,9 @@ def grep(path='.',expr='',
     full_note [False]
         Whether to search the entire note text or just the "notes" section
     
+    fixed_strings [False]
+        Match the string exactly. i.e. does a re.escape() on the pattern
+    
     match_any [True]
         Whether to match any expr
     
@@ -721,7 +725,10 @@ def grep(path='.',expr='',
         expr = (expr,)
     
     match = any if match_any else all
-    requeries = [re.compile(e,flags=flags) for e in expr]
+    if fixed_strings:
+        requeries = [re.compile(re.escape(e),flags=flags) for e in expr]
+    else:
+        requeries = [re.compile(e,flags=flags) for e in expr]
     
     notes = find_notes(path=path,
                        excludes=excludes,matchcase=matchcase,
@@ -1235,14 +1242,16 @@ Notes:
     
     parsers['grep'] = subpar.add_parser('grep',help="Search notes for a given string")
     parsers['grep'].add_argument('expr',nargs='+',
-        help=('Search expression. Follows python regex patterns. '
+        help=('Search expression. Follows python regex patterns (unless -F). '
               'Multiple arguments are considered an ANY query unless --all is set. '
-              'Use advanced regex strings for more control.'))
+              'Use advanced regex strings for more control. May need to escape them for bash parsing'))
     parsers['grep'].add_argument('--match-expr-case',action='store_true',dest='match_expr_case',
         help='Match case on expr')
     parsers['grep'].add_argument('-p','--path',default='.',help='[%(default)s] Specify path')
     parsers['grep'].add_argument('-f','--full',action='store_true',
         help='Search all fields of the note rather than just the "notes" field')
+    parsers['grep'].add_argument('-F','--fixed-strings',action='store_true',
+        help='Match the string literally without regex patterns')
     
     parsers['search_tags'] = subpar.add_parser('search-tags',help="List all files with the specific tag(s) or all tags. Prints in YAML format")
     parsers['search_tags'].add_argument('tags',nargs='*',
@@ -1451,6 +1460,7 @@ def cliactions(args):
                          include_orphaned=False,
                          full_note=args.full,
                          match_any=args.match_any,
+                         fixed_strings=args.fixed_strings,
                          **findopts):
             print(note,file=stream)
     
