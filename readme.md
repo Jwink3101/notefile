@@ -117,6 +117,9 @@ Alternatively, the `export` command can be used.
 
 ## Change Log:
 
+* **20200521.1**:
+    * Orphan repairs no longer take `-H` or `-V` and instead respect the hidden state of the original file
+
 * **20200521.0**:
     * Filename is no longer tracked metadata. It will not be removed from existing notes though. It was unneeded since the note itself had the filename and makes it *less* clear with links. See `scripts/remove_filename.py` to remove filenames
     * Cleared up that orphaned repairs do NOT check mtime unless `--mtime` and added appropriate test.

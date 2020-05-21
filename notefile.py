@@ -4,7 +4,7 @@
 Write notesfiles to accompany main files
 """
 from __future__ import division, print_function, unicode_literals
-__version__ = '20200521.0'
+__version__ = '20200521.1'
 __author__ = 'Justin Winokur'
 
 import sys
@@ -322,7 +322,7 @@ class Notefile(object):
         
         
         # Get the actual notefile path (destnote) regardless of hidden settings
-        # And whether it exisst
+        # And whether it exists
         self.destnote,self.exists = hidden_chooser(self.vis_note,self.hid_note,hidden)
         self.hidden = hidden
         self.ishidden = self.destnote == self.hid_note
@@ -983,7 +983,9 @@ def repair_orphaned(path='.',
                     noteopts=None,
                     hidden=HIDDEN):
     """
-    Find orphaned notes and search for thier original refferent.
+    Find orphaned notes and search for thier original refferent. 
+    
+    Note that hidden status is based on source status
     
     Inputs:
     --------
@@ -1016,9 +1018,6 @@ def repair_orphaned(path='.',
     
     search_maxdepth [maxdepth]
         Maximum depth for searching search_path
-    
-    hidden [Global default]
-        Whether or not to *prefer* the hidden notefile for repairs
         
     noteopts [{}]
         Options passed to Notefile
@@ -1073,7 +1072,7 @@ def repair_orphaned(path='.',
         newfile = candidates[0]
         
         filename,notesname,hid_note = get_filenames(newfile)
-        newnote,_ = hidden_chooser(notesname,hid_note,hidden)
+        newnote,_ = hidden_chooser(notesname,hid_note,note.ishidden) # Respect the original note
         
         if dry_run:
             yield note.destnote0,newnote,False
@@ -1300,10 +1299,6 @@ Notes:
                   "If 'source', will add the notefile to the source only (non-recursively). "
                   "If 'symlink', will add the notefile to *just* the symlink file. "
                   "If 'both', will add the notefile the source (non-recursivly) and then symlimk to that notefile"))
-        parsers[name].add_argument('-H','--hidden',action='store_true',default=HIDDEN,
-            help='Override default and make new notes hidden')
-        parsers[name].add_argument('-V','--visible',action='store_false',dest='hidden',
-            help='Override default and make new notes visible')
         
         if name == 'copy': # Neither of these make sense with copy
             continue
@@ -1316,6 +1311,13 @@ Notes:
         
         parsers[name].add_argument('--no-refresh',action='store_true',
             help='Never refresh file metadata when a notefile is modified')
+
+    # Hidden settings ( Repair hidden respects source hidden)
+    for name in ['add','edit','tag','copy']:
+        parsers[name].add_argument('-H','--hidden',action='store_true',default=HIDDEN,
+            help='Override default and make new notes hidden')
+        parsers[name].add_argument('-V','--visible',action='store_false',dest='hidden',
+            help='Override default and make new notes visible')
     
     # Add exclude options:
     for name in ['repair','grep','search_tags','export','vis']:
@@ -1448,7 +1450,6 @@ def cliactions(args):
             for old,new,_ in repair_orphaned(dry_run=args.dry_run,
                                              search_path=args.search_path,
                                              search_maxdepth=args.maxdepth,
-                                             hidden=args.hidden,
                                              noteopts=noteopts,
                                              check_mtime=args.mtime,
                                              **findopts):

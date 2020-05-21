@@ -976,6 +976,25 @@ def test_hidden(link):
         call('add --link {} -rV link4.txt notenew'.format(link))
         assert os.path.islink('link4.txt.notes.yaml') # Still there (visible) (c)
         assert os.path.exists('link4.txt.notes.yaml') # No longer broken
+    
+    # Test that the hidden stat is preserved
+    with open('repair1.txt','wt') as file: file.write('repair1')
+    with open('repair2.txt','wt') as file: file.write('repair2')
+    
+    call('add -V repair1.txt note1')
+    call('add -H repair2.txt note2')
+    shutil.move('repair1.txt','repairME1.txt')
+    shutil.move('repair2.txt','repairME2.txt')
+    call('repair -t orphaned')
+    
+    assert os.path.exists('repairME1.txt.notes.yaml')
+    assert not os.path.exists('.repairME1.txt.notes.yaml')
+    
+    assert not os.path.exists('repairME2.txt.notes.yaml')
+    assert os.path.exists('.repairME2.txt.notes.yaml')
+    
+    
+    
     os.chdir(TESTDIR)
 
 @pytest.mark.parametrize("hide_flag,hash_flag", [('-H', ''), ('-H', '--no-hash'), ('-V', ''), ('-V', '--no-hash')])
