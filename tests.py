@@ -158,7 +158,7 @@ def test_repairs(repair_type):
         file.write('\nrepair metadata NOW')
     
     shutil.move('repair_orphaned.txt','repair_orphaned_moved.txt')
-    shutil.copy('repair_orphanedDUPE.txt','repair_orphanedDUPE1.txt')
+    shutil.copy2('repair_orphanedDUPE.txt','repair_orphanedDUPE1.txt')
     shutil.move('repair_orphanedDUPE.txt','repair_orphanedDUPE2.txt')
     
     # Repair the whole directory
@@ -172,7 +172,7 @@ def test_repairs(repair_type):
         assert meta1['sha256'] == meta0['sha256'] # Make sure it hasn't changed
         
     if repair_type in ['both','orphaned']:
-        assert os.path.exists('repair_orphaned_moved.txt.notes.yaml')
+        assert os.path.exists('repair_orphaned_moved.txt.notes.yaml'),'not found'
         assert not os.path.exists('repair_orphaned.txt.notes.yaml')
               
     else:
@@ -180,6 +180,48 @@ def test_repairs(repair_type):
         assert os.path.exists('repair_orphaned.txt.notes.yaml')
     # Should *not* have been fixed either way
     assert os.path.exists('repair_orphanedDUPE.txt.notes.yaml') 
+
+    ## Test the --mtime flag if repairing orphaned and for overwrite
+    if repair_type in ['both','orphaned']:
+        
+        with open('orphaned1.txt','wt') as file:file.write('1')
+        with open('orphaned2.txt','wt') as file:file.write('2')
+        
+        call('add orphaned1.txt ONE')
+        call('add orphaned2.txt TWO')
+        
+        shutil.move('orphaned1.txt','Morphaned1.txt')
+        shutil.move('orphaned2.txt','Morphaned2.txt')
+        
+        # Change mtime
+        os.utime('Morphaned1.txt',(100,100))
+        os.utime('Morphaned2.txt',(100,100))
+        
+        call('repair --type {} orphaned1.txt.notes.yaml'.format(repair_type))
+        call('repair --mtime --type {} orphaned2.txt.notes.yaml'.format(repair_type))
+        
+        # 1 was moved
+        assert os.path.exists('Morphaned1.txt.notes.yaml')
+        assert not os.path.exists('orphaned1.txt.notes.yaml')
+
+        # 2 was NOT moved
+        assert not os.path.exists('Morphaned2.txt.notes.yaml')
+        assert os.path.exists('orphaned2.txt.notes.yaml')
+    
+        ## Test for overwrite
+        with open('orphaned3.txt','wt') as file:file.write('3')
+        call('add orphaned3.txt Three')
+        shutil.move('orphaned3.txt','Morphaned3.txt')
+     
+        call('add Morphaned3.txt ThreeV2')
+     
+        call('repair --type {} orphaned3.txt.notes.yaml'.format(repair_type))
+        
+        assert os.path.exists('orphaned3.txt.notes.yaml'),'Should NOT have been moved'
+        
+        call('cat -o out Morphaned3.txt')
+        with open('out','rt') as f: note = f.read()
+        assert note.strip() ==  'ThreeV2','Should NOT have been changed'
 
     os.chdir(TESTDIR)
 
@@ -207,6 +249,38 @@ def test_repairs_searchpath():
     
     
     os.chdir(TESTDIR)
+
+def test_repair_dryrun():
+    """
+    Test that dry-run doesn't do anything
+    """
+    os.chdir(TESTDIR)
+    dirpath = os.path.join(TESTDIR,'repairs_dry')
+    cleanmkdir(dirpath)
+    os.chdir(dirpath)
+    
+    
+    with open('file.txt','wt') as file: file.write('New File')
+    call('add file.txt "testing a note"')
+    
+    call('cat -f -o out file.txt')
+    with open('out') as f: gold = f.read()
+    
+    # Make it need a metadata repair
+    with open('file.txt','at') as file: file.write('Updated File')
+    
+    call('repair --dry-run -t metadata file.txt ')
+    call('cat -f -o out file.txt')
+    with open('out') as f: assert f.read() == gold
+
+    call('repair -t metadata file.txt ')
+    call('cat -f -o out file.txt')
+    with open('out') as f: assert f.read() != gold
+    
+    
+    os.chdir(TESTDIR)
+    
+    
 
 @pytest.mark.parametrize("link", ['both','symlink','source'])
 def test_links(link):
@@ -1019,6 +1093,7 @@ if __name__ == '__main__':
     test_repairs('orphaned')
     test_repairs('metadata')
     test_repairs_searchpath()
+    test_repair_dryrun()
     test_links('both')
     test_links('symlink')
     test_links('source')

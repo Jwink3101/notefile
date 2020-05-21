@@ -4,7 +4,7 @@
 Write notesfiles to accompany main files
 """
 from __future__ import division, print_function, unicode_literals
-__version__ = '20200517.0'
+__version__ = '20200521.0'
 __author__ = 'Justin Winokur'
 
 import sys
@@ -22,8 +22,9 @@ from ruamel.yaml.scalarstring import PreservedScalarString
 if sys.version_info[0] > 2:
     unicode = str
 
-NOTESTXT = '.notes.yaml'
+NOTESEXT = '.notes.yaml'
 NOHASH = '** not computed **'
+DT = 1 # mtime change
 
 HIDDEN = os.environ.get('NOTEFILE_HIDDEN','false').strip().lower() == 'true'
 
@@ -57,8 +58,6 @@ def pss(item):
 ################################################################################
 #################################### utils #####################################
 ################################################################################
-
-
 def touni(s):
     if isinstance(s,(tuple,list)):
         return type(s)([touni(i) for i in s])
@@ -67,6 +66,7 @@ def touni(s):
     except:
         pass
     return s
+
 def randstr(N=10):
     return ''.join(random.choice('abcefghijklmnopqrstuvwxyz0123456789') for _ in range(N))
 
@@ -99,7 +99,7 @@ def now_string(pm=False):
 
 def get_filenames(filename):
     """
-    Normalize filenames for NOTESTXT
+    Normalize filenames for NOTESEXT
     
     If given a hidden notefile, assumes the base name is 
     NOT hidden. 
@@ -110,20 +110,20 @@ def get_filenames(filename):
     filename = touni(filename)
     base,name = os.path.split(filename)
     
-    if name.endswith(NOTESTXT): # Given a notefile path
+    if name.endswith(NOTESEXT): # Given a notefile path
         if name.startswith('.'): # Given a HIDDEN file
             vis_note = name[1:]
             hid_note = name
-            name = name[1:-len(NOTESTXT)] # Assume *NOT* hidden
+            name = name[1:-len(NOTESEXT)] # Assume *NOT* hidden
         else:
             vis_note = name
             hid_note = '.' + name
-            name = name[:-len(NOTESTXT)]
+            name = name[:-len(NOTESEXT)]
     else:
         if name.startswith('.'): # file itself is hidden
-            vis_note = hid_note = name + NOTESTXT
+            vis_note = hid_note = name + NOTESEXT
         else:
-            vis_note = name + NOTESTXT
+            vis_note = name + NOTESEXT
             hid_note = '.' + vis_note
         
     return os.path.join(base,name),os.path.join(base,vis_note),os.path.join(base,hid_note)
@@ -183,7 +183,7 @@ def exclude_in_place(mylist,excludes,
         Match case on exclusions
     
     remove_noteext [False]
-        test and compare without NOTESTXT
+        test and compare without NOTESEXT
     
     keep_notes_only [None] {None,True,False}
         None: No Filters
@@ -203,14 +203,14 @@ def exclude_in_place(mylist,excludes,
         excludes = [e.lower() for e in excludes]
 
     for item in mylist[:]: # Iterate a copy!
-        if (keep_notes_only is False and item.endswith(NOTESTXT)) \
-        or (keep_notes_only is True and not item.endswith(NOTESTXT)):
+        if (keep_notes_only is False and item.endswith(NOTESEXT)) \
+        or (keep_notes_only is True and not item.endswith(NOTESEXT)):
             mylist.remove(item)
             continue
         
         item0 = item
-        if item.endswith(NOTESTXT) and remove_noteext:
-            item = item[:-len(NOTESTXT)]
+        if item.endswith(NOTESEXT) and remove_noteext:
+            item = item[:-len(NOTESEXT)]
             
         if any(fnmatch.fnmatch(case(item),e) for e in excludes):
             mylist.remove(item0)
@@ -220,10 +220,12 @@ def exclude_in_place(mylist,excludes,
             continue
 
   
-def find_by_size_hash(path,size,sha,excludes=None,matchcase=False,maxdepth=None):
+def find_by_size_mtime_hash(path,size,mtime,sha,excludes=None,matchcase=False,maxdepth=None):
     """
     Find potential basefiles based on thier size and hash. Check sizes first and
-    then only hash if the size matches
+    then only hash if the size matches.
+    
+    If mtime is None, will not check it
     """
     possible = []
     for root, dirs, files in os.walk(path):
@@ -243,8 +245,13 @@ def find_by_size_hash(path,size,sha,excludes=None,matchcase=False,maxdepth=None)
             if not os.path.exists(file): 
                 continue # Likely a broken link
             
-            if not os.stat(file).st_size == size:
+            stat = os.stat(file)
+            
+            if not stat.st_size == size:
                 continue
+            if mtime is not None and abs(mtime - stat.st_mtime) > DT:
+                continue
+            
             if sha256(file) == sha:
                 possible.append(file)
     return possible
@@ -259,7 +266,6 @@ class Notefile(object):
     
     Inputs:
     -------
-    
     filename
         Filename (or notefile name). Will be set as needed
     
@@ -346,8 +352,7 @@ class Notefile(object):
                     raise type(E)('Broken Link')
                 raise # Shouldn't be here!!!
                 
-            self.data = {'filename': os.path.basename(self.filename),
-                         'filesize': stat.st_size,
+            self.data = {'filesize': stat.st_size,
                          'mtime':stat.st_mtime}
             if self.hashfile:
                 self.data['sha256'] = sha256(self.filename)
@@ -495,6 +500,7 @@ class Notefile(object):
             
         if sys.version_info[0] == 2: # Issues with the io.StringIO in py2
             debug('Dammit! Switch to python3 already/. Writing then reading')
+            warnings.warn('python2 will be deprecated shortly')
             self.write()
             self.read()
             return
@@ -508,7 +514,7 @@ class Notefile(object):
         """
         Repair (if Needed) the notefile metadata.
         
-        If force, will check (mtime,size,sha256) and reset as needed.
+        If force, will check (mtime,size) and reset as needed.
         Otherwise, will first check (mtime,size). If they are wrong, will update
         them and the sha256 if self.hashfile
         
@@ -526,12 +532,10 @@ class Notefile(object):
         
         if force \
         or self.data.get('filesize',-1) != stat.st_size  \
-        or abs(self.data.get('mtime',-1) - stat.st_mtime) > 1 \
-        or self.data.get('filename','') != os.path.basename(self.filename):
+        or abs(self.data.get('mtime',-1) - stat.st_mtime) > DT:
             if dry_run:
-                return True
+                return True # Do not do anything else since we won't be writing
             
-            self.data['filename'] = os.path.basename(self.filename) 
             self.data['filesize'] = stat.st_size
             self.data['mtime'] = stat.st_mtime
             if self.hashfile:
@@ -647,7 +651,7 @@ def find_notes(path='.',
         dirs.sort(key=lambda s:s.lower())
         
         for file in files:
-            if not file.lower().endswith(NOTESTXT):
+            if not file.lower().endswith(NOTESEXT):
                 continue
                 
             ffile = os.path.join(root,file)
@@ -974,6 +978,7 @@ def repair_orphaned(path='.',
                     excludes=None,matchcase=False,
                     maxdepth=None,
                     exclude_links=False,
+                    check_mtime=False,
                     search_path=None,search_maxdepth=None,
                     noteopts=None,
                     hidden=HIDDEN):
@@ -1001,6 +1006,9 @@ def repair_orphaned(path='.',
 
     exclude_links [ False ] 
         If True, will *not* return symlinked notes
+    
+    check_mtime [False]
+        If True, will require mtime to not be changed
     
     search_path [path]
         Where to search for the original file. Note that the search will use
@@ -1044,11 +1052,12 @@ def repair_orphaned(path='.',
         # handle if the hash is not the same caps
         data = {k.lower():v for k,v in note.data.items()}
         sha = data.get('sha256','')
+        mtime = data.get('mtime',0) if check_mtime else None
         if len(sha) != 64 or 'filesize' not in data:
             warnings.warn("No SHA256 or filesize for '{}'. Cannot repair!".format(note.destnote0))
             continue
         
-        candidates = find_by_size_hash(search_path,data['filesize'],sha,
+        candidates = find_by_size_mtime_hash(search_path,data['filesize'],mtime,sha,
                                        excludes=excludes,matchcase=matchcase,
                                        maxdepth=search_maxdepth)
         
@@ -1068,6 +1077,10 @@ def repair_orphaned(path='.',
         
         if dry_run:
             yield note.destnote0,newnote,False
+            continue
+        
+        if os.path.exists(newnote):
+            warnings.warn('Notefile exists. Not Moving!\n   SRC:{}\n   DST:{}'.format(note.destnote0,newnote))
             continue
             
         shutil.move(note.destnote0,newnote)
@@ -1136,12 +1149,13 @@ def repair_metadata(path='.',
             continue
             
         try:
-            r = note.repair_metadata(dry_run=dry_run,force=force)
+            if note.repair_metadata(dry_run=dry_run,force=force):
+                if not dry_run:
+                    note.write()
+                yield note.destnote0
         except ValueError:
             continue # Orphaned
-        note.write()
-        if r:
-            yield note.destnote0
+            
 
 
 def cli(argv=None):
@@ -1153,19 +1167,21 @@ def cli(argv=None):
         
     description = """\
 notefile -- Tool for managing notes, tags, etc in 
-            associated *{} files""".format(NOTESTXT)
+            associated *{} files""".format(NOTESEXT)
     epilog ="""\
 Notes:
-    * metadata is refreshed if mtime or size have changed.
-      Or if `--force-refresh` and never if `--no-refresh`
 
-    * If there exists *different* notefiles for a symlink and its source, 
-      the notefile may be overwritten if `--link` is not set properly. 
-      Use caution!
-      
-    * Tags should not be Python built-ins (e.g. "and", "or", "not") since
-      the queries will not work. They should be valid Python variables names
-      (i.e. should not contain spaces or characters like a "-")
+* The hidden and visible settings are for creating notes. The setting is
+  ignored if either a hidden or visible note already exits. If both exist,
+  it will use the setting (and depending on the use, may throw an 
+  error/warning)
+  
+* metadata is refreshed if mtime or size have changed.
+  Or if `--force-refresh` and never if `--no-refresh`
+
+* If there exists *different* notefiles for a symlink and its source, 
+  the notefile may be overwritten if `--link` is not set properly. 
+  Use caution!
     
 """
     import argparse
@@ -1225,12 +1241,16 @@ Notes:
         default='both',
         help=("['both'] Specify the type of repairs to make. Metadata repairs only fix the "
               "metadata for the base file (and only checks the hash if other metadata "
-              "is wrong or if `--force-refresh`). Orphaned repairs look (in the "
-              "current directory and below) for an orphaned basefile."))
+              "is wrong or if `--force-refresh`). Orphaned repairs look in --search-path for "
+              "an orphaned basefile. The search is optimized by searching by size "
+              "(and optionally mtime) first before hashing"))
     parsers['repair'].add_argument('--search-path',default='.',metavar='PATH',
         help=('[%(default)s] Specify the path to search for the basefile for '
               'orphaned notefiles. WARNING: Will recurse the _entire_ path '
               'which may be very slow for large directories'))
+    parsers['repair'].add_argument('-m','--mtime',action='store_true',
+        help=('Require mtime be the same for orphaned notes. Could speed '
+              'up search by reducing the number of files to be hashed'))
     
     ## Queries
     parsers['cat'] = subpar.add_parser('cat',help="Print the notes")
@@ -1430,6 +1450,7 @@ def cliactions(args):
                                              search_maxdepth=args.maxdepth,
                                              hidden=args.hidden,
                                              noteopts=noteopts,
+                                             check_mtime=args.mtime,
                                              **findopts):
                 print("{}Moved '{}' --> '{}'".format(t,old,new))
     

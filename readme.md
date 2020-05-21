@@ -1,6 +1,6 @@
 # Notefile
 
-notefile is a tool to quickly and easily manage sidecar metadata files ("notefiles") along with the file itself as YAML files.
+notefile is a tool to quickly and easily manage sidecar metadata files ("notefiles") along with the file itself as a YAML file (with the extensions `.notes.yaml`).
 
 It is not a perfect solution but it does address many main needs as well as concerns I have with alternative tools.
 
@@ -10,21 +10,22 @@ It is also worth noting that while notefile can be used as a Python module, it i
 
 ## Design & Goals
 
-When a note or tag is added, an associated file is created in the same location. The design is a compromise of competing factors. For example, extended attributes are great but they are easily broken and are not always compatible across different operating systems. Other metadata like ID3 or EXIF changes the file itself and is domain-specific. 
+When a note or tag is added, a notefile is created in the same location with the same name plus `.notes.yaml`. The design is a compromise of competing factors of the alternatives.
 
-Similarly, single-database solutions are cleaner but risk damage and are a single point of failure (corruption and recoverability). And it is not as explicit that they are being used at the same time.
+For example, extended attributes are great but they are easily broken and are not always compatible across different operating systems. Other metadata like ID3 or EXIF changes the file itself and are domain-specific. 
 
-Associated YAML notefiles provide a clear indication of their being a note (or tag) of interest and are cross-platform. Furthermore, by being YAML text-based files, they are not easily corrupted.
+Similarly, single-database solutions (like [TMSU](https://tmsu.org/)) are cleaner but risk damage and are a single point of failure (corruption and recoverability). And it is not as explicit that they are being used on a file.
+
+YAML notefiles provide a clear indication of their being a note (or tag) of interest and are cross-platform. Furthermore, by being YAML text-based files, they are not easily corrupted. Also, YAML files are easily read and written by humans.
 
 The format is YAML and should not be changed. However, this code does not assume any given fields except:
 
-* filename
 * filesize
-* sha256
+* sha256 (optional)
 * tags
 * notes
 
-Any other data can be added and will be preserved.
+Any other data can be added and will be preserved across all actions.
 
 ## Install and Usage
 
@@ -72,19 +73,21 @@ To repair an orphaned notefile, it will search in and below the current director
 
 By default, the SHA256 hash is computed. It is *highly* suggested that this be allowed since it greatly increases the integrity of the link between the basefile and the notefile sidecar. However, `--no-hash` can be passed to many of the functions and it will disable hashing.
 
-Note that when using `--no-hash`, the file may still be rehashed in subsequent runs with `--no-hash` depending on the state of the file.
+Note that when using `--no-hash`, the file may still be rehashed in subsequent runs without  `--no-hash`, depending on the opperation.
 
 When repairing an orphaned notefile, candidate files are first compared by filesize and then by SHA256. While not foolproof, this *greatly* reduces the number of SHA256 computations to be performed; especially on larger files where it becomes increasingly unlikely to be the exact same size.
 
 ## Hidden Notefiles
 
-Notefiles can be either visible sidecar files as `<filename>.<ext>.notes.yaml` or can be hidden as `.<filename>.<ext>.notes.yaml`. They are visible by default but can be made to default to hidden by setting the environmental variable `NOTEFILE_HIDDEN=true` (any other value will be false). Regardless of the default, each note can be created as hidden or visible with `-V, --visible` or `-H, --hidden` flags.
+Notefiles can be either visible (default) or can be hidden with a preceeding dot. They are visible by default but can be made to default to hidden by setting the environmental variable `NOTEFILE_HIDDEN=true` (any other value will be false). Regardless of the default, each note can be created as hidden or visible with `-V, --visible` or `-H, --hidden` flags.
 
-Note that the flags *only* apply to creating a *new* note. For example if a visible note already exists, it will always go to that even if `-V` is set.
+Note that the flags *only* apply to creating a *new* note. For example if a visible note already exists, it will always go to that even if `-H` is set.
 
 To hide or unhide a note, use `notefile vis hide` or `notefile vis show` on either file(s) or dir(s). If specified as dir, will apply to all items following exclusion flags.
 
 Changing the visibility of a symlinked referent will cause the symlinked note to be broken. However, by design it will still properly read the note and will be fixed when editing (note: will *not* respect prior visibility setting though). (this is actually the behavior for *any* broken symlink to a note)
+
+Hidden notefiles are more easily orphaned since it is harder to move both files but not having a directory filling with notefiles can be helpful. 
 
 ## Tips
 
@@ -114,6 +117,13 @@ Alternatively, the `export` command can be used.
 
 ## Change Log:
 
+* **20200521.0**:
+    * Filename is no longer tracked metadata. It will not be removed from existing notes though. It was unneeded since the note itself had the filename and makes it *less* clear with links. See `scripts/remove_filename.py` to remove filenames
+    * Cleared up that orphaned repairs do NOT check mtime unless `--mtime` and added appropriate test.
+    * Bug Fixes:
+        * Fixed a bug where dry run metadata repair would still rewrite the notefile even without (correctly) updating the file
+        * Fixed a bug where a repair could overwrite an existing file
+    
 * **20200517.0**:
     * Adds `-F` for grep (i.e. `re.escape` the query)
     * Fixes shebang (I left `python2` for testing but python2 support will go away soon)
@@ -128,7 +138,6 @@ Alternatively, the `export` command can be used.
         * By the new design, if the note is created with `--no-hash`, it won't get a hash unless repaired with `--force-refresh` or the underlying file has been modified (This behavior is now tested)
     * Other minor bug fixes and improvements
         
-    
 * **20200506.0**: 
     * Add `--all` mode to `grep` (and internally handle multiple expressions differently).
     * Remove header in interactive edit

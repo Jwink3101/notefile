@@ -2,14 +2,15 @@
 # -*- coding: utf-8 -*-
 
 # Cannot import notefile if the user doesn't have `install_requires`
-# so instead read it from the the file itself. This is a bit hacky but works
+# so instead read it from the the file itself. This is a bit hacky but works.
+# And while eval is usually unsafe, I control the code it calls so it is fine
 
 with open('notefile.py','rt') as file:
     for line in file:
         line = line.strip()
         if line.startswith('__version__'):
             __version__ = line.split('=',1)[1].strip()
-            __version__ = eval(__version__)
+            __version__ = eval(__version__) 
             break
     else:
         raise ValueError('Could not find __version__ in source')
