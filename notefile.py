@@ -4,7 +4,7 @@
 Write notesfiles to accompany main files
 """
 from __future__ import division, print_function, unicode_literals
-__version__ = '20200521.1'
+__version__ = '20200522.0'
 __author__ = 'Justin Winokur'
 
 import sys
@@ -1259,6 +1259,8 @@ Notes:
     parsers['cat'].add_argument('-f','--full',action='store_true',
         help='Prints the entire YAML notefile') 
     
+    parsers['find'] = subpar.add_parser('find',help="Find and list all notes")
+
     parsers['grep'] = subpar.add_parser('grep',help="Search notes for a given string")
     parsers['grep'].add_argument('expr',nargs='+',
         help=('Search expression. Follows python regex patterns (unless -F). '
@@ -1266,7 +1268,6 @@ Notes:
               'Use advanced regex strings for more control. May need to escape them for bash parsing'))
     parsers['grep'].add_argument('--match-expr-case',action='store_true',dest='match_expr_case',
         help='Match case on expr')
-    parsers['grep'].add_argument('-p','--path',default='.',help='[%(default)s] Specify path')
     parsers['grep'].add_argument('-f','--full',action='store_true',
         help='Search all fields of the note rather than just the "notes" field')
     parsers['grep'].add_argument('-F','--fixed-strings',action='store_true',
@@ -1276,11 +1277,9 @@ Notes:
     parsers['search_tags'].add_argument('tags',nargs='*',
         help=('Specify tag(s) to list. If empty, lists them all. '
               'Multiple arguments are considered an ANY query unless --all is set.'))
-    parsers['search_tags'].add_argument('-p','--path',default='.',help='[%(default)s] Specify path')
-
+    
     parsers['export'] = subpar.add_parser('export',help="Export all notesfiles to YAML")
-    parsers['export'].add_argument('-p','--path',default='.',help='[%(default)s] Specify path')
-
+    
     parsers['vis'] = subpar.add_parser('vis',help='Change the visibility of file(s)/dir(s)')
     parsers['vis'].add_argument('mode',choices=['hide', 'show'],
         help='Visibility mode for file(s)/dir(s) ')
@@ -1312,6 +1311,11 @@ Notes:
         parsers[name].add_argument('--no-refresh',action='store_true',
             help='Never refresh file metadata when a notefile is modified')
 
+    # Search path
+    for name in ['grep','search_tags','export','find',]:
+        parsers[name].add_argument('-p','--path',default='.',help='[%(default)s] Specify path')
+        
+        
     # Hidden settings ( Repair hidden respects source hidden)
     for name in ['add','edit','tag','copy']:
         parsers[name].add_argument('-H','--hidden',action='store_true',default=HIDDEN,
@@ -1320,27 +1324,27 @@ Notes:
             help='Override default and make new notes visible')
     
     # Add exclude options:
-    for name in ['repair','grep','search_tags','export','vis']:
+    for name in ['repair','grep','search_tags','export','vis','find']:
         parsers[name].add_argument('--exclude',action='append',default=[],
             help=('Specify a glob pattern to exclude when looking for notes. '
-                  "Directories are also matched with a trailing '/'"))
+                  "Directories are also matched with a trailing '/'. Can specify multiple times."))
         parsers[name].add_argument('--match-exclude-case',action='store_true',
             dest='match_case',help='Match case on exclude patterns')
         parsers[name].add_argument('--max-depth',
             type=int,metavar='N',default=None,dest='maxdepth',
             help='Specify the maximum depth to search for notefiles. The current directory is 0')
     
-    # Search
+    # Queries
     for name in ['grep','search_tags']:
         parsers[name].add_argument('--all',action='store_false',dest='match_any',
                                    help='Match ALL expressions')        
 
     # add outfiles
-    for name in ['search_tags','cat','grep','export']:
+    for name in ['search_tags','cat','grep','export','find']:
         parsers[name].add_argument('-o','--out-file',help='Specify file rather than stdout',metavar='FILE')
 
     # exclude links
-    for name in ['search_tags','grep','export','vis']:
+    for name in ['search_tags','grep','export','vis','find']:
         parsers[name].add_argument('--exclude-links',action='store_true',
             help='Do not include symlinked notefiles')
     
@@ -1485,6 +1489,14 @@ def cliactions(args):
                          fixed_strings=args.fixed_strings,
                          **findopts):
             print(note,file=stream)
+
+    if args.command == 'find':
+        for note in find_notes(include_orphaned=False,
+                               return_note=True,
+                               noteopts=None,
+                               **findopts):
+            print(note.filename0,file=stream)
+            
     
     if args.command == 'search-tags':
         res = search_tags(tags=args.tags,

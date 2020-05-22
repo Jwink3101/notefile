@@ -506,7 +506,7 @@ def test_maxdepth():
     
     os.chdir(TESTDIR)
 
-def test_grep_and_listtags_and_export():
+def test_grep_and_listtags_and_export_and_find():
     """
     Tests greping including for tags
     """
@@ -669,42 +669,40 @@ def test_grep_and_listtags_and_export():
         res = {k:set(v) for k,v in res.items()}
     assert {'link': {'./file6.txt'}} == res
     
-    ## Export
-    call('export -o out')
-    with open('out') as file:
-        res = yaml.load(file)
-        # Just look at the files
-        res = set(res['notes'].keys())
-    assert {'./file6.txt', './file5.txt', './link.txt', 
-            './noenter/file3.txt', './file2.txt', './file4.exc', 
-            './file1.txt'} == res
+    ## Export & find. Mostly test for exclusions
+    def _read(filename,export=True):
+        if export:
+            with open(filename) as file:
+                res = yaml.load(file)
+                # Just look at the files
+                return set(res['notes'].keys())
+        with open(filename) as file:
+            return set(l.strip() for l in file.readlines() if l.strip())
+            
+    for cmd in ['export','find']:
+        call('{} -o out'.format(cmd))
+        res = _read('out',export=cmd=='export')
+        assert {'./file6.txt', './file5.txt', './link.txt', 
+                './noenter/file3.txt', './file2.txt', './file4.exc', 
+                './file1.txt'} == res
 
-    call('export -o out --exclude-links')
-    with open('out') as file:
-        res = yaml.load(file)
-        # Just look at the files
-        res = set(res['notes'].keys())
-    assert {'./file6.txt', './file5.txt',
-            './noenter/file3.txt', './file2.txt', './file4.exc', 
-            './file1.txt'} == res
+        call('{} -o out --exclude-links'.format(cmd))
+        res = _read('out',export=cmd=='export')
+        assert {'./file6.txt', './file5.txt',
+                './noenter/file3.txt', './file2.txt', './file4.exc', 
+                './file1.txt'} == res
 
-    call('export -o out --exclude "*.exC"')
-    with open('out') as file:
-        res = yaml.load(file)
-        # Just look at the files
-        res = set(res['notes'].keys())
-    assert {'./file6.txt', './file5.txt', './link.txt', 
-            './noenter/file3.txt', './file2.txt', 
-            './file1.txt'} == res
+        call('{} -o out --exclude "*.exC"'.format(cmd))
+        res = _read('out',export=cmd=='export')
+        assert {'./file6.txt', './file5.txt', './link.txt', 
+                './noenter/file3.txt', './file2.txt', 
+                './file1.txt'} == res
 
-    call('export -o out --exclude "*.exC" --match-exclude-case')
-    with open('out') as file:
-        res = yaml.load(file)
-        # Just look at the files
-        res = set(res['notes'].keys())
-    assert {'./file6.txt', './file5.txt', './link.txt', 
-            './noenter/file3.txt', './file2.txt', './file4.exc', 
-            './file1.txt'} == res
+        call('{} -o out --exclude "*.exC" --match-exclude-case'.format(cmd))
+        res = _read('out',export=cmd=='export')
+        assert {'./file6.txt', './file5.txt', './link.txt', 
+                './noenter/file3.txt', './file2.txt', './file4.exc', 
+                './file1.txt'} == res
     
     os.chdir(TESTDIR)
 
@@ -1120,7 +1118,7 @@ if __name__ == '__main__':
     test_link_overwrite('symlink')
     test_link_overwrite('source')
     test_excludes_repair()
-    test_grep_and_listtags_and_export()
+    test_grep_and_listtags_and_export_and_find()
     test_grep_w_multiple_expr()
     test_nohash()
     test_maxdepth()

@@ -117,6 +117,9 @@ Alternatively, the `export` command can be used.
 
 ## Change Log:
 
+* **20200522.0**:
+    * Adds a `find` command. Basically just like `grep ""` but faster since it doesn't have to read the files
+    
 * **20200521.1**:
     * Orphan repairs no longer take `-H` or `-V` and instead respect the hidden state of the original file
 
