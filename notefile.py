@@ -4,7 +4,7 @@
 Write notesfiles to accompany main files
 """
 from __future__ import division, print_function, unicode_literals
-__version__ = '20200522.0'
+__version__ = '20200523.0'
 __author__ = 'Justin Winokur'
 
 import sys
@@ -157,7 +157,7 @@ def hidden_chooser(notesfile,hnotesfile,hidden):
     """
     testfiles = [hnotesfile,notesfile] if hidden else [notesfile,hnotesfile]
     for testfile in testfiles:
-        if os.path.exists(testfile):
+        if exists_or_link(testfile):
             return testfile,True
     return testfiles[0],False # first one from hidden
 
@@ -325,7 +325,7 @@ class Notefile(object):
         # And whether it exists
         self.destnote,self.exists = hidden_chooser(self.vis_note,self.hid_note,hidden)
         self.hidden = hidden
-        self.ishidden = self.destnote == self.hid_note
+        self.ishidden = self.destnote0 == self.hid_note0
         debug('Hidden setting: {}. Is hidden: {}'.format(self.hidden,self.ishidden))
         
         # Check if orphhaned on original file (broken links are still NOT orphaned)
@@ -532,7 +532,8 @@ class Notefile(object):
         
         if force \
         or self.data.get('filesize',-1) != stat.st_size  \
-        or abs(self.data.get('mtime',-1) - stat.st_mtime) > DT:
+        or abs(self.data.get('mtime',-1) - stat.st_mtime) > DT \
+        or self._isbroken_broken_from_hide():
             if dry_run:
                 return True # Do not do anything else since we won't be writing
             
@@ -544,6 +545,26 @@ class Notefile(object):
             return True    
         
         return False
+    
+    def _isbroken_broken_from_hide(self):
+        """
+        Returns whether a link note is broken from being hidden
+        """
+        if self.link != 'both' or not self.islink:
+            return False
+        
+        # Is it a link and is it NOT broken (is a file)
+        if os.path.islink(self.destnote0) and os.path.isfile(self.destnote0):
+            return False
+        
+        # Finally make sure the *correct* dest exists:
+        if not os.path.isfile(self.destnote):
+            return False # Still broken but not repairable
+        
+        return True
+    
+    
+             
 
 ################################################################################   
 ################################## functions ###################################
@@ -1350,7 +1371,7 @@ Notes:
     
     # dry run
     for name in ['repair','vis']:
-        parsers[name].add_argument('-d','--dry-run',action='store_true',
+        parsers[name].add_argument('--dry-run',action='store_true',
             help='Do not make any changes')
 
     # This sorts the optional arguments or each parser.

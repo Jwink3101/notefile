@@ -945,9 +945,9 @@ def test_hidden(link):
     #
     # > Changing the visibility of a symlinked referent will cause the 
     # > symlinked note to be broken. However, by design it will still 
-    # > properly read the note and will be fixed when editing (note: 
-    # > will *not* respect prior visibility setting though).
-    
+    # > properly read the note and will be fixed when editing or repairing 
+    # > metadata.
+    #
     if link == 'both': # Doesn't apply to the others since they don't symlink the note
         with open('file4.txt','wt') as file: file.write('file4')
         os.symlink('file4.txt','link4.txt')
@@ -969,11 +969,27 @@ def test_hidden(link):
         call('vis hide link4.txt')
         assert ishidden('link4.txt')
         
-        # Editing should (a) still work, (b) fix it, and (c) reset vis to new call
+        # Editing should (a) still work, (b) fix it
         # (by design of sorts. See copy of doc)
-        call('add --link {} -rV link4.txt notenew'.format(link))
-        assert os.path.islink('link4.txt.notes.yaml') # Still there (visible) (c)
-        assert os.path.exists('link4.txt.notes.yaml') # No longer broken
+        call('add --link {} link4.txt notenew'.format(link))
+        assert os.path.islink('.link4.txt.notes.yaml') # Still there (hidden)
+        assert os.path.exists('.link4.txt.notes.yaml') # No longer broken
+        
+        # Break it again. Make sure it's broken
+        call('vis show file4.txt')
+        assert os.path.islink('.link4.txt.notes.yaml') # Still there (hidden)
+        assert not os.path.exists('.link4.txt.notes.yaml') # NOW it IS broken
+        
+        # Make sure dry-run does NOT repair
+        call('repair --dry-run --type metadata link4.txt')
+        assert os.path.islink('.link4.txt.notes.yaml') # Still there (hidden)
+        assert not os.path.exists('.link4.txt.notes.yaml') # No longer broken
+        
+        # Repair for real        
+        call('repair --type metadata link4.txt')
+        assert os.path.islink('.link4.txt.notes.yaml') # Still there (hidden)
+        assert os.path.exists('.link4.txt.notes.yaml') # No longer broken
+        
     
     # Test that the hidden stat is preserved
     with open('repair1.txt','wt') as file: file.write('repair1')
