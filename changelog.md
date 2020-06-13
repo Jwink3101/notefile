@@ -2,6 +2,12 @@
 
 (**_newest_** on *top)
 
+## 20200613.0
+
+* Adds `-0,--print0` to `grep` and `find` for better handling of spaces in filenames when piping to `xargs -0`. Adds tests for this as well.
+    * Note that `search-tags` is always YAML output so this isn't needed
+* `--debug` now prints to stderr
+
 ## 20200523.0
 
 * Made metadata repair fix broken links if broken from changing the visibility f the  the referent (and added tests)

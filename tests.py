@@ -121,9 +121,44 @@ def test_odd_filenames():
         with open(filename,'wt') as file:
             file.write('this is a\ntest file')
         call('add "{}" "this is a note"'.format(filename))
+        call('tag -t mytag "{}" '.format(filename))
         data = read_note(filename)
         assert "this is a note" == data['notes'].strip()
     
+    
+    # Test --print0. Need to test stdout (especially in python2) and file output
+    filenames = set(filenames)
+    
+    # Just to test stdout to make sure it doesn't throw errors
+    call('find')
+    call('find -0')
+    call('grep "this" ')
+    call('grep -0 "this" ')
+    call('search-tags') # This outputs YAML so no -0
+
+    # Capture to test
+    gold = {'./spac es.txt', './unic°de and spaces and no ext', './unic·de.txt', './sub dir/dir2/dir 3/hi'}
+    
+    for cmd,nul in itertools.product(['find','grep "this"'],[True,False]):
+        if nul:
+            cmd += ' -0'
+        cmd += ' -o out'
+        call(cmd)
+        with open('out','rb') as file:
+            dat = file.read()
+    
+        dat = dat.replace(b'\n',b'\x00')
+        res = set(d.decode('utf8') for d in dat.split(b'\x00'))
+        res = set(r for r in res if r)
+
+        assert res == gold
+    
+    call('search-tags -o out')
+    with open('out') as file:
+        d = yaml.load(file)
+        res = set(d['mytag'])
+    assert res == gold
+
     os.chdir(TESTDIR)
     
 @pytest.mark.parametrize("repair_type", ['both','orphaned','metadata'])

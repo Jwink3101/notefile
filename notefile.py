@@ -4,7 +4,7 @@
 Write notesfiles to accompany main files
 """
 from __future__ import division, print_function, unicode_literals
-__version__ = '20200523.0'
+__version__ = '20200613.0'
 __author__ = 'Justin Winokur'
 
 import sys
@@ -31,6 +31,7 @@ HIDDEN = os.environ.get('NOTEFILE_HIDDEN','false').strip().lower() == 'true'
 DEBUG = os.environ.get('NOTEFILE_DEBUG','false').strip().lower() == 'true'
 def debug(*args,**kwargs):
     if DEBUG:
+        kwargs['file'] = sys.stderr
         print('DEBUG:',*args,**kwargs)
 
 #### Set up YAML
@@ -1294,7 +1295,9 @@ Notes:
     parsers['grep'].add_argument('-F','--fixed-strings',action='store_true',
         help='Match the string literally without regex patterns')
     
-    parsers['search_tags'] = subpar.add_parser('search-tags',help="List all files with the specific tag(s) or all tags. Prints in YAML format")
+    parsers['search_tags'] = subpar.add_parser('search-tags',
+        help=("List all files with the specific tag(s) or all tags. "
+              "Always outputs in YAML format"))
     parsers['search_tags'].add_argument('tags',nargs='*',
         help=('Specify tag(s) to list. If empty, lists them all. '
               'Multiple arguments are considered an ANY query unless --all is set.'))
@@ -1374,6 +1377,12 @@ Notes:
         parsers[name].add_argument('--dry-run',action='store_true',
             help='Do not make any changes')
 
+    # Null print0
+    for name in ['find','grep']:
+        parsers[name].add_argument('-0','--print0',action='store_true',
+        help=("Terminate lines with a nul byte (\x00) for use with `xargs -0` when "
+              "filenames have spaces"))
+
     # This sorts the optional arguments or each parser.
     # It is a bit of a hack. The biggest issue is that this happens on every 
     # call but it takes about 10 microseconds
@@ -1398,7 +1407,7 @@ Notes:
     else:
         # Monkey patch warnings.showwarning for CLI usage
         warnings.showwarning = showwarning
-    
+        
     try:
         cliactions(args)        
     except Exception as E:
@@ -1502,6 +1511,7 @@ def cliactions(args):
         print(note.cat(tags=args.tags,full=args.full),file=stream)
             
     if args.command == 'grep':
+        end = b'\x00' if args.print0 else b'\n'
         for note in grep(expr=args.expr,
                          expr_matchcase=args.match_expr_case,
                          include_orphaned=False,
@@ -1509,15 +1519,23 @@ def cliactions(args):
                          match_any=args.match_any,
                          fixed_strings=args.fixed_strings,
                          **findopts):
-            print(note,file=stream)
+            # python2 will not have a buffer but can accept bytes regardless of mode
+            if hasattr(stream,'buffer'):
+                stream.buffer.write(note.encode('utf8') + end)
+            else: # Will deprecate when not using python2
+                stream.write(note.encode('utf8') + end)
 
     if args.command == 'find':
+        end = b'\x00' if args.print0 else b'\n'
         for note in find_notes(include_orphaned=False,
                                return_note=True,
                                noteopts=None,
                                **findopts):
-            print(note.filename0,file=stream)
-            
+            # python2 will not have a buffer but can accept bytes regardless of mode
+            if hasattr(stream,'buffer'):
+                stream.buffer.write(note.filename0.encode('utf8') + end)
+            else: # Will deprecate when not using python2
+                stream.write(note.filename0.encode('utf8') + end)
     
     if args.command == 'search-tags':
         res = search_tags(tags=args.tags,
