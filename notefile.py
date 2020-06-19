@@ -4,7 +4,7 @@
 Write notesfiles to accompany main files
 """
 from __future__ import division, print_function, unicode_literals
-__version__ = '20200613.0'
+__version__ = '20200619.0'
 __author__ = 'Justin Winokur'
 
 import sys
@@ -563,9 +563,6 @@ class Notefile(object):
             return False # Still broken but not repairable
         
         return True
-    
-    
-             
 
 ################################################################################   
 ################################## functions ###################################
@@ -604,6 +601,13 @@ def copy_note(src,dst,
         dst_note.data[key] = val
     
     dst_note.write()
+
+
+def _dot_sort(file):
+    file = file.lower()
+    if file.startswith('.'):
+        return file[1:]
+    return file
 
 def find_notes(path='.',
                excludes=None,matchcase=False,
@@ -669,7 +673,7 @@ def find_notes(path='.',
             del dirs[:] # Do not go deeper
             continue
 
-        files.sort(key=lambda s:s.lower())
+        files.sort(key=_dot_sort)
         dirs.sort(key=lambda s:s.lower())
         
         for file in files:
@@ -1380,7 +1384,7 @@ Notes:
     # Null print0
     for name in ['find','grep']:
         parsers[name].add_argument('-0','--print0',action='store_true',
-        help=("Terminate lines with a nul byte (\x00) for use with `xargs -0` when "
+        help=("Terminate lines with a nul byte for use with `xargs -0` when "
               "filenames have spaces"))
 
     # This sorts the optional arguments or each parser.

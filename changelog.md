@@ -2,6 +2,10 @@
 
 (**_newest_** on *top)
 
+## 20200619.0
+
+* Improved sorting to results to sort *regardless* of hidden (previously, hidden were found first)
+
 ## 20200613.0
 
 * Adds `-0,--print0` to `grep` and `find` for better handling of spaces in filenames when piping to `xargs -0`. Adds tests for this as well.
