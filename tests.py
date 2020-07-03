@@ -1193,7 +1193,7 @@ if __name__ == '__main__':
 #     * `-r`
 #     * Default
 # Editing notes
-#     * regular
+#     * regular & --full
 #     * link modes (this is a different pathway than `add` but the link-logic
 #       goes through the same codes
 #     * --no-hash does not set a hash!

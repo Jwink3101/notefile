@@ -4,7 +4,7 @@
 Write notesfiles to accompany main files
 """
 from __future__ import division, print_function, unicode_literals
-__version__ = '20200619.0'
+__version__ = '20200703.0'
 __author__ = 'Justin Winokur'
 
 import sys
@@ -410,7 +410,7 @@ class Notefile(object):
             os.symlink(linkpath,linknote)
         return self # for convenience
         
-    def interactive_edit(self):    
+    def interactive_edit(self,full=False):    
         """Launch the editor. Does *NOT* write()"""
         import subprocess
         if self.data is None:
@@ -426,18 +426,28 @@ class Notefile(object):
         else:
             raise ValueError(('Must specify an editor. Possible enviormental variables: '
                              (', '.join("'{}'".format(e) for e in editor_names))))
-
+        
+        if full:
+            self.data2txt()
+            content = self.txt
+        else:
+            content = self.data.get('notes','')               
+        
         tmpfile = tmpfileinpath(self.destnote)
         with open(tmpfile,'wt') as file:
-            file.write(self.data.get('notes',''))
+            file.write(content)
 
         subprocess.check_call([editor,file.name])
 
         with open(tmpfile,'rt') as f:
             newtxt = f.read()
         os.remove(tmpfile)
-
-        self.data['notes'] = newtxt.strip()
+        
+        if full:
+            self.data = yaml.load(newtxt)
+        else:
+            self.data['notes'] = newtxt.strip()
+            
         return self # for convenience
     
     def add_note(self,note,replace=False):
@@ -482,7 +492,7 @@ class Notefile(object):
             raise ValueError('Cannot edit empty data. Use read() or set data attribute')
 
         if full:
-            self.data2txt(force=False)
+            self.data2txt()
             return self.txt
             
         if tags:
@@ -492,24 +502,23 @@ class Notefile(object):
             
         return self.data.get('notes','')
         
-    def data2txt(self,force=False):
+    def data2txt(self):
         """
         Fills the text attribute
         """
-        if self.txt is None and not force:
-            return 
             
         if sys.version_info[0] == 2: # Issues with the io.StringIO in py2
-            debug('Dammit! Switch to python3 already/. Writing then reading')
+            debug('Dammit! Switch to python3 already! Writing then reading')
             warnings.warn('python2 will be deprecated shortly')
             self.write()
             self.read()
-            return
+            return self.txt
         
         import io
         f = io.StringIO()
         yaml.dump(self.data,f)
         self.txt = f.getvalue()
+        return self.txt
         
     def repair_metadata(self,dry_run=False,force=False,stream=sys.stdout):
         """
@@ -1282,8 +1291,7 @@ Notes:
     parsers['cat'].add_argument('file',help='Specify file to cat')
     parsers['cat'].add_argument('-t','--tags',action='store_true',
         help='Print tags rather than notes') 
-    parsers['cat'].add_argument('-f','--full',action='store_true',
-        help='Prints the entire YAML notefile') 
+    
     
     parsers['find'] = subpar.add_parser('find',help="Find and list all notes")
 
@@ -1387,6 +1395,11 @@ Notes:
         help=("Terminate lines with a nul byte for use with `xargs -0` when "
               "filenames have spaces"))
 
+    # full file
+    for name in ['cat','edit']:
+        parsers[name].add_argument('-f','--full',action='store_true',
+            help='Prints/Edits the entire YAML notefile') 
+
     # This sorts the optional arguments or each parser.
     # It is a bit of a hack. The biggest issue is that this happens on every 
     # call but it takes about 10 microseconds
@@ -1460,7 +1473,7 @@ def cliactions(args):
     if args.command == 'edit':      
         note = Notefile(args.file,**noteopts)
         note.read()
-        note.interactive_edit()
+        note.interactive_edit(full=args.full)
         if not args.no_refresh:
             note.repair_metadata(force=args.force_refresh)
         note.write()
