@@ -2,6 +2,14 @@
 
 (**_newest_** on *top)
 
+## 20200708.0
+
+* Adds tag editing to interactive `edit` command
+
+## 20200703.0
+
+* Adds `-f/--full` flag to `edit` command to edit the YAML file
+
 ## 20200619.0
 
 * Improved sorting to results to sort *regardless* of hidden (previously, hidden were found first)

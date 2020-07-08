@@ -1194,6 +1194,7 @@ if __name__ == '__main__':
 #     * Default
 # Editing notes
 #     * regular & --full
+#     * Tags in edited notes
 #     * link modes (this is a different pathway than `add` but the link-logic
 #       goes through the same codes
 #     * --no-hash does not set a hash!

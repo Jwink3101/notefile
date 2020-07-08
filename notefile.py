@@ -4,7 +4,7 @@
 Write notesfiles to accompany main files
 """
 from __future__ import division, print_function, unicode_literals
-__version__ = '20200703.0'
+__version__ = '20200708.0'
 __author__ = 'Justin Winokur'
 
 import sys
@@ -427,11 +427,17 @@ class Notefile(object):
             raise ValueError(('Must specify an editor. Possible enviormental variables: '
                              (', '.join("'{}'".format(e) for e in editor_names))))
         
+        tagtxt = '<< Comma-seperated tags. DO NOT MODIFY THIS LINE >>'
+        
         if full:
             self.data2txt()
             content = self.txt
         else:
-            content = self.data.get('notes','')               
+            content = self.data.get('notes','')
+            content += '\n\n' + tagtxt + '\n'
+            tags = self.data.get('tags',[])
+            tags = sorted(t for t in set(tt.strip().lower() for tt in tags) if t)
+            content += ', '.join(tags) + '\n'
         
         tmpfile = tmpfileinpath(self.destnote)
         with open(tmpfile,'wt') as file:
@@ -446,7 +452,19 @@ class Notefile(object):
         if full:
             self.data = yaml.load(newtxt)
         else:
-            self.data['notes'] = newtxt.strip()
+            lines = iter(newtxt.strip().split('\n'))
+            note,tags = [],[]
+            
+            for line in lines: # Get notes
+                if line.strip() == tagtxt:
+                    break
+                note.append(line)
+            for line in lines: # Get tags with the remaining lines
+                tags.extend(line.split(','))
+                
+            self.data['notes'] = '\n'.join(note)
+            tags = sorted(t for t in set(tt.strip().lower() for tt in tags) if t)
+            self.data['tags'] = tags
             
         return self # for convenience
     
