@@ -4,7 +4,7 @@
 Write notesfiles to accompany main files
 """
 from __future__ import division, print_function, unicode_literals
-__version__ = '20200708.0'
+__version__ = '20200709.0'
 __author__ = 'Justin Winokur'
 
 import sys
@@ -27,8 +27,8 @@ NOHASH = '** not computed **'
 DT = 1 # mtime change
 
 HIDDEN = os.environ.get('NOTEFILE_HIDDEN','false').strip().lower() == 'true'
-
 DEBUG = os.environ.get('NOTEFILE_DEBUG','false').strip().lower() == 'true'
+
 def debug(*args,**kwargs):
     if DEBUG:
         kwargs['file'] = sys.stderr
@@ -781,11 +781,16 @@ def grep(path='.',expr='',
     if isinstance(expr,(str,unicode)):
         expr = (expr,)
     
-    match = any if match_any else all
     if fixed_strings:
-        requeries = [re.compile(re.escape(e),flags=flags) for e in expr]
+        expr = [re.escape(e) for e in expr]
+    
+    # For all, you need individual regexes but for any, can make a single one
+    if match_any:
+        requery = re.compile('|'.join(expr),flags=flags)
+        query = lambda qtext: bool(requery.search(qtext))
     else:
         requeries = [re.compile(e,flags=flags) for e in expr]
+        query = lambda qtext: all(r.search(qtext) for r in requeries)
     
     notes = find_notes(path=path,
                        excludes=excludes,matchcase=matchcase,
@@ -794,16 +799,25 @@ def grep(path='.',expr='',
                        include_orphaned=include_orphaned,
                        return_note=True) # no need to send noteopts
     for note in notes:
-        note.read()
+        # Since reading the YAML is slow, we query the note itself.
+        # If full_mode, we're done. Otherwise, we then read the YAML and
+        # apply the query again
+                
+        with open(note.destnote,'rt') as f:
+                qtext = f.read()
         
+        if not query(qtext):
+            continue
+                        
         if full_note:
-            note.data2txt()
-            qtext = note.txt
-        else:
-            qtext = note.data.get('notes','')
-        
-        if match(len(requery.findall(qtext)) > 0 for requery in requeries):
             yield note.filename0 # non-link version
+            continue
+            
+        note.read()
+        qtext = note.data.get('notes','')
+        if query(qtext):
+            yield note.filename0 # non-link version
+        
 
 def search_tags(path='.',tags=tuple(),
                 excludes=None,matchcase=False,
