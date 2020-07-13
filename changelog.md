@@ -2,6 +2,11 @@
 
 (**_newest_** on *top*)
 
+## 20200713.0
+
+* Adds `--filter` to `search-tags` where the expression is interpreted as a Python ternary expression. Enables searches like `--filter "'tag1' in tags and not 'tag2' in tags"`
+* Adds `--full-word` to match full words matches other. (adds `\b` to each side of the expression)
+
 ## 20200709.0
 
 * Speed improvements to `grep`.  This change will drastically speed up grep when there aren't a ton of matches (as one would expect). I have some more improvements planned but this change goes a long way!

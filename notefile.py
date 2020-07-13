@@ -4,7 +4,7 @@
 Write notesfiles to accompany main files
 """
 from __future__ import division, print_function, unicode_literals
-__version__ = '20200709.0'
+__version__ = '20200713.0'
 __author__ = 'Justin Winokur'
 
 import sys
@@ -725,7 +725,7 @@ def grep(path='.',expr='',
          excludes=None,matchcase=False,
          maxdepth=None,
          exclude_links=False,include_orphaned=False,
-         full_note=False,
+         full_note=False,full_word=False,
          fixed_strings=False,
          match_any=True):
     """
@@ -766,6 +766,9 @@ def grep(path='.',expr='',
     fixed_strings [False]
         Match the string exactly. i.e. does a re.escape() on the pattern
     
+    full_word [False]
+        If True, matches the full word. Basically add \b to each pattern
+    
     match_any [True]
         Whether to match any expr
     
@@ -783,6 +786,9 @@ def grep(path='.',expr='',
     
     if fixed_strings:
         expr = [re.escape(e) for e in expr]
+    
+    if full_word:
+        expr = [r'\b' + e + r'\b' for e in expr]
     
     # For all, you need individual regexes but for any, can make a single one
     if match_any:
@@ -823,6 +829,7 @@ def search_tags(path='.',tags=tuple(),
                 excludes=None,matchcase=False,
                 maxdepth=None,
                 exclude_links=False,include_orphaned=False,
+                filter_mode=False,
                 match_any=True):
     """
     Search notes for tags
@@ -854,8 +861,19 @@ def search_tags(path='.',tags=tuple(),
         If True, will ALSO return orphaned notes. 
         Otherwise, they are excluded   
     
-    full_note [False]
-        Whether to search the entire note text or just the "notes" section
+    filter_mode [False]
+        Interpret each tag argument as a python ternary expression with the 
+        variable 'tags' defined as a set of tags. For example
+        
+            >>> search_tags(tags="'tag1' in tags and not 'tag2' in tags")
+            
+        would match notes with 'tag1' and not 'tag2'. Multiple expressions
+        will still follow 'match_any'. Must properly quote tag names!
+        
+        The input will still be .lower()ed since all tags are considered
+        lowercase
+        
+        WARNING: Input is NOT sanitized. Do not use untrusted input
     
     match_any [True]
         Whether to match any expr
@@ -890,6 +908,20 @@ def search_tags(path='.',tags=tuple(),
                 res[t].append(note.filename0)
             continue
         
+        if filter_mode:
+            env = {'tags':ntags}
+            try:
+                matches = [eval(qtag,env) for qtag in qtags]
+            except NameError as E:
+                msg = ("NameError. Make sure tags are quoted! "
+                       "Original error: ") + str(E)
+                raise NameError(msg)                
+            if match(matches):
+                for m,name in zip(matches,qtags):
+                    if m:
+                        res[name].append(note.filename0)
+            continue
+                
         # Test and then add each one
         if match(qtag in ntags for qtag in qtags):
             for t in qtags.intersection(ntags):
@@ -1338,6 +1370,8 @@ Notes:
         help='Search all fields of the note rather than just the "notes" field')
     parsers['grep'].add_argument('-F','--fixed-strings',action='store_true',
         help='Match the string literally without regex patterns')
+    parsers['grep'].add_argument('--full-word',action='store_true',
+        help='Matches the full word(s) of the expression. (adds \b around query)')
     
     parsers['search_tags'] = subpar.add_parser('search-tags',
         help=("List all files with the specific tag(s) or all tags. "
@@ -1345,6 +1379,15 @@ Notes:
     parsers['search_tags'].add_argument('tags',nargs='*',
         help=('Specify tag(s) to list. If empty, lists them all. '
               'Multiple arguments are considered an ANY query unless --all is set.'))
+    parsers['search_tags'].add_argument('--filter',action='store_true',
+        help=('Interpret each tag argument as a Python ternary expression with the '
+              "variable 'tags' defined as a set of tags. "
+              """For example, `--filter "'tag1' in tags and not 'tag2' in tags"` """
+              "would match notes with 'tag1' and not 'tag2'. Multiple expressions "
+              "will still follow --all. Tags MUST be quoted properly as strings "
+              "and the input will be made lowercase since tags are always made "
+              "lowercase. "
+              "WARNING: Input is NOT sanitized. Do not use untrusted input!"))
     
     parsers['export'] = subpar.add_parser('export',help="Export all notesfiles to YAML")
     
@@ -1567,6 +1610,7 @@ def cliactions(args):
                          full_note=args.full,
                          match_any=args.match_any,
                          fixed_strings=args.fixed_strings,
+                         full_word=args.full_word,
                          **findopts):
             # python2 will not have a buffer but can accept bytes regardless of mode
             if hasattr(stream,'buffer'):
@@ -1590,6 +1634,7 @@ def cliactions(args):
         res = search_tags(tags=args.tags,
                           include_orphaned=False,
                           match_any=args.match_any,
+                          filter_mode=args.filter,
                           **findopts)
         
         yaml.dump(res,stream)

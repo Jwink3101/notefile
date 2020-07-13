@@ -669,6 +669,34 @@ def test_grep_and_listtags_and_export_and_find():
         res = {k:set(v) for k,v in res.items()}
     assert {'tag1': {'./file1.txt'}, 'tag2': {'./file1.txt'}} == res
     
+    ## --filters. Also use a mix of caps to test that it gets fixed
+    call("""search-tags -o out --filter "'tag1' in tags and 'tAG2' not in tags" """)
+    with open('out') as file:
+        res = yaml.load(file)
+        # Convert to dict of sets for ordering
+        res = {k:set(v) for k,v in res.items()}
+    assert res == {"'tag1' in tags and 'tag2' not in tags":  # made lowercase
+                      {'./file4.exc', './noenter/file3.txt'}} # NOT ./file1.txt
+    # Multiple
+    call("""search-tags -o out --filter "'tag1' in tags and 'tAG2' not in tags" '"tag2" in tags' """)
+    with open('out') as file:
+        res = yaml.load(file)
+        # Convert to dict of sets for ordering
+        res = {k:set(v) for k,v in res.items()}
+    assert res == {"'tag1' in tags and 'tag2' not in tags": 
+                        {'./file4.exc', './noenter/file3.txt'}, 
+                   '"tag2" in tags':  # Different quote pattern to match the query
+                        {'./file1.txt'}}
+
+    # Multiple --all
+    call("""search-tags -o out --all --filter "'tag1' in tags and 'tAG2' not in tags" '"tag2" in tags' """)
+    with open('out') as file:
+        res = yaml.load(file)
+        # Convert to dict of sets for ordering
+        res = {k:set(v) for k,v in res.items()}
+    assert res == {}
+
+    
     ## Link Excludes
     # Add this after the previous
     with open('file6.txt','wt') as file:
@@ -776,9 +804,13 @@ def test_grep_w_multiple_expr():
     ## Test grep with regex
     with open('file4.txt','wt') as file:file.write('FILE 4')
     with open('file5.txt','wt') as file:file.write('FILE 5')
+    with open('file6.txt','wt') as file:file.write('FILE 6')
+    with open('file7.txt','wt') as file:file.write('FILE 7')
     
     call('add file4.txt "this is a te.*st"')
     call('add file5.txt "This is a teblablabast"')
+    call('add file6.txt "These are their words"')
+    call('add file7.txt "these are the words"')
     
     call('grep -o out "te.*st"') 
     with open('out') as file:
@@ -789,6 +821,17 @@ def test_grep_w_multiple_expr():
     with open('out') as file:
         res = set(f.strip() for f in file.read().splitlines() if f.strip())
     assert {'./file4.txt'} == res
+        
+    call('grep -o out the')
+    with open('out') as file:
+        res = set(f.strip() for f in file.read().splitlines() if f.strip())
+    assert {'./file6.txt','./file7.txt'} == res
+
+    call('grep -o out --full-word the')
+    with open('out') as file:
+        res = set(f.strip() for f in file.read().splitlines() if f.strip())
+    assert {'./file7.txt'} == res
+    
     
     os.chdir(TESTDIR)
 
@@ -1184,7 +1227,8 @@ if __name__ == '__main__':
     
     print('ALL TESTS PASS') # In case we do not get to this from a sys.exit()
     pass
-
+    
+os.chdir(TESTDIR)
 ## Manual Testing
 # Not everything gets tested automatically but it should be easy enough to test
 # manually. The following is a list of key items to test manually
