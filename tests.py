@@ -14,6 +14,7 @@ import shlex
 import hashlib
 import glob
 import itertools
+import time
 
 import notefile # this *should* import the local version even if it is installed
 print('version',notefile.__version__)
@@ -93,14 +94,37 @@ def test_main_note():
     
     ## Tags
     call('tag -t test -t "two words" main.txt')
-    
     data = read_note('main.txt')
     assert {'test',"two words"} == set(data['tags'])
 
-    call('tag -t "two words" -t "another" -r main.txt')
-    
+    call('tag -r "two words" -r "another" main.txt')
     data = read_note('main.txt')
     assert {'test'} == set(data['tags'])
+    
+    call('tag -r test -t new main.txt') # Add and remove at the same call
+    data = read_note('main.txt')
+    assert {'new'} == set(data['tags'])
+    
+    # Test that when the note is unchanged
+    
+    with open('new.txt','wt') as file:
+        file.write('NEW file')
+    
+    call('add new.txt ""') # Shouldn't change it
+    assert not os.path.exists('new.txt.notes.yaml'),'should not have written a note'
+    
+    call('tag -t atag new.txt')
+    hash0 = hashlib.sha1(open('new.txt.notes.yaml','rb').read()).digest()
+    
+    time.sleep(1.1) # Make sure the 'last-updated' would be modified
+    call('tag -t atag new.txt')
+    hash1 = hashlib.sha1(open('new.txt.notes.yaml','rb').read()).digest()
+    assert hash0 == hash1,'should *not* have written a new note'
+    
+    call('tag -r atag new.txt')
+    call('tag -t atag new.txt')
+    hash2 = hashlib.sha1(open('new.txt.notes.yaml','rb').read()).digest()
+    assert hash2 != hash0,'The mod date *should* have changed'
 
     os.chdir(TESTDIR)
     

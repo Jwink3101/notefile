@@ -2,6 +2,20 @@
 
 (**_newest_** on *top*)
 
+## 20200714.0
+
+* Tag CLI has changed so that tags can be added or removed in one call. For example, in the past, to remove `old` and add `new`, you would do:
+    ```
+    $ notefile -t old -r file.ext
+    $ notefile -t new file.ext
+    ```
+    and now it is
+    ```
+    $ notefile -t new -r old file.ext
+    ```
+    
+* Does not modify a note if nothing has changed. This includes not making a new note if not changed
+
 ## 20200713.0
 
 * Adds `--filter` to `search-tags` where the expression is interpreted as a Python ternary expression. Enables searches like `--filter "'tag1' in tags and not 'tag2' in tags"`

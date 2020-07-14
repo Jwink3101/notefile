@@ -4,7 +4,7 @@
 Write notesfiles to accompany main files
 """
 from __future__ import division, print_function, unicode_literals
-__version__ = '20200713.0'
+__version__ = '20200714.0'
 __author__ = 'Justin Winokur'
 
 import sys
@@ -13,6 +13,7 @@ import shutil
 import fnmatch
 import random
 import warnings
+import copy
 # Many imports are done lazily since they aren't always needed
     
 # Third-Party
@@ -365,9 +366,13 @@ class Notefile(object):
         if 'notes' not in self.data:
             self.data['notes'] = ''
         
+        # Make a copy for compare later. Use deep copy in case mutable 
+        # objects are modified
+        self.data0 = copy.deepcopy(self.data) 
+        
         return self # for convenience
-
-    def write(self):
+        
+    def write(self,force=False):
         """
         Write the data
         """
@@ -376,7 +381,18 @@ class Notefile(object):
         
         if 'notes' in self.data:
             self.data['notes'] = self.data['notes'].strip() 
+        
+        tags = self.data.get('tags',[])
+        tags = set(t.strip() for t in tags if t.strip())
+        self.data['tags'] = sorted(tags)
+        
         data = pss(self.data) # Will recurse into lists and dicts too
+        
+        if not force and not self.ismod():
+            debug('Note not modified. Not saving')
+            self.make_links() # Rebuild the links in case they were broken
+            return
+            
         data['last-updated'] = now_string()
         data['notefile version'] = __version__
         
@@ -392,7 +408,36 @@ class Notefile(object):
             yaml.dump(data,file)
         shutil.move(tmpfile,self.destnote)
         debug("Wrote '{}'".format(self.destnote))
-    
+        
+        self.make_links()
+
+        return self # for convenience
+    def ismod(self):
+        """
+        Compare data0 (when read()) to data (before write())
+        """
+        # Will do a dictionary compare at the end so pop() certain keys before
+        # we get to that. Since we're removing then, make a copy
+        if not hasattr(self,'data0'):
+            return True
+        
+        old,new = self.data0.copy(),self.data.copy()
+        
+        for key in ['last-updated','notefile version']:
+            old.pop(key,None),new.pop(key,None)
+       
+        if abs(old.pop('mtime',0) - new.pop('mtime',100)) >= DT:
+            return False
+        
+        old['tags'] = set(old.get('tags',[]))
+        new['tags'] = set(new.get('tags',[]))
+        
+        return not old == new
+        
+    def make_links(self):
+        """
+        Build the links if the note is a link.
+        """
         # Handle both-type links by linking to the note
         if self.islink and self.link == 'both':
             linknote = self.destnote0 # Original path for the note
@@ -408,8 +453,7 @@ class Notefile(object):
                 pass
                 
             os.symlink(linkpath,linknote)
-        return self # for convenience
-        
+   
     def interactive_edit(self,full=False):    
         """Launch the editor. Does *NOT* write()"""
         import subprocess
@@ -480,29 +524,30 @@ class Notefile(object):
         
         return self # for convenience
         
-    def modify_tags(self,tags,remove=False):
-        """Add or remove tags. Does *NOT* write(). Returns whether it was *actually* changed"""
-        if 'tags' not in self.data:
-            self.data['tags'] = []
-        self.data['tags'] = [tag.lower() for tag in self.data['tags']] # make a mutable list
-        data0 = self.data.copy()
-    
-        if isinstance(tags,(str,unicode)):
-            tags = [tags] # make a list
-    
-        for tag in tags:
-            tag = tag.lower()
-            if remove: 
-                try:
-                    self.data['tags'].remove(tag)
-                except ValueError:
-                    pass
-                continue
+    def modify_tags(self,add=tuple(),remove=tuple()):
+        """
+        Add or remove tags. Does *NOT* write().
         
-            if tag not in self.data['tags']:
-                self.data['tags'].append(tag)
+        Inputs:
+        -------
+        add [empty tuple]
+            Iterable or str/unicode of tags to add
+        
+        remove [empty tuple]
+            Iterable or str/unicode of tags to remove
+        
+        """
+        tags = set(tag.lower() for tag in self.data.get('tags',[])) # make a mutable set
+        
+        if isinstance(add,(str,unicode)):
+            add = [add] # make a list
+        if isinstance(remove,(str,unicode)):
+            remove = [remove] # make a list
             
-        return data0 == self.data
+        tags.difference_update(remove)
+        tags.update(add)
+        self.data['tags'] = sorted(t.lower().strip() for t in tags if t.strip())
+    
     
     def cat(self,tags=False,full=False):
         """cat the notes to a string"""
@@ -1313,11 +1358,11 @@ Notes:
     parsers['edit'].add_argument('file',help='Specify file to edit')
     
     parsers['tag'] = subpar.add_parser('tag',
-        help="Add or remove tags from file") 
-    parsers['tag'].add_argument('-r','--remove',action='store_true',
-        help='Remove tag on file(s) if present')
-    parsers['tag'].add_argument('-t','--tag',action='append',required=True,
-        help='Specify tag to add or remove. Must specify at least one. Tags are made lowercase.')
+        help="Add or remove tags from file. Note that tags are converted to lowercase") 
+    parsers['tag'].add_argument('-r','--remove',default=[],
+        action='append',help='Specify tags to remove')
+    parsers['tag'].add_argument('-t','--tag','-a','--add',default=[],
+        action='append',help='Specify tags to add')
     parsers['tag'].add_argument('file',help='File(s) to tag',nargs='+')
 
     parsers['copy'] = subpar.add_parser('copy',
@@ -1554,11 +1599,13 @@ def cliactions(args):
         note.write()
            
     if args.command == 'tag':
+        if not (args.tag or args.remove):
+            raise ValueError('Must specify at least one tag to add or remove')
         for file in args.file:
             note = Notefile(file,**noteopts)
             note.read()
             
-            note.modify_tags(args.tag,remove=args.remove)
+            note.modify_tags(add=args.tag,remove=args.remove)
             if not args.no_refresh:
                 note.repair_metadata(force=args.force_refresh)
             note.write()
