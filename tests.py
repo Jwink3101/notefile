@@ -198,15 +198,20 @@ def test_repairs(repair_type):
     # Test files
     with open('repair_meta.txt','wt') as file:
         file.write('repair metadata')
+    with open('repair_meta_mtime.txt','wt') as file:
+        file.write('repair metadata from changing mtime')
+    
     with open('repair_orphaned.txt','wt') as file:
         file.write('repair orphaned')
-
     with open('repair_orphanedDUPE.txt','wt') as file:
         file.write('repair orphanedDUPE')
     
     # Initial Data    
     call('add repair_meta.txt "Metadata repair please"')
     meta0 = read_note('repair_meta.txt')
+
+    call('tag -t mtime repair_meta_mtime.txt')
+    meta0_mtime = read_note('repair_meta_mtime.txt')
 
     call('add repair_orphaned.txt "orphaned repair please"')
 
@@ -216,6 +221,9 @@ def test_repairs(repair_type):
     with open('repair_meta.txt','at') as file:
         file.write('\nrepair metadata NOW')
     
+    s = os.stat('repair_meta_mtime.txt')
+    os.utime('repair_meta_mtime.txt',(s.st_atime - 100,s.st_mtime - 100))
+    
     shutil.move('repair_orphaned.txt','repair_orphaned_moved.txt')
     shutil.copy2('repair_orphanedDUPE.txt','repair_orphanedDUPE1.txt')
     shutil.move('repair_orphanedDUPE.txt','repair_orphanedDUPE2.txt')
@@ -224,9 +232,11 @@ def test_repairs(repair_type):
     call('repair --type {} .'.format(repair_type))
     
     meta1 = read_note('repair_meta.txt')
+    meta1_mtime = read_note('repair_meta_mtime.txt')
     
     if repair_type in ['both','metadata']:
         assert meta1['sha256'] != meta0['sha256']
+        assert abs(meta0_mtime['mtime'] - meta1_mtime['mtime'] - 100) < 0.1,'mtime not updated'
     else:
         assert meta1['sha256'] == meta0['sha256'] # Make sure it hasn't changed
         

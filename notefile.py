@@ -4,7 +4,7 @@
 Write notesfiles to accompany main files
 """
 from __future__ import division, print_function, unicode_literals
-__version__ = '20200714.0'
+__version__ = '20200716.0'
 __author__ = 'Justin Winokur'
 
 import sys
@@ -420,14 +420,14 @@ class Notefile(object):
         # we get to that. Since we're removing then, make a copy
         if not hasattr(self,'data0'):
             return True
-        
+
         old,new = self.data0.copy(),self.data.copy()
         
         for key in ['last-updated','notefile version']:
             old.pop(key,None),new.pop(key,None)
        
         if abs(old.pop('mtime',0) - new.pop('mtime',100)) >= DT:
-            return False
+            return True
         
         old['tags'] = set(old.get('tags',[]))
         new['tags'] = set(new.get('tags',[]))
@@ -1294,7 +1294,7 @@ def repair_metadata(path='.',
         try:
             if note.repair_metadata(dry_run=dry_run,force=force):
                 if not dry_run:
-                    note.write()
+                    note.write(force=True)
                 yield note.destnote0
         except ValueError:
             continue # Orphaned
