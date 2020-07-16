@@ -68,6 +68,20 @@ def ishidden(filename,check_dupe=True):
 
     return check_hid
 
+
+def find_links(path='.'):
+    res = set()
+    for dirpath, dirnames, filenames in os.walk(path):
+        for filename in filenames:
+            filepath = os.path.join(dirpath,filename)
+            if not os.path.islink(filepath):
+                continue
+            link = os.readlink(filepath)
+            fulldest = os.path.normpath(os.path.join(dirpath,link))
+            working = os.path.isfile(fulldest)
+            res.add((filepath,link,fulldest,working))
+    return res
+
 ##########################
 
 def test_main_note():
@@ -1230,6 +1244,100 @@ def test_copy_with_links(link):
     
     os.chdir(TESTDIR)   
 
+def test_symlink_result():
+    """
+    Tests the output to --symlink for find, grep, and search-tags
+    """
+    os.chdir(TESTDIR)
+    dirpath = os.path.join(TESTDIR,'symlink_res')
+    cleanmkdir(dirpath)
+    os.chdir(dirpath)
+    
+    os.makedirs('sub')
+    with open('file1.txt','wt') as f:f.write('This is file1')
+    with open('file2.txt','wt') as f:f.write('This is file2')
+    with open('sub/file1.txt','wt') as f:f.write('This is file1 SUB')
+    
+    call('tag -t tag1 file1.txt')
+    call('add file1.txt "note1"')
+    
+    call('tag -t tag1 -t tag2 file2.txt')
+    call('add file2.txt "note2" "two lines"')
+    
+    call('tag -t tag1 -t tag2 -t sub sub/file1.txt')
+    call('add sub/file1.txt "note1SUB or note 3"')
+    
+    ## Find
+    call('find --symlink links')
+    links = find_links() # set of (link,link-dest,resolved-dest,working)
+    assert links == {('./links/file2.txt', '../file2.txt', 'file2.txt', True), 
+                     ('./links/file1.txt', '../file1.txt', 'file1.txt', True), 
+                     ('./links/file1.1.txt', '../sub/file1.txt', 'sub/file1.txt', True)} # Notice it is file1.1.txt
+    shutil.rmtree('links')
+    
+    ## grep -- all
+    call('grep --symlink links ""')
+    links = find_links() # set of (link,link-dest,resolved-dest,working)
+    assert links == {('./links/file2.txt', '../file2.txt', 'file2.txt', True), 
+                     ('./links/file1.txt', '../file1.txt', 'file1.txt', True), 
+                     ('./links/file1.1.txt', '../sub/file1.txt', 'sub/file1.txt', True)} # Notice it is file1.1.txt
+    shutil.rmtree('links')
+    
+    ## grep -- specific 1
+    call('grep --symlink links "note1"')    
+    links = find_links() # set of (link,link-dest,resolved-dest,working)
+    assert links == {('./links/file1.txt', '../file1.txt', 'file1.txt', True), 
+                     ('./links/file1.1.txt', '../sub/file1.txt', 'sub/file1.txt', True)} # Notice it is file1.1.txt
+    shutil.rmtree('links')
+
+    ## grep -- specific 2 -- will *not* rename the link
+    call('grep --symlink links "note 3"')    
+    links = find_links() # set of (link,link-dest,resolved-dest,working)
+    assert links == {('./links/file1.txt', '../sub/file1.txt', 'sub/file1.txt', True)} # Notice it is **NOT** file1.1.txt
+    shutil.rmtree('links')
+    
+    ## tags -- all
+    call('search-tags --symlink links')
+    links = find_links() # set of (link,link-dest,resolved-dest,working)
+    assert links == {('./links/sub/file1.txt', '../../sub/file1.txt', 'sub/file1.txt', True), 
+                     ('./links/tag1/file1.1.txt', '../../sub/file1.txt', 'sub/file1.txt', True), 
+                     ('./links/tag1/file1.txt', '../../file1.txt', 'file1.txt', True), 
+                     ('./links/tag1/file2.txt', '../../file2.txt', 'file2.txt', True), 
+                     ('./links/tag2/file1.txt', '../../sub/file1.txt', 'sub/file1.txt', True), 
+                     ('./links/tag2/file2.txt', '../../file2.txt', 'file2.txt', True)}
+    shutil.rmtree('links')
+    
+    ## tags -- tag1 OR sub
+    call('search-tags --symlink links tag1 sub')
+    links = find_links() # set of (link,link-dest,resolved-dest,working)
+    assert links == {('./links/sub/file1.txt', '../../sub/file1.txt', 'sub/file1.txt', True), 
+                     ('./links/tag1/file1.1.txt', '../../sub/file1.txt', 'sub/file1.txt', True), 
+                     ('./links/tag1/file1.txt', '../../file1.txt', 'file1.txt', True), 
+                     ('./links/tag1/file2.txt', '../../file2.txt', 'file2.txt', True)}
+    shutil.rmtree('links')
+    
+    ## tags -- tag1 AND sub
+    call('search-tags --symlink links --all tag1 sub')
+    links = find_links() # set of (link,link-dest,resolved-dest,working)
+    assert links == {('./links/sub/file1.txt', '../../sub/file1.txt', 'sub/file1.txt', True), 
+                     ('./links/tag1/file1.txt', '../../sub/file1.txt', 'sub/file1.txt', True)} # no .1
+    shutil.rmtree('links')
+
+    ## tags with --filter
+    call("""search-tags --filter --symlink links "'tag1' in tags and not 'tag2' in tags" """)
+    links = find_links() # set of (link,link-dest,resolved-dest,working)
+    assert links == {("./links/'tag1' in tags and not 'tag2' in tags/file1.txt", '../../file1.txt', 'file1.txt', True)}
+    shutil.rmtree('links')
+
+    
+    ## tags with --filter multiple
+    call("""search-tags --filter --symlink links "'tag1' in tags and not 'tag2' in tags" "'sub' in tags" """)
+    links = find_links() # set of (link,link-dest,resolved-dest,working)
+    assert links == {("./links/'tag1' in tags and not 'tag2' in tags/file1.txt", '../../file1.txt', 'file1.txt', True), 
+                     ("./links/'sub' in tags/file1.txt", '../../sub/file1.txt', 'sub/file1.txt', True)}
+    shutil.rmtree('links')
+    
+    os.chdir(TESTDIR) 
 
 if __name__ == '__main__': 
     test_main_note()
@@ -1258,6 +1366,7 @@ if __name__ == '__main__':
     test_copy_with_links('both')
     test_copy_with_links('symlink')
     test_copy_with_links('source')
+    test_symlink_result()
     
     print('ALL TESTS PASS') # In case we do not get to this from a sys.exit()
     pass

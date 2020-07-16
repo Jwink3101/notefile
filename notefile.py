@@ -4,7 +4,7 @@
 Write notesfiles to accompany main files
 """
 from __future__ import division, print_function, unicode_literals
-__version__ = '20200716.0'
+__version__ = '20200716.1'
 __author__ = 'Justin Winokur'
 
 import sys
@@ -258,6 +258,34 @@ def find_by_size_mtime_hash(path,size,mtime,sha,excludes=None,matchcase=False,ma
                 possible.append(file)
     return possible
 
+
+def symlink_file(src,dstdir):
+    """
+    Create a relative symlink from src to the dstdir. Note that the dest is
+    a directory
+    """
+    dst = os.path.join(dstdir,os.path.basename(src))
+    
+    for i in range(1,100): # Really shouldn't need 100. Make this an upper limit for safety
+        if not os.path.exists(dst):
+            break
+        dst0 = dst
+        a,b = os.path.splitext(dst)
+        dst = a + '.{}'.format(i) + b
+        warnings.warn("'{dst0}' exists. Changing to '{dst}'".format(dst0=dst0,dst=dst))
+    else:
+        raise ValueError('Too many existing files with the same name')
+    
+    src = os.path.relpath(src,dstdir)
+    
+    try:
+        os.makedirs(dstdir)
+    except OSError:
+        pass
+    
+    os.symlink(src,dst)
+    debug("symlink '{}' --> '{}'".format(src,dst))
+    
 ################################################################################
 ############################### Notefile Object ################################
 ################################################################################
@@ -772,7 +800,8 @@ def grep(path='.',expr='',
          exclude_links=False,include_orphaned=False,
          full_note=False,full_word=False,
          fixed_strings=False,
-         match_any=True):
+         match_any=True,
+         symlink_result=None):
     """
     Search the content of notes for expr
     
@@ -816,6 +845,9 @@ def grep(path='.',expr='',
     
     match_any [True]
         Whether to match any expr
+
+    symlink_result [None]
+        If specified, will make symlinks in '<symlink_result>'
     
     Yields:
     -------
@@ -849,6 +881,17 @@ def grep(path='.',expr='',
                        exclude_links=exclude_links,
                        include_orphaned=include_orphaned,
                        return_note=True) # no need to send noteopts
+    
+    def _sym(src):
+        if symlink_result:
+            symlink_file(src,symlink_result)
+        return src
+    
+    # If the results will be symlinked, we want to have already traversed
+    # so run this now
+    if symlink_result:
+        notes = list(notes)
+    
     for note in notes:
         # Since reading the YAML is slow, we query the note itself.
         # If full_mode, we're done. Otherwise, we then read the YAML and
@@ -861,13 +904,13 @@ def grep(path='.',expr='',
             continue
                         
         if full_note:
-            yield note.filename0 # non-link version
+            yield _sym(note.filename0) # non-link version
             continue
             
         note.read()
         qtext = note.data.get('notes','')
         if query(qtext):
-            yield note.filename0 # non-link version
+            yield _sym(note.filename0) # non-link version
         
 
 def search_tags(path='.',tags=tuple(),
@@ -875,7 +918,8 @@ def search_tags(path='.',tags=tuple(),
                 maxdepth=None,
                 exclude_links=False,include_orphaned=False,
                 filter_mode=False,
-                match_any=True):
+                match_any=True,
+                symlink_result=None):
     """
     Search notes for tags
     
@@ -922,6 +966,9 @@ def search_tags(path='.',tags=tuple(),
     
     match_any [True]
         Whether to match any expr
+    
+    symlink_result [None]
+        If specified, will make symlinks in '<symlink_result>/<tag>'
     
     Returns:
     -------
@@ -972,7 +1019,14 @@ def search_tags(path='.',tags=tuple(),
             for t in qtags.intersection(ntags):
                 res[t].append(note.filename0)
         
-    return {k:sorted(res[k]) for k in sorted(res)}
+    res =  {k:sorted(res[k]) for k in sorted(res)}
+
+    if symlink_result:
+        for k,files in res.items():
+            dstdir = os.path.join(symlink_result,k)
+            for file in files:
+                symlink_file(file,dstdir)
+    return res
     
 def export(path='.',
            excludes=None,matchcase=False,
@@ -1401,7 +1455,6 @@ Notes:
     parsers['cat'].add_argument('-t','--tags',action='store_true',
         help='Print tags rather than notes') 
     
-    
     parsers['find'] = subpar.add_parser('find',help="Find and list all notes")
 
     parsers['grep'] = subpar.add_parser('grep',help="Search notes for a given string")
@@ -1519,6 +1572,15 @@ Notes:
     for name in ['cat','edit']:
         parsers[name].add_argument('-f','--full',action='store_true',
             help='Prints/Edits the entire YAML notefile') 
+
+    # symlink results
+    for name in ['find','grep','search_tags']:
+        parsers[name].add_argument('--symlink',default=None,metavar='DIR',
+            help=('Create symlinks in DIR to the found files. If used in '
+                  'search-tags, will also have subdirs with the name (or filter). '
+                  'If there are name conflicts, will add `.N` to the filename '
+                  'and print a warning to stderr'))
+
 
     # This sorts the optional arguments or each parser.
     # It is a bit of a hack. The biggest issue is that this happens on every 
@@ -1658,6 +1720,7 @@ def cliactions(args):
                          match_any=args.match_any,
                          fixed_strings=args.fixed_strings,
                          full_word=args.full_word,
+                         symlink_result=args.symlink,
                          **findopts):
             # python2 will not have a buffer but can accept bytes regardless of mode
             if hasattr(stream,'buffer'):
@@ -1667,6 +1730,7 @@ def cliactions(args):
 
     if args.command == 'find':
         end = b'\x00' if args.print0 else b'\n'
+        notes = []
         for note in find_notes(include_orphaned=False,
                                return_note=True,
                                noteopts=None,
@@ -1676,12 +1740,19 @@ def cliactions(args):
                 stream.buffer.write(note.filename0.encode('utf8') + end)
             else: # Will deprecate when not using python2
                 stream.write(note.filename0.encode('utf8') + end)
-    
+            
+            notes.append(note)
+        
+        if args.symlink:
+            for note in notes:
+                symlink_file(note.filename0,args.symlink)  
+            
     if args.command == 'search-tags':
         res = search_tags(tags=args.tags,
                           include_orphaned=False,
                           match_any=args.match_any,
                           filter_mode=args.filter,
+                          symlink_result=args.symlink,
                           **findopts)
         
         yaml.dump(res,stream)
