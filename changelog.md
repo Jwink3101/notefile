@@ -2,6 +2,15 @@
 
 (**_newest_** on *top*)
 
+## 20200716.1
+
+* Adds symlink result option to `find`, `grep` and `search-tags`. Removes the scripts that used to do this
+* Adds note about know issues (will be fixed in the future)
+
+## 20200716.0
+
+* Bug fix for mtime repair
+
 ## 20200714.0
 
 * Tag CLI has changed so that tags can be added or removed in one call. For example, in the past, to remove `old` and add `new`, you would do:

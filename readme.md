@@ -115,6 +115,13 @@ If using it on its own, you can tell git to only track notes files with the foll
 
 Alternatively, the `export` command can be used.
 
+## Known Issues
+
+These will likely be addressed (roughly in order of priority)
+
+* Excluding `.*` will exclude hidden note when searching. Use `.*/` to exclude hidden directories 
+* Behavior with hidden files themselves is not consistent
+
 ## Changelog
 
 See [Changelog](changelog.md)
