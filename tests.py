@@ -1339,6 +1339,40 @@ def test_symlink_result():
     
     os.chdir(TESTDIR) 
 
+
+def test_hidden_note_exclusion():
+    """
+    Tests the output to --symlink for find, grep, and search-tags
+    """
+    os.chdir(TESTDIR)
+    dirpath = os.path.join(TESTDIR,'hidden_exc')
+    cleanmkdir(dirpath)
+    os.chdir(dirpath)
+    
+    os.makedirs('.hidden')
+
+    with open('vis.txt','wt') as f:f.write('visible')
+    with open('vis_hiddennote.txt','wt') as f:f.write('visible with a hidden note')
+    with open('.hid.txt','wt') as f:f.write('hidden')
+    with open('.hidden/file1.txt','wt') as f:f.write('This is in a hidden dir')
+    
+    call('tag -t vis vis.txt')
+    call('tag -t hid -H vis_hiddennote.txt')
+    call('tag -t vis .hidden/file1.txt')
+    
+    call('find -o out')
+    with open('out') as f:
+        res = set(f.read().split())
+    assert res == {'./.hidden/file1.txt', './vis_hiddennote.txt', './vis.txt'}
+    
+    # Now do a find but exclude .*
+    call('find --exclude ".*" -o out')
+    with open('out') as f:
+        res = set(f.read().split())
+    assert res == {'./vis_hiddennote.txt', './vis.txt'}
+    
+    os.chdir(TESTDIR) 
+
 if __name__ == '__main__': 
     test_main_note()
     test_odd_filenames()
@@ -1367,6 +1401,7 @@ if __name__ == '__main__':
     test_copy_with_links('symlink')
     test_copy_with_links('source')
     test_symlink_result()
+    test_hidden_note_exclusion()
     
     print('ALL TESTS PASS') # In case we do not get to this from a sys.exit()
     pass

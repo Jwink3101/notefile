@@ -2,6 +2,10 @@
 
 (**_newest_** on *top*)
 
+## 20200724.0
+
+* Fixes a bug where `.*` type exclude would exclude hidden notes on visible files. Also added a warning when using notefile on hidden files. Not recommended and untested
+
 ## 20200716.1
 
 * Adds symlink result option to `find`, `grep` and `search-tags`. Removes the scripts that used to do this

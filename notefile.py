@@ -4,7 +4,7 @@
 Write notesfiles to accompany main files
 """
 from __future__ import division, print_function, unicode_literals
-__version__ = '20200716.1'
+__version__ = '20200724.0'
 __author__ = 'Justin Winokur'
 
 import sys
@@ -185,7 +185,8 @@ def exclude_in_place(mylist,excludes,
         Match case on exclusions
     
     remove_noteext [False]
-        test and compare without NOTESEXT
+        test and compare without NOTESEXT. Also assumes the main file
+        does not have a . if the note is hidden
     
     keep_notes_only [None] {None,True,False}
         None: No Filters
@@ -213,6 +214,9 @@ def exclude_in_place(mylist,excludes,
         item0 = item
         if item.endswith(NOTESEXT) and remove_noteext:
             item = item[:-len(NOTESEXT)]
+            if item.startswith('.'):
+                item = item[1:]
+            
             
         if any(fnmatch.fnmatch(case(item),e) for e in excludes):
             mylist.remove(item0)
@@ -308,6 +312,41 @@ class Notefile(object):
     hashfile [True]
         Whether or not to hash the file    
     
+    Notable Attributes:
+    -------------------
+    Any attribute with 0 is the original. The version without 0 is the refferent
+    if the file is a symlink and not 'symlink' mode
+    
+    filename0,filename: str
+        File being noted
+        
+    destnote0,destnote: str
+        The final note location.
+    
+    islink: bool
+        Whether or not the note is a link. 
+        
+    hidden: bool
+        Whether the note is hidden or not. May be different than the setting
+        if the note already existed
+    
+    data:
+        Note data including 'notes' and 'tags'. Note that you *must* call read()
+        first
+    
+    Notable Methods:
+    ---------------
+    read()
+        Read the contents of the note. Cannot use data without having called
+        read()
+    
+    write()
+        Write the note content. Many actions will change data but will not save
+        it unless write() is called
+    
+    make_links()
+        Build the appropriate symlinks if the note is a link
+    
     Note:
     -----
     Most methods also return itself for convenience 
@@ -320,6 +359,9 @@ class Notefile(object):
         self.link = link
         
         self.filename,self.vis_note,self.hid_note = get_filenames(filename)
+        
+        if os.path.basename(self.filename).startswith('.'):
+            warnings.warn("hidden files may not always work: '{}'".format(self.filename))
         
         # Store the original paths. Will be reset later if link 
         self.destnote0,_ = hidden_chooser(self.vis_note,self.hid_note,hidden)
