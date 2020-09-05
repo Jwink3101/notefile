@@ -589,7 +589,7 @@ def test_maxdepth():
     
     os.chdir(TESTDIR)
 
-def test_grep_and_listtags_and_export_and_find():
+def test_grep_and_listtags_and_export_and_find_and_change():
     """
     Tests greping including for tags
     """
@@ -701,6 +701,12 @@ def test_grep_and_listtags_and_export_and_find():
         res = {k:set(v) for k,v in res.items()}
     assert {'tag1': {'./noenter/file3.txt','./file1.txt'}} == res   
     
+    # Just test the --tag-only mode
+    call('search-tags -o out --tag-only')
+    with open('out') as file:
+        res = yaml.load(file)
+    assert set(res) == {'tag1','tag2'}
+
     ## Fancy Queries
     call('search-tags -o out "tag1" "tag2"')
     with open('out') as file:
@@ -814,6 +820,41 @@ def test_grep_and_listtags_and_export_and_find():
         assert {'./file6.txt', './file5.txt', './link.txt', 
                 './noenter/file3.txt', './file2.txt', './file4.exc', 
                 './file1.txt'} == res
+    
+    ## Changing tags
+    
+    # Vanilla
+    call('change-tag tag2 tagTWO') # Just change one. See that it lowercases it
+    call('search-tags -o out tag2 tagtwo')
+    with open('out') as file:
+        res = yaml.load(file)
+        # Convert to dict of sets for ordering
+        res = {k:set(v) for k,v in res.items()}
+    assert res == {'tagtwo': {'./file1.txt'}}
+    
+    # Dry run
+    call('search-tags -o out0') # to compare against
+    call('change-tag tag1 tag11 --dry-run -o out')
+    with open('out') as file:
+        lines = [l for l in file if l.strip()]
+        assert len(lines) == 5
+    call('search-tags -o out1') # to compare against
+    with open('out0') as out0, open('out1') as out1:
+        res0,res1 = yaml.load(out0),yaml.load(out1)
+    assert res0 == res1
+    
+    
+    call('change-tag --exclude "*.exc" tag1 tagone')
+    call('search-tags tag1 -o out')
+    with open('out') as file:
+        res = yaml.load(file)
+        res = {k:set(v) for k,v in res.items()}
+    assert res == {'tag1': {'./file4.exc'}}
+        
+    # Not Tested:
+    #   * Exclude links. This should be fine because it's the same logic as the
+    #     the others but there is no link that would work for this since the referent
+    #     gets changed
     
     os.chdir(TESTDIR)
 
@@ -1388,7 +1429,7 @@ if __name__ == '__main__':
     test_link_overwrite('symlink')
     test_link_overwrite('source')
     test_excludes_repair()
-    test_grep_and_listtags_and_export_and_find()
+    test_grep_and_listtags_and_export_and_find_and_change()
     test_grep_w_multiple_expr()
     test_nohash()
     test_maxdepth()

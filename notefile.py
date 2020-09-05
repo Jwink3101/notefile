@@ -4,7 +4,7 @@
 Write notesfiles to accompany main files
 """
 from __future__ import division, print_function, unicode_literals
-__version__ = '20200724.0'
+__version__ = '20200905.0'
 __author__ = 'Justin Winokur'
 
 import sys
@@ -539,7 +539,7 @@ class Notefile(object):
                 pass
         else:
             raise ValueError(('Must specify an editor. Possible enviormental variables: '
-                             (', '.join("'{}'".format(e) for e in editor_names))))
+                              ', '.join("'{}'".format(e) for e in editor_names)))
         
         tagtxt = '<< Comma-seperated tags. DO NOT MODIFY THIS LINE >>'
         
@@ -977,7 +977,7 @@ def search_tags(path='.',tags=tuple(),
     excludes []
         Specify excludes in glob-style. Will be checked against
         both filenames and directories. Will also be checked against
-        directorys with "/" appended
+        directories with "/" appended
     
     matchcase [False]
         Whether or not to match the case of the exclude file
@@ -1069,6 +1069,76 @@ def search_tags(path='.',tags=tuple(),
             for file in files:
                 symlink_file(file,dstdir)
     return res
+
+def change_tag(oldtag,newtag,
+                path='.',
+                excludes=None,matchcase=False,
+                maxdepth=None,
+                exclude_links=False,include_orphaned=False,
+                dry_run=False,
+                noteopts=None):
+    """
+    Search for oldtag and rename it newtag
+    
+    Inputs:
+    -------
+    oldtag,newtag
+        The old and new tag names
+        
+    path ['.']
+        Where to search
+    
+    excludes []
+        Specify excludes in glob-style. Will be checked against
+        both filenames and directories. Will also be checked against
+        directories with "/" appended
+    
+    matchcase [False]
+        Whether or not to match the case of the exclude file
+    
+    maxdepth [None]
+        Specify a maximum depth. The current directory is 0
+
+    exclude_links [ False ] 
+        If True, will *not* return symlinked notes
+    
+    include_orphaned [ False ]
+        If True, will ALSO return orphaned notes. 
+        Otherwise, they are excluded   
+    
+    noteopts [ None ]
+        Options to pass to find_notes
+    
+    Yields:
+    -------
+    note - read and written note that was modified
+    """
+    
+    notes = find_notes(path=path,
+                       excludes=excludes,
+                       matchcase=matchcase,
+                       maxdepth=maxdepth,
+                       exclude_links=exclude_links,
+                       include_orphaned=include_orphaned,
+                       return_note=True,
+                       noteopts=noteopts)
+
+    oldtag,newtag = oldtag.lower().strip(),newtag.lower().strip()
+    for note in notes:
+        note.read()
+        
+        ntags = note.data.get('tags',[])
+        ntags = set(t.lower() for t in ntags)
+
+        if oldtag in ntags:
+            if not dry_run:
+                note.modify_tags(add=newtag,remove=oldtag)
+                note.write()
+            yield note
+    
+        
+    
+
     
 def export(path='.',
            excludes=None,matchcase=False,
@@ -1491,6 +1561,13 @@ Notes:
         help=('Require mtime be the same for orphaned notes. Could speed '
               'up search by reducing the number of files to be hashed'))
     
+    parsers['change_tag'] = subpar.add_parser('change-tag',help='Change one tag to another')
+    parsers['change_tag'].add_argument('old_tag',help='Old tag you will be changing')
+    parsers['change_tag'].add_argument('new_tag',help='New tag you will be using')
+    parsers['change_tag'].add_argument('-s','--silent',action='store_true',
+        help='Do NOT list notes that were modified')
+    
+    
     ## Queries
     parsers['cat'] = subpar.add_parser('cat',help="Print the notes")
     parsers['cat'].add_argument('file',help='Specify file to cat')
@@ -1528,6 +1605,8 @@ Notes:
               "and the input will be made lowercase since tags are always made "
               "lowercase. "
               "WARNING: Input is NOT sanitized. Do not use untrusted input!"))
+    parsers['search_tags'].add_argument('-t','--tag-only',action='store_true',
+        help=('Print just the tag names and not the files'))   
     
     parsers['export'] = subpar.add_parser('export',help="Export all notesfiles to YAML")
     
@@ -1536,11 +1615,11 @@ Notes:
         help='Visibility mode for file(s)/dir(s) ')
     parsers['vis'].add_argument('path',default=['.'],nargs='*',help='[.] files(s)/dir(s)')
 
-    ## Common arguments
+    ## Common arguments for when there are more than one command using it
     # Could use various parent parsers but this is honestly just as easy!
     
     # Modification Flags. 
-    for name in ['add','edit','tag','repair','copy']:
+    for name in ['add','edit','tag','repair','copy','change_tag']:
         parsers[name].add_argument('--no-hash',action='store_false',dest='hashfile',
             help='Do *not* compute the SHA256 of the basefile. Will not be able to repair orphaned notes')
         parsers[name].add_argument('--link',choices=['source','symlink','both'],
@@ -1563,19 +1642,20 @@ Notes:
             help='Never refresh file metadata when a notefile is modified')
 
     # Search path
-    for name in ['grep','search_tags','export','find',]:
+    for name in ['change_tag', 'export', 'find', 'grep', 'search_tags']:
         parsers[name].add_argument('-p','--path',default='.',help='[%(default)s] Specify path')
         
         
     # Hidden settings ( Repair hidden respects source hidden)
-    for name in ['add','edit','tag','copy']:
+    # Note that change_tag will only work on existing so no need to set hidden
+    for name in ['add', 'copy', 'edit', 'tag']:
         parsers[name].add_argument('-H','--hidden',action='store_true',default=HIDDEN,
             help='Override default and make new notes hidden')
         parsers[name].add_argument('-V','--visible',action='store_false',dest='hidden',
             help='Override default and make new notes visible')
     
     # Add exclude options:
-    for name in ['repair','grep','search_tags','export','vis','find']:
+    for name in  ['change_tag', 'export', 'find', 'grep', 'repair', 'search_tags', 'vis']:
         parsers[name].add_argument('--exclude',action='append',default=[],
             help=('Specify a glob pattern to exclude when looking for notes. '
                   "Directories are also matched with a trailing '/'. Can specify multiple times."))
@@ -1591,16 +1671,16 @@ Notes:
                                    help='Match ALL expressions')        
 
     # add outfiles
-    for name in ['search_tags','cat','grep','export','find']:
+    for name in ['search_tags','cat','grep','export','find','change_tag']:
         parsers[name].add_argument('-o','--out-file',help='Specify file rather than stdout',metavar='FILE')
 
     # exclude links
-    for name in ['search_tags','grep','export','vis','find']:
+    for name in ['search_tags','grep','export','vis','find','change_tag']:
         parsers[name].add_argument('--exclude-links',action='store_true',
             help='Do not include symlinked notefiles')
     
     # dry run
-    for name in ['repair','vis']:
+    for name in ['repair','vis','change_tag']:
         parsers[name].add_argument('--dry-run',action='store_true',
             help='Do not make any changes')
 
@@ -1747,8 +1827,22 @@ def cliactions(args):
     args.out_file = getattr(args,'out_file',None) # Make sure it's set
     stream = sys.stdout if args.out_file is None else open(args.out_file,'wt') 
     
+    if args.command == 'change-tag': # THis queries and changes
+        t = '(DRYRUN) ' if args.dry_run else ''
+        for note in change_tag(args.old_tag,args.new_tag,
+                               noteopts=noteopts, # hashfile,link
+                               include_orphaned=False,
+                               dry_run=args.dry_run,
+                               **findopts # path,excludes,matchcase,maxdepth,exclude_links
+                               ):
+            if not args.no_refresh:
+                note.repair_metadata(force=args.force_refresh)
+            if not args.silent:
+                print('{}Modifed {}'.format(t,note.filename0),file=stream)    
+                               
+
+    
     if args.command == 'cat': 
-   
         note = Notefile(args.file,**noteopts)
         note.read()
         print(note.cat(tags=args.tags,full=args.full),file=stream)
@@ -1796,7 +1890,8 @@ def cliactions(args):
                           filter_mode=args.filter,
                           symlink_result=args.symlink,
                           **findopts)
-        
+        if args.tag_only:
+            res = list(res.keys())
         yaml.dump(res,stream)
         
     if args.command == 'export':
