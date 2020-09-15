@@ -723,32 +723,6 @@ def test_grep_and_listtags_and_export_and_find_and_change():
         res = {k:set(v) for k,v in res.items()}
     assert {'tag1': {'./file1.txt'}, 'tag2': {'./file1.txt'}} == res
     
-    ## --filters. Also use a mix of caps to test that it gets fixed
-    call("""search-tags -o out --filter "'tag1' in tags and 'tAG2' not in tags" """)
-    with open('out') as file:
-        res = yaml.load(file)
-        # Convert to dict of sets for ordering
-        res = {k:set(v) for k,v in res.items()}
-    assert res == {"'tag1' in tags and 'tag2' not in tags":  # made lowercase
-                      {'./file4.exc', './noenter/file3.txt'}} # NOT ./file1.txt
-    # Multiple
-    call("""search-tags -o out --filter "'tag1' in tags and 'tAG2' not in tags" '"tag2" in tags' """)
-    with open('out') as file:
-        res = yaml.load(file)
-        # Convert to dict of sets for ordering
-        res = {k:set(v) for k,v in res.items()}
-    assert res == {"'tag1' in tags and 'tag2' not in tags": 
-                        {'./file4.exc', './noenter/file3.txt'}, 
-                   '"tag2" in tags':  # Different quote pattern to match the query
-                        {'./file1.txt'}}
-
-    # Multiple --all
-    call("""search-tags -o out --all --filter "'tag1' in tags and 'tAG2' not in tags" '"tag2" in tags' """)
-    with open('out') as file:
-        res = yaml.load(file)
-        # Convert to dict of sets for ordering
-        res = {k:set(v) for k,v in res.items()}
-    assert res == {}
 
     
     ## Link Excludes
@@ -923,6 +897,121 @@ def test_grep_w_multiple_expr():
     
     
     os.chdir(TESTDIR)
+
+def test_queries():
+    os.chdir(TESTDIR)
+    dirpath = os.path.join(TESTDIR,'queries')
+    cleanmkdir(dirpath)
+    os.chdir(dirpath)
+
+    def _read_res(out='out'):
+        with open(out) as file:
+            return set(f.strip() for f in file.read().splitlines() if f.strip())
+
+    ## Setup
+    with open('file1.txt','wt') as file:file.write('file1')
+    with open('file2.txt','wt') as file:file.write('file2')
+    with open('file3.txt','wt') as file:file.write('file3')
+    
+    with open('file4.exc','wt') as file:file.write('file4')
+    with open('file4.txt','wt') as file:file.write('FILE4')
+    
+    with open('file5.txt','wt') as file:file.write('file5')
+    with open('file6.txt','wt') as file:file.write('file6')
+    with open('file7.txt','wt') as file:file.write('file7')
+    
+    with open('file8.txt','wt') as file:file.write('file8')    
+    
+    call('add file1.txt "word1" "word2" "word3" ')
+    call('add file2.txt "word1" "word3" ')
+    call('add file3.txt "word1" "word2" "d1" ')
+    call('tag -t tag1 file1.txt')
+    call('tag -t tag2 file2.txt')
+    
+    call('add file4.txt RaNdOM')
+    call('add file4.exc RANDOM')
+    
+    call('tag file5.txt -t T1 -t T2 -t T3 ')
+    call('tag file6.txt -t T1 -t T3 ')
+    call('tag file7.txt -t T1 -t T2 ')
+    
+    # Tests with grep and tags
+    call("""query "grep('word1') and grep('word2') and not grep('word3')" -o out""")
+    assert _read_res() == {'./file3.txt'}
+    
+    call("""query "g('word1') and 'tag1' in tags" -o out""") # include tags
+    assert _read_res() == {'./file1.txt'}
+    
+    call("""query "g('d1')" -o out""")
+    assert _read_res() == {'./file1.txt', './file2.txt', './file3.txt'}
+    
+    call("""query "g('d1')" --full-word -o out""")
+    assert _read_res() == {'./file3.txt'}
+
+    call("""query "g('w.*?1')" -o out""")
+    assert _read_res() == {'./file1.txt', './file2.txt', './file3.txt'}
+    
+    call("""query "g('w.*?1')" --fixed-strings -o out""")
+    assert _read_res() == set()
+    
+        
+    # Excludes and case
+    call("""query "g('RANDOM')" -o out""")
+    assert _read_res() == {'./file4.txt', './file4.exc'}
+    
+    call("""query "g('RANDOM')" --match-expr-case -o out""")
+    assert _read_res() == {'./file4.exc'}
+    
+    call("""query "g('RANDOM')" --exclude '*.eXc' -o out""")
+    assert _read_res() == {'./file4.txt'}
+
+    call("""query "g('RANDOM')" --exclude '*.eXc' --match-exclude-case -o out""")
+    assert _read_res() == {'./file4.txt','./file4.exc'}
+    
+    call("""query "any('T{}'.format(a) in tags for a in '123')" -o out""") #Should be none since tags are always lowercase
+    assert _read_res() == set()
+    
+    call("""query "any('t{}'.format(a) in tags for a in '123')" -o out""")
+    assert _read_res() == {'./file5.txt', './file6.txt', './file7.txt'}
+
+    call("""query "all('t{}'.format(a) in tags for a in '123')" -o out""")
+    assert _read_res() == {'./file5.txt'}
+
+    # Multiline
+    call("""query "a = g('word1');b = 't3' in tags; c=note.filename == './file6.txt'; (a or b) and not c" -o out""")
+    assert {'./file2.txt', './file5.txt', './file3.txt', './file1.txt'} == _read_res()
+    
+    call("""query "a = g('word1')" "b = 't3' in tags; c=note.filename == './file6.txt'" "(a or b) and not c" -o out""")
+    assert {'./file2.txt', './file5.txt', './file3.txt', './file1.txt'} == _read_res()
+    
+    # Test output methods
+    call("""query "'t1' in tags" -0 -o out""")
+    with open('out','rb') as f:
+        txt = f.read()
+    assert b'\n' not in txt
+    assert b'\x00' in txt
+
+    call("""query "all('t{}'.format(a) in tags for a in '123')" -o out --symlink links""")    
+    assert os.readlink('links/file5.txt') == '../file5.txt'
+    
+    # Query other fields
+    note = notefile.Notefile('file8.txt').read()
+    note.data['other'] = {'f1':'file8'}    
+    note.write()
+    
+    # these SHOULD error since it is asking for keys that don't exists
+    # use `--debug` to raise the error
+    try:
+        call("""--debug query "note.data['other']['f1'] == 'file8'" """)
+        assert False,"no error"
+    except notefile.QueryError:
+        assert True
+    # use .get() to handle this better
+    call("""query "note.data.get('other',{}).get('f1') == 'file8'" -o out""")
+    assert _read_res() == {'./file8.txt'}
+    
+    os.chdir(TESTDIR)
+
 
 def test_nohash():
     os.chdir(TESTDIR)
@@ -1363,20 +1452,6 @@ def test_symlink_result():
     assert links == {('./links/sub/file1.txt', '../../sub/file1.txt', 'sub/file1.txt', True), 
                      ('./links/tag1/file1.txt', '../../sub/file1.txt', 'sub/file1.txt', True)} # no .1
     shutil.rmtree('links')
-
-    ## tags with --filter
-    call("""search-tags --filter --symlink links "'tag1' in tags and not 'tag2' in tags" """)
-    links = find_links() # set of (link,link-dest,resolved-dest,working)
-    assert links == {("./links/'tag1' in tags and not 'tag2' in tags/file1.txt", '../../file1.txt', 'file1.txt', True)}
-    shutil.rmtree('links')
-
-    
-    ## tags with --filter multiple
-    call("""search-tags --filter --symlink links "'tag1' in tags and not 'tag2' in tags" "'sub' in tags" """)
-    links = find_links() # set of (link,link-dest,resolved-dest,working)
-    assert links == {("./links/'tag1' in tags and not 'tag2' in tags/file1.txt", '../../file1.txt', 'file1.txt', True), 
-                     ("./links/'sub' in tags/file1.txt", '../../sub/file1.txt', 'sub/file1.txt', True)}
-    shutil.rmtree('links')
     
     os.chdir(TESTDIR) 
 
@@ -1431,6 +1506,7 @@ if __name__ == '__main__':
     test_excludes_repair()
     test_grep_and_listtags_and_export_and_find_and_change()
     test_grep_w_multiple_expr()
+    test_queries()
     test_nohash()
     test_maxdepth()
     test_hidden('both')
@@ -1443,6 +1519,8 @@ if __name__ == '__main__':
     test_copy_with_links('source')
     test_symlink_result()
     test_hidden_note_exclusion()
+    
+
     
     print('ALL TESTS PASS') # In case we do not get to this from a sys.exit()
     pass

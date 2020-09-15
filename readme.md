@@ -123,18 +123,15 @@ These will likely be addressed (roughly in order of priority)
 
 ## Additional Workflows
 
-This tools includes a lot of features but does not include everything. More can be done in Python direction. 
+This tools includes a lot of features but does not include everything. More can be done in Python directly
 
-For example, to rename a tag from `old` to `new`:
+For example, to search for all notes and perform a test do 
 
 ```python
 import notefile
 for note in notefile.find_notes(return_note=True):
     note.read() # Access to data attribute
-    if 'old' in note.data.get('tags',[]): # tags may not always exist
-        note.modify_tags(add='new',remove='old')
-        note.write()
-        print(note.filename)
+    # test on note.data
 ```
 
 Additional fields can be added (or removed) from `data` and will be saved when `write` is called.

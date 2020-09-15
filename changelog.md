@@ -2,6 +2,17 @@
 
 (**_newest_** on *top*)
 
+## 20200915.0
+
+* Adds `query` command to perform python queries. This works like `search-tags --filter` but lets you also query the notes and other fields.
+    * Removes `--filter` from `search-tags` as the query replaces it
+    * Note that `query` can replace all of `search-tags` and `grep` but adds a lot of boilerplate that those two remove. Also, `query` is slower than `grep` since `grep` avoids parsing YAML on all notes
+* Tests updated to test `query` and remote `search-tags --filter`
+
+## 20200905.0
+
+* Adds `change-tag` command to rename specific tags.
+
 ## 20200724.0
 
 * Fixes a bug where `.*` type exclude would exclude hidden notes on visible files. Also added a warning when using notefile on hidden files. Not recommended and untested
