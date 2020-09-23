@@ -1547,6 +1547,12 @@ def test_alternative_fields():
     call("""query -o out --note-field other "g('alt')" """) # Should still work
     assert _read_res() == {'./file.txt'}
 
+    # Test the copy when note was never set
+    with open('new.txt','w') as f:f.write('this is new')
+    call('add --note-field other new.txt this is in other')
+    
+    with open('newcopy.txt','w') as f:f.write('will get copy')
+    call('copy new.txt newcopy.txt')
 
 
     os.chdir(TESTDIR) 

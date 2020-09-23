@@ -2,6 +2,12 @@
 
 (**_newest_** on *top*)
 
+## 20200923.0 (and .1)
+
+* Adds the ability to specify the field in which notes are written. Will grep and query a string representation but will not let you add text to it.
+    * Does not (yet?) let you set the tags field
+* `.1` fixes a minor bug in copy
+
 ## 20200915.0
 
 * Adds `query` command to perform python queries. This works like `search-tags --filter` but lets you also query the notes and other fields.

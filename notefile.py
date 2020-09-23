@@ -4,7 +4,7 @@
 Write notesfiles to accompany main files
 """
 from __future__ import division, print_function, unicode_literals
-__version__ = '20200923.0'
+__version__ = '20200923.1'
 __author__ = 'Justin Winokur'
 
 import sys
@@ -747,16 +747,17 @@ def copy_note(src,dst,
     src_note = Notefile(src) # SRC is assumed to have it's OWN notefile (symlink or file)
     src_note.read()
     
-    # Copy all NEW keys from src and dst. Delete notes and tags so they are
-    # also copied (they will appear as new)
-    del dst_note.data['tags']
-    del dst_note.data['notes']
-    
+    metadata = {'filesize','mtime','sha256','last-updated','notefile version'}
     for key,val in src_note.data.items():
-        if key in dst_note.data or key == 'sha256':
-            continue # things like metadata. Do sha256 in case it isn't processed by dst_note
+        if key in metadata:
+            continue
         dst_note.data[key] = val
     
+    # Remove any empty keys as they may be leftover from the default
+    for key in list(dst_note.data):
+        if not dst_note.data[key]:
+            del dst_note.data[key]
+            
     dst_note.write()
 
 
