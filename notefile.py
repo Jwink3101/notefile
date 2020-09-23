@@ -4,7 +4,7 @@
 Write notesfiles to accompany main files
 """
 from __future__ import division, print_function, unicode_literals
-__version__ = '20200915.0'
+__version__ = '20200923.0'
 __author__ = 'Justin Winokur'
 
 import sys
@@ -27,6 +27,8 @@ DT = 1 # mtime change
 
 HIDDEN = os.environ.get('NOTEFILE_HIDDEN','false').strip().lower() == 'true'
 DEBUG = os.environ.get('NOTEFILE_DEBUG','false').strip().lower() == 'true'
+
+NOTEFIELD = os.environ.get('NOTEFILE_NOTEFIELD','notes').strip()
 
 def debug(*args,**kwargs):
     if DEBUG:
@@ -312,6 +314,9 @@ class Notefile(object):
     hashfile [True]
         Whether or not to hash the file    
     
+    note_field [NOTEFIELD]
+        The field for reading and writing notes
+    
     Notable Attributes:
     -------------------
     Any attribute with 0 is the original. The version without 0 is the refferent
@@ -351,12 +356,17 @@ class Notefile(object):
     -----
     Most methods also return itself for convenience 
     """
-    def __init__(self,filename,hidden=HIDDEN,link='both',hashfile=True):
+    def __init__(self,filename,
+                 hidden=HIDDEN,
+                 link='both',
+                 hashfile=True,
+                 note_field=NOTEFIELD):
         ## Notation: 
         #   _0 names re the original file for a link (or when 'symlink' mode).
         #   When not a link, it doesn't matter!
         self.hashfile = hashfile
         self.link = link
+        self.note_field = note_field
         
         self.filename,self.vis_note,self.hid_note = get_filenames(filename)
         
@@ -433,8 +443,8 @@ class Notefile(object):
         if 'tags' not in self.data:
             self.data['tags'] = []
             
-        if 'notes' not in self.data:
-            self.data['notes'] = ''
+        if self.note_field not in self.data:
+            self.data[self.note_field] = ''
         
         # Make a copy for compare later. Use deep copy in case mutable 
         # objects are modified
@@ -449,8 +459,8 @@ class Notefile(object):
         if self.data is None:
             raise ValueError('Cannot write empty data. Use read() or set data attribute')
         
-        if 'notes' in self.data:
-            self.data['notes'] = self.data['notes'].strip() 
+        if self.note_field in self.data and isinstance(self.data[self.note_field],(str,unicode)):
+            self.data[self.note_field] = self.data[self.note_field].strip() 
         
         tags = self.data.get('tags',[])
         tags = set(t.strip() for t in tags if t.strip())
@@ -547,7 +557,9 @@ class Notefile(object):
             self.data2txt()
             content = self.txt
         else:
-            content = self.data.get('notes','')
+            content = self.data.get(self.note_field,'') # in case it's a dict
+            if not isinstance(content,(str,unicode)):
+                raise TypeError('Cannot edit non-string notes. Edit the full YAML instead')
             content += '\n\n' + tagtxt + '\n'
             tags = self.data.get('tags',[])
             tags = sorted(t for t in set(tt.strip().lower() for tt in tags) if t)
@@ -576,7 +588,7 @@ class Notefile(object):
             for line in lines: # Get tags with the remaining lines
                 tags.extend(line.split(','))
                 
-            self.data['notes'] = '\n'.join(note)
+            self.data[self.note_field] = '\n'.join(note)
             tags = sorted(t for t in set(tt.strip().lower() for tt in tags) if t)
             self.data['tags'] = tags
             
@@ -588,9 +600,9 @@ class Notefile(object):
             raise ValueError('Cannot edit empty data. Use read() or set data attribute')
 
         if replace:
-            self.data['notes'] = note
+            self.data[self.note_field] = note
         else:
-            self.data['notes'] += '\n' + note.strip()
+            self.data[self.note_field] += '\n' + note.strip() # Could cause an error if not an str
         
         return self # for convenience
         
@@ -633,7 +645,10 @@ class Notefile(object):
             tags = sorted(t.lower() for t in tags)
             return '\n'.join(tags)
             
-        return self.data.get('notes','')
+        txt = self.data.get(self.note_field,'')
+        if not isinstance(txt,(str,unicode)):
+            raise TypeError('Cannot cat non-string notes. cat the full YAML instead')
+        return txt
         
     def data2txt(self):
         """
@@ -733,13 +748,13 @@ def copy_note(src,dst,
     src_note.read()
     
     # Copy all NEW keys from src and dst. Delete notes and tags so they are
-    # also copied
+    # also copied (they will appear as new)
     del dst_note.data['tags']
     del dst_note.data['notes']
     
     for key,val in src_note.data.items():
         if key in dst_note.data or key == 'sha256':
-            continue # things like metadata
+            continue # things like metadata. Do sha256 in case it isn't processed by dst_note
         dst_note.data[key] = val
     
     dst_note.write()
@@ -843,7 +858,8 @@ def grep(path='.',expr='',
          full_note=False,full_word=False,
          fixed_strings=False,
          match_any=True,
-         symlink_result=None):
+         symlink_result=None,
+         note_field=NOTEFIELD):
     """
     Search the content of notes for expr
     
@@ -890,6 +906,10 @@ def grep(path='.',expr='',
 
     symlink_result [None]
         If specified, will make symlinks in '<symlink_result>'
+    
+    note_field [NOTEFIELD]
+        Specify the field with the notes. If the field is not a string,
+        will use the str() with a warning
     
     Yields:
     -------
@@ -948,9 +968,11 @@ def grep(path='.',expr='',
         if full_note:
             yield _sym(note.filename0) # non-link version
             continue
-            
         note.read()
-        qtext = note.data.get('notes','')
+        qtext = note.data.get(note_field,'') 
+        if not isinstance(qtext,(str,unicode)):
+            warnings.warn('Note is {}. Converting to string'.format(unicode(type(qtext))))
+            qtext = unicode(qtext)# Make it a string
         if query(qtext):
             yield _sym(note.filename0) # non-link version
 
@@ -965,7 +987,8 @@ def query(path='.',
           exclude_links=False,
           include_orphaned=False, 
           full_word=False,fixed_strings=False,
-          symlink_result=None):
+          symlink_result=None,
+          note_field=NOTEFIELD):
     """
     Perform python queries on notes:
     
@@ -1006,7 +1029,11 @@ def query(path='.',
 
     symlink_result [None]
         If specified, will make symlinks in '<symlink_result>'
-    
+
+    note_field [NOTEFIELD]
+        Specify the field with the notes. If the field is not a string,
+        will use the str()
+
     Yields:
     -------
     filename
@@ -1047,14 +1074,18 @@ def query(path='.',
         note.write = lambda *a,**k:None # disable write
         
         note.data['tags'] = set(t.lower() for t in note.data.get('tags',[]))
-        
         namespace = {
             'note':note,
             'data':note.data,
             'tags':note.data['tags'],
-            'notes':note.data.get('notes',''),
+            'notes':note.data.get(note_field,''),
             'text':getattr(note,'txt',''),
         }
+        
+        if not isinstance(namespace['notes'],(str,unicode)):
+            warnings.warn('Note is {}. Converting to string'.format(unicode(type(namespace['notes']))))
+            namespace['notes'] = unicode(namespace['notes']) # Make it a string
+        
         namespace['grep'] = partial(_grep,note=namespace['notes'])
         namespace['g'] = namespace['grep']
         namespace['re'] = re
@@ -1637,10 +1668,6 @@ Notes:
     
 """
 
-
-
-
-
     import argparse
     parsers = {}
     parsers['main'] = argparse.ArgumentParser(\
@@ -1853,6 +1880,12 @@ Notes:
                   'If there are name conflicts, will add `.N` to the filename '
                   'and print a warning to stderr'))
 
+    # Notefield
+    for name in ['add','edit','cat','grep','query']:
+        parsers[name].add_argument('--note-field',default=NOTEFIELD,metavar='name',
+            help=("['notes'] Specify the field to write or query notes. "
+                  "Can also be set by NOTEFILE_NOTEFIELD enviormental variable. " 
+                  "Setting it here takes precedance"))
 
     # This sorts the optional arguments or each parser.
     # It is a bit of a hack. The biggest issue is that this happens on every 
@@ -1906,10 +1939,14 @@ def cliactions(args):
     if getattr(args,'no_refresh',False):
         args.hashfile = False # Reset this!
     
+    if hasattr(args,'note_field') and not args.note_field:
+        args.note_field = NOTEFIELD
+    
     # Store common settings with sensible defaults
     noteopts = dict(hidden=getattr(args,'hidden',None),
                     link=getattr(args,'link','both'),
-                    hashfile=getattr(args,'hashfile',None))
+                    hashfile=getattr(args,'hashfile',None),
+                    note_field=getattr(args,'note_field',NOTEFIELD))
     
     findopts = dict(path=getattr(args,'path',None),
                     excludes=getattr(args,'exclude',None),
@@ -2015,6 +2052,7 @@ def cliactions(args):
                          fixed_strings=args.fixed_strings,
                          full_word=args.full_word,
                          symlink_result=args.symlink,
+                         note_field=getattr(args,'note_field',NOTEFIELD),
                          **findopts):
             # python2 will not have a buffer but can accept bytes regardless of mode
             if hasattr(stream,'buffer'):
@@ -2030,6 +2068,7 @@ def cliactions(args):
                           fixed_strings=args.fixed_strings,
                           full_word=args.full_word,
                           symlink_result=args.symlink,
+                          note_field=getattr(args,'note_field',NOTEFIELD),
                           **findopts):
             # python2 will not have a buffer but can accept bytes regardless of mode
             if hasattr(stream,'buffer'):

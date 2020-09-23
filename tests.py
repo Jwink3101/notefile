@@ -1489,6 +1489,69 @@ def test_hidden_note_exclusion():
     
     os.chdir(TESTDIR) 
 
+def test_alternative_fields():
+    os.chdir(TESTDIR)
+    dirpath = os.path.join(TESTDIR,'alt_field')
+    cleanmkdir(dirpath)
+    os.chdir(dirpath)
+    
+    def _read_res(out='out'):
+        with open(out) as file:
+            return set(f.strip() for f in file.read().splitlines() if f.strip())
+    
+    with open('note.txt','wt') as f:f.write('Im a note')
+    
+    call('add note.txt "Default" ')
+    call('add --note-field alt note.txt "Alternative"')
+
+    # Grep and query with grep()    
+    call('grep -o out Default')
+    assert _read_res() == {'./note.txt'}
+    call("""query -o out "g('Default')" """)
+    assert _read_res() == {'./note.txt'}
+    
+    call('grep -o out --note-field alt Default')
+    assert _read_res() == set()
+    call("""query -o out --note-field alt "g('Default')" """)
+    assert _read_res() == set()
+    
+    call('grep -o out Alternative')
+    assert _read_res() == set()
+    call("""query -o out "g('Alternative')" """)
+    assert _read_res() == set()
+    
+    call('grep -o out --note-field alt Alternative')
+    assert _read_res() == {'./note.txt'}
+    call("""query -o out --note-field alt "g('Alternative')" """)
+    assert _read_res() == {'./note.txt'}
+    
+
+    # Test with non-text stuff
+    with open('file.txt','wt') as f:f.write('I am a file')
+    
+    note = notefile.Notefile('file.txt')
+    note.read()
+    note.data['notes'] = 'default'
+    note.data['other'] = dict(a='alt')
+    note.write()
+
+    # This should error since you cannot add to a dictionary
+    try:
+        call('--debug add --note-field other file.txt bla')    
+        assert False
+    except TypeError:
+        assert True
+        
+    call('grep -o out --note-field other alt') # Should still work
+    assert _read_res() == {'./file.txt'}
+    call("""query -o out --note-field other "g('alt')" """) # Should still work
+    assert _read_res() == {'./file.txt'}
+
+
+
+    os.chdir(TESTDIR) 
+
+
 if __name__ == '__main__': 
     test_main_note()
     test_odd_filenames()
@@ -1519,9 +1582,8 @@ if __name__ == '__main__':
     test_copy_with_links('source')
     test_symlink_result()
     test_hidden_note_exclusion()
-    
+    test_alternative_fields()
 
-    
     print('ALL TESTS PASS') # In case we do not get to this from a sys.exit()
     pass
     

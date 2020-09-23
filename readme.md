@@ -136,6 +136,8 @@ for note in notefile.find_notes(return_note=True):
 
 Additional fields can be added (or removed) from `data` and will be saved when `write` is called.
 
+Note that notefile does support setting alternative note fields (but not tags) so that may be useful from the CLI.
+
 ## Changelog
 
 See [Changelog](changelog.md)
