@@ -1010,6 +1010,9 @@ def test_queries():
     call("""query "note.data.get('other',{}).get('f1') == 'file8'" -o out""")
     assert _read_res() == {'./file8.txt'}
     
+    # Do the error again but with `--allow-exception`
+    call("""--debug query --allow-exception  -o out "note.data['other']['f1'] == 'file8'" """)
+    assert _read_res() == {'./file8.txt'}
     os.chdir(TESTDIR)
 
 

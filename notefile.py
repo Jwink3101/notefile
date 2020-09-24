@@ -4,7 +4,7 @@
 Write notesfiles to accompany main files
 """
 from __future__ import division, print_function, unicode_literals
-__version__ = '20200923.1'
+__version__ = '20200924.0'
 __author__ = 'Justin Winokur'
 
 import sys
@@ -989,7 +989,8 @@ def query(path='.',
           include_orphaned=False, 
           full_word=False,fixed_strings=False,
           symlink_result=None,
-          note_field=NOTEFIELD):
+          note_field=NOTEFIELD,
+          allow_exception=False):
     """
     Perform python queries on notes:
     
@@ -1034,6 +1035,9 @@ def query(path='.',
     note_field [NOTEFIELD]
         Specify the field with the notes. If the field is not a string,
         will use the str()
+    
+    allow_exception [False]
+        If True, raises a warning instead of an exception
 
     Yields:
     -------
@@ -1100,8 +1104,12 @@ def query(path='.',
             except Exception as E:
                 err = E.__class__.__name__
                 desc = unicode(E) 
-                etxt = 'Line {} `{}` raised {}. MSG: "{}"'.format(ii,line,err,desc)
-                raise  QueryError(etxt)
+                etxt = 'Line {} `{}` raised {}. MSG: "{}". Note: "{}"'.format(ii,line,err,desc,note.filename0)
+                if allow_exception:
+                    warnings.warn('Query Error: {}'.format(etxt))
+                    namespace['_res'] = False
+                else:
+                    raise  QueryError(etxt)
         
         if not bool(namespace['_res']):
             continue
@@ -1768,6 +1776,8 @@ Notes:
         help=("Query expression. See 'query -h' for details. Can be multiple lines "
               "delineated by multiple arguments and/or ';' but the last line must "
               "evaluate to True or False as the query"))
+    parsers['query'].add_argument('-e','--allow-exception',action='store_true',
+        help=('Allow exceptions in the query. Still prints a warning to stderr for each one'))
 
     parsers['search_tags'] = subpar.add_parser('search-tags',
         help=("List all files with the specific tag(s) or all tags. "
@@ -2070,6 +2080,7 @@ def cliactions(args):
                           full_word=args.full_word,
                           symlink_result=args.symlink,
                           note_field=getattr(args,'note_field',NOTEFIELD),
+                          allow_exception=args.allow_exception,
                           **findopts):
             # python2 will not have a buffer but can accept bytes regardless of mode
             if hasattr(stream,'buffer'):

@@ -2,6 +2,10 @@
 
 (**_newest_** on *top*)
 
+## 20200924.0
+
+* Adds `--allow-exception` to query.
+
 ## 20200923.0 (and .1)
 
 * Adds the ability to specify the field in which notes are written. Will grep and query a string representation but will not let you add text to it.
