@@ -141,3 +141,10 @@ Note that notefile does support setting alternative note fields (but not tags) s
 ## Changelog
 
 See [Changelog](changelog.md)
+
+## Known Issues
+
+The following may or may not be fixed but they are known issues:
+
+* repairs will look at symlinks. Resolution is to add a flag to skip links in looking for repairs
+s

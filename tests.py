@@ -1560,6 +1560,49 @@ def test_alternative_fields():
 
     os.chdir(TESTDIR) 
 
+def test_empty_find():
+    os.chdir(TESTDIR)
+    dirpath = os.path.join(TESTDIR,'empty')
+    cleanmkdir(dirpath)
+    os.chdir(dirpath)
+
+    with open('ne1.txt','wt') as f: f.write('not empty 1')
+    with open('ne2.txt','wt') as f: f.write('not empty 2')
+    with open('ee1.txt','wt') as f: f.write('YES empty 1')
+    with open('ee2.txt','wt') as f: f.write('YES empty 2')
+    
+    call('add ne1.txt "note"')
+    call('add ne2.txt --note-field other "note"')
+    
+    call('add ee1.txt "note"') # Need to write something first then remove
+    call('add ee1.txt "" -r ')
+    
+    call('add ee2.txt --note-field other "note"') # Need to write something first then remove
+    call('add ee2.txt --note-field other "" -r ')
+    
+    def _read_res(out='out'):
+        with open(out) as file:
+            return set(f.strip() for f in file.read().splitlines() if f.strip())
+    
+    # Find should do all of them 
+    call('find -o out')
+    assert _read_res() == {'./ne1.txt', './ee1.txt', './ee2.txt', './ne2.txt'}
+
+    # Make sure empty considered other fields
+    call('find --empty -o out')
+    assert _read_res() == {'./ee1.txt', './ee2.txt'}
+    
+    call('find --non-empty -o out')
+    assert _read_res() == {'./ne1.txt', './ne2.txt'}
+    
+    call('query "note.isempty()" -o out')
+    assert _read_res() == {'./ee1.txt', './ee2.txt'}
+    
+    call('query "not note.isempty()" -o out')
+    assert _read_res() == {'./ne1.txt', './ne2.txt'}
+    
+    os.chdir(TESTDIR)
+
 
 if __name__ == '__main__': 
     test_main_note()
@@ -1592,7 +1635,8 @@ if __name__ == '__main__':
     test_symlink_result()
     test_hidden_note_exclusion()
     test_alternative_fields()
-
+    test_empty_find()
+    
     print('ALL TESTS PASS') # In case we do not get to this from a sys.exit()
     pass
     

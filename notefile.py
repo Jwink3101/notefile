@@ -4,7 +4,7 @@
 Write notesfiles to accompany main files
 """
 from __future__ import division, print_function, unicode_literals
-__version__ = '20200924.0'
+__version__ = '20200926.0'
 __author__ = 'Justin Winokur'
 
 import sys
@@ -29,6 +29,8 @@ HIDDEN = os.environ.get('NOTEFILE_HIDDEN','false').strip().lower() == 'true'
 DEBUG = os.environ.get('NOTEFILE_DEBUG','false').strip().lower() == 'true'
 
 NOTEFIELD = os.environ.get('NOTEFILE_NOTEFIELD','notes').strip()
+
+METADATA = frozenset(('filesize','mtime','sha256','last-updated','notefile version'))
 
 def debug(*args,**kwargs):
     if DEBUG:
@@ -352,6 +354,9 @@ class Notefile(object):
     make_links()
         Build the appropriate symlinks if the note is a link
     
+    isempty()
+        Whether or not it is empty. Looks at ALL fields besides metadata
+    
     Note:
     -----
     Most methods also return itself for convenience 
@@ -509,8 +514,9 @@ class Notefile(object):
         if abs(old.pop('mtime',0) - new.pop('mtime',100)) >= DT:
             return True
         
-        old['tags'] = set(old.get('tags',[]))
-        new['tags'] = set(new.get('tags',[]))
+        # Make tags comparison based on sets
+        old['tags'] = set(t.lower() for t in old.get('tags',[]))
+        new['tags'] = set(t.lower() for t in new.get('tags',[]))
         
         return not old == new
         
@@ -667,7 +673,17 @@ class Notefile(object):
         yaml.dump(self.data,f)
         self.txt = f.getvalue()
         return self.txt
-        
+    
+    def isempty(self):
+        if self.data is None:
+            raise ValueError('Cannot determine empty with out read() or set data attribute')
+    
+        for key in set(self.data) - METADATA:
+            if self.data[key]:
+                return False
+
+        return True
+    
     def repair_metadata(self,dry_run=False,force=False,stream=sys.stdout):
         """
         Repair (if Needed) the notefile metadata.
@@ -747,9 +763,9 @@ def copy_note(src,dst,
     src_note = Notefile(src) # SRC is assumed to have it's OWN notefile (symlink or file)
     src_note.read()
     
-    metadata = {'filesize','mtime','sha256','last-updated','notefile version'}
+    
     for key,val in src_note.data.items():
-        if key in metadata:
+        if key in METADATA:
             continue
         dst_note.data[key] = val
     
@@ -773,6 +789,7 @@ def find_notes(path='.',
                exclude_links=False,
                include_orphaned=False,
                return_note=False,
+               empty=None,
                noteopts=None):
     """
     find notes recurisvly starting in `path`
@@ -803,6 +820,11 @@ def find_notes(path='.',
     return_note [False]
         Return the note object
     
+    empty [None]
+        None: Return all (also optimized)
+        True: Only return empty notes
+        False: Only return non-empty notes
+        
     noteopts [{}]
         Options for the notefile created and returned
     
@@ -846,6 +868,13 @@ def find_notes(path='.',
             
             if nf.orphaned and not include_orphaned: 
                 continue
+            
+            if empty is not None: # True or False
+                isempty = nf.read().isempty()
+                if empty and not isempty:
+                    continue
+                if not empty and isempty:
+                    continue
             
             yield nf if return_note else nf.destnote0
 
@@ -1758,7 +1787,14 @@ Notes:
     parsers['cat'].add_argument('-t','--tags',action='store_true',
         help='Print tags rather than notes') 
     
-    parsers['find'] = subpar.add_parser('find',help="Find and list all notes")
+    parsers['find'] = subpar.add_parser('find',help="Find and list all notes",
+        epilog=('An empty note means NO FIELD is defined '
+                "other than metadata; not just 'notes' and 'tags'"))
+    parsers['find'].add_argument('--empty',action='store_true',
+        help='ONLY returns empty notes. Slower default find')
+    parsers['find'].add_argument('--non-empty',action='store_true',
+        help='ONLY returns NON empty notes. Slower default find')
+             
 
     parsers['grep'] = subpar.add_parser('grep',help="Search notes for a given string")
     parsers['grep'].add_argument('expr',nargs='+',
@@ -2090,11 +2126,21 @@ def cliactions(args):
                 
 
     if args.command == 'find':
+        if args.empty and args.non_empty:
+            raise ValueError('Cannot specify both --empty and --non-empty')
+        elif args.empty:
+            empty = True
+        elif args.non_empty:
+            empty = False
+        else:
+            empty = None
+        
         end = b'\x00' if args.print0 else b'\n'
         notes = []
         for note in find_notes(include_orphaned=False,
                                return_note=True,
                                noteopts=None,
+                               empty=empty,
                                **findopts):
             # python2 will not have a buffer but can accept bytes regardless of mode
             if hasattr(stream,'buffer'):
