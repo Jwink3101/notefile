@@ -2,6 +2,10 @@
 
 (**_newest_** on *top*)
 
+## 20200930.0:
+
+* Fixes a bug with `vis --dry-run` and no longer silently accepts error on them.
+
 ## 20200926.0:
 
 * Adds `--empty` and `--non-empty` to `find`. An empty note means it has *NO* field besides metadata. It is *not* just notes, etc.

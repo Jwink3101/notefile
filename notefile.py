@@ -1,10 +1,10 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 """
-Write notesfiles to accompany main files
+Write notesfile sidecar files
 """
 from __future__ import division, print_function, unicode_literals
-__version__ = '20200926.0'
+__version__ = '20200930.0'
 __author__ = 'Justin Winokur'
 
 import sys
@@ -46,7 +46,7 @@ def pss(item):
     and recurse into dicts and lists (and tuples which are converted to lists).
     """
     if isinstance(item,(list,tuple)):
-        return [pss(i) for i in item]
+        return [pss(i) for i in item] # Convert tuples to lists for parsing
     elif isinstance(item,dict):
         item = item.copy()
         for key,val in item.items():
@@ -131,7 +131,11 @@ def get_filenames(filename):
             vis_note = name + NOTESEXT
             hid_note = '.' + vis_note
         
-    return os.path.join(base,name),os.path.join(base,vis_note),os.path.join(base,hid_note)
+    filename = os.path.join(base,name)
+    vis_note = os.path.join(base,vis_note)
+    hid_note = os.path.join(base,hid_note)
+    
+    return filename,vis_note,hid_note
 
 def sha256(filepath,blocksize=2**20):
     """
@@ -640,7 +644,7 @@ class Notefile(object):
     def cat(self,tags=False,full=False):
         """cat the notes to a string"""
         if self.data is None:
-            raise ValueError('Cannot edit empty data. Use read() or set data attribute')
+            raise ValueError('Cannot cat empty data. Use read() or set data attribute')
 
         if full:
             self.data2txt()
@@ -1301,10 +1305,6 @@ def change_tag(oldtag,newtag,
                 note.write()
             yield note
     
-        
-    
-
-    
 def export(path='.',
            excludes=None,matchcase=False,
            maxdepth=None,
@@ -1381,7 +1381,7 @@ def change_visibility(mode,
         Where to look
     
     dry_run [False]:
-        Do not actually repair
+        Do not actually change vis
         
     excludes []
         Specify excludes in glob-style. Will be checked against
@@ -1428,22 +1428,25 @@ def change_visibility(mode,
         if os.path.exists(vis_note) and os.path.exists(hid_note):
             warnings.warn("Both hidden and visible notes exist for '{}'. Not changing mode".format(note.filename0))
             continue
+            
         if mode == 'hide':
+            if note.ishidden:
+                continue
             src_note = vis_note
             dst_note = hid_note
         else:
+            if not note.ishidden:
+                continue
             src_note = hid_note
             dst_note = vis_note
         
         if not dry_run:
             try:
                 shutil.move(src_note,dst_note)
-            except (OSError,IOError): 
+            except (OSError,IOError) as E: 
+                warnings.warn("Error on move '{}' to '{}'. Error: {}".format(src_note,dst_note,E))
                 continue
         yield note.filename0
-        
-        
-    
 
 ################################################################################   
 ################################### Repair #####################################
