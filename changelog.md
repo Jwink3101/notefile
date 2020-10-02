@@ -2,6 +2,10 @@
 
 (**_newest_** on *top*)
 
+## 20201002.1:
+
+* If pyyaml is installed, will use that to read notefiles (~2x) and if it is linked to LibYAML, ~25x.
+
 ## 20201002.0:
 
 * Adds the function `tany()` (and `t()`) and `tall()` to query as a shortcut

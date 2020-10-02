@@ -4,7 +4,7 @@
 Write notesfile sidecar files
 """
 from __future__ import division, print_function, unicode_literals
-__version__ = '20201002.0'
+__version__ = '20201002.1'
 __author__ = 'Justin Winokur'
 
 import sys
@@ -13,10 +13,7 @@ import shutil
 import warnings
 import copy
 # Many imports are done lazily since they aren't always needed
-    
-# Third-Party
-import ruamel.yaml
-from ruamel.yaml.scalarstring import PreservedScalarString 
+
 
 if sys.version_info[0] > 2:
     unicode = str
@@ -38,6 +35,16 @@ def debug(*args,**kwargs):
         print('DEBUG:',*args,**kwargs)
 
 #### Set up YAML
+# ruamel.yaml is does a nice job with formatting but it is slow to load YAML.
+# pyyaml is faster to load YAML anyway and *much* faster with CLoader if it
+# is available.
+#
+# The biggest reason to still use ruamel.yaml over pyyaml is https://github.com/yaml/pyyaml/issues/121
+# However I do not want to make pyyaml *also* a requirement so it will use it
+# if it can or fall back
+import ruamel.yaml
+from ruamel.yaml.scalarstring import LiteralScalarString as PreservedScalarString 
+
 yaml = ruamel.yaml.YAML()
 
 def pss(item):
@@ -56,7 +63,24 @@ def pss(item):
         return PreservedScalarString(item)
     else:
         return item
-
+# Note debug()that this will *still* not show with `--debug` since CLI hasn't 
+# been parsed. Set NOTEFILE_DEBUG to see it
+try:
+    import yaml as pyyaml
+    debug('loaded pyyaml') 
+    try:
+        from yaml import CLoader as Loader
+        debug('got CLoader')
+    except ImportError:
+        debug('no CLoader')
+        from yaml import Loader
+        
+    def _load_yaml(txt):
+        return pyyaml.load(txt,Loader=Loader)
+except ImportError:
+    debug('no pyyaml. Fallback to ruamel.yaml to load')
+    def _load_yaml(txt):
+        return yaml.load(txt)    
 #### /Set up YAML
 
 ################################################################################
@@ -433,7 +457,7 @@ class Notefile(object):
             debug("loading {}".format(self.destnote))
             with open(self.destnote,'rt') as file:
                 self.txt = file.read()
-            self.data = yaml.load(self.txt)
+            self.data = _load_yaml(self.txt)
         else:
             debug('New notefile')
             try:
@@ -586,7 +610,7 @@ class Notefile(object):
         os.remove(tmpfile)
         
         if full:
-            self.data = yaml.load(newtxt)
+            self.data = _load_yaml(newtxt)
         else:
             lines = iter(newtxt.strip().split('\n'))
             note,tags = [],[]
@@ -665,7 +689,7 @@ class Notefile(object):
         Fills the text attribute
         """
             
-        if sys.version_info[0] == 2: # Issues with the io.StringIO in py2
+        if sys.version_info[0] == 2: # Issues with the io.StringIO in py2. Probably fixable but I just don't care
             debug('Dammit! Switch to python3 already! Writing then reading')
             warnings.warn('python2 will be deprecated shortly')
             self.write()
@@ -1979,7 +2003,7 @@ Notes:
     if args.debug:
         DEBUG = True
     else:
-        DEBUG = False
+        DEBUG = os.environ.get('NOTEFILE_DEBUG','false').strip().lower() == 'true' # reset by environ
         
     if DEBUG: # May have been set not at CLI
         debug('argv: {}'.format(repr(argv)))

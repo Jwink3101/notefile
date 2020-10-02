@@ -35,6 +35,26 @@ Install right from github:
 
     $ python -m pip install git+https://github.com/Jwink3101/notefile.git
 
+### Requirements
+
+The only *real* requirement is `ruamel.yaml`. However, if you have `pyyaml` ([website](https://pyyaml.org/)) installed, notefile will use that for reader as it is about 2x faster by default. Even better, if you [LibYAML](https://pyyaml.org/wiki/LibYAML), it will be about 25x faster
+
+To install LibYAML, see: (based on [these instructions](https://pyyaml.org/wiki/LibYAML)):
+
+> Download the source package: http://pyyaml.org/download/libyaml/yaml-0.2.5.tar.gz.
+> 
+> To build and install LibYAML, run
+> 
+>     $ ./configure
+>     $ make
+>     # make install
+
+Then to install pyyaml,
+
+    $ python -m pip install pyyaml
+
+In my (limited) experience, pyyaml comes with Anaconda but not miniconda
+
 ### Usage
 
 Every command is documented. For example, run
