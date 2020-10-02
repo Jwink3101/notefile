@@ -2,6 +2,10 @@
 
 (**_newest_** on *top*)
 
+## 20201002.0:
+
+* Adds the function `tany()` (and `t()`) and `tall()` to query as a shortcut
+
 ## 20200930.0:
 
 * Fixes a bug with `vis --dry-run` and no longer silently accepts error on them.

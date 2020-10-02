@@ -4,7 +4,7 @@
 Write notesfile sidecar files
 """
 from __future__ import division, print_function, unicode_literals
-__version__ = '20200930.0'
+__version__ = '20201002.0'
 __author__ = 'Justin Winokur'
 
 import sys
@@ -1093,7 +1093,11 @@ def query(path='.',
         if fixed_strings: expr = re.escape(expr)
         if full_word: expr = r'\b' + expr + r'\b'
         return bool(re.search(expr,note,flags=flags))
-    
+    def _tany(ntags,*tags):
+        return any(t.lower() in ntags for t in tags)
+    def _tall(ntags,*tags):
+        return all(t.lower() in ntags for t in tags)
+        
     notes = find_notes(path=path,
                        excludes=excludes,
                        matchcase=matchcase,
@@ -1126,6 +1130,10 @@ def query(path='.',
         
         namespace['grep'] = partial(_grep,note=namespace['notes'])
         namespace['g'] = namespace['grep']
+        namespace['tany'] = partial(_tany,note.data['tags'])
+        namespace['tall'] = partial(_tall,note.data['tags'])
+        namespace['t'] = namespace['tany']
+        
         namespace['re'] = re
         
         full_expr = [i.strip() for e in expr for i in e.split(';') if i.strip()]
@@ -1653,7 +1661,13 @@ And it includes the following functions:
     grep    performs a match against 'notes'. Respects the flags:
             '--match-expr-case','--fixed-strings','--full-word' automatically
     g       Aliased to grep
-
+    
+    tany    Returns True if that tag is in tags: e.g
+                tany('tag1','tag2') <==> any(t in tags for t in ['tag1','tag2'])
+    tall    Returns true if all args are in tags:
+                tall('tag1','tag2') <==> all(t in tags for t in ['tag1','tag2'])
+    t       aliased to tany
+    
 It also includes the `re` module
 
 Queries can replace search-tags and grep but grep is much faster if it can
@@ -1672,6 +1686,10 @@ Limited multi-line support exists. Multiple lines can be delineated by separate
 arguments and/or ';'. However, the last line must evaluate the query. Example:
 
     $ notefile query "tt = ['a','b','c']" "all(t in tags for t in tt)"
+
+tany and/or tall could also be used:
+    
+    $ notefile query "tall('a','b','c')"
 
 Queries are pretty flexible and give a good bit of control but some actions
 and queries are still better handled directly in Python.

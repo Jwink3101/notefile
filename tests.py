@@ -977,6 +977,19 @@ def test_queries():
     call("""query "all('t{}'.format(a) in tags for a in '123')" -o out""")
     assert _read_res() == {'./file5.txt'}
 
+    # Test tall and tany
+    call("""query -o out "tany('t1','t2')" """)
+    assert _read_res() == {'./file5.txt', './file6.txt', './file7.txt'}
+    
+    call("""query -o out "tall('t1','t2')" """)
+    assert _read_res() == {'./file5.txt', './file7.txt'}
+    
+    call("""query -o out "tany('t1','t2','t999')" """)
+    assert _read_res() == {'./file5.txt', './file6.txt', './file7.txt'}
+    
+    call("""query -o out "tall('t1','t2','t999')" """)
+    assert _read_res() == set()
+    
     # Multiline
     call("""query "a = g('word1');b = 't3' in tags; c=note.filename == './file6.txt'; (a or b) and not c" -o out""")
     assert {'./file2.txt', './file5.txt', './file3.txt', './file1.txt'} == _read_res()
