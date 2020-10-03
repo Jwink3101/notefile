@@ -4,7 +4,7 @@
 Write notesfile sidecar files
 """
 from __future__ import division, print_function, unicode_literals
-__version__ = '20201002.1'
+__version__ = '20201003.0'
 __author__ = 'Justin Winokur'
 
 import sys
@@ -515,7 +515,7 @@ class Notefile(object):
         except TypeError:
             pass # Likely due to python2 and ordering
         
-        # Make the write atomic
+        # Make the write atomic by writing and swapping
         tmpfile = tmpfileinpath(self.destnote)   
         with open(tmpfile,'wt') as file:
             yaml.dump(data,file)
@@ -688,6 +688,9 @@ class Notefile(object):
         """
         Fills the text attribute
         """
+        txt =  getattr(self,'txt',None)
+        if txt:
+            return txt
             
         if sys.version_info[0] == 2: # Issues with the io.StringIO in py2. Probably fixable but I just don't care
             debug('Dammit! Switch to python3 already! Writing then reading')

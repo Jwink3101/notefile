@@ -2,6 +2,10 @@
 
 (**_newest_** on *top*)
 
+## 20200103.0:
+
+* Fixed a minor bug with `cat -f` and the proper formatting
+
 ## 20201002.1:
 
 * If pyyaml is installed, will use that to read notefiles (~2x) and if it is linked to LibYAML, ~25x.
