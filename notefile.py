@@ -4,7 +4,7 @@
 Write notesfile sidecar files
 """
 from __future__ import division, print_function, unicode_literals
-__version__ = '20201003.0'
+__version__ = '20201012.0'
 __author__ = 'Justin Winokur'
 
 import sys
@@ -39,7 +39,8 @@ def debug(*args,**kwargs):
 # pyyaml is faster to load YAML anyway and *much* faster with CLoader if it
 # is available.
 #
-# The biggest reason to still use ruamel.yaml over pyyaml is https://github.com/yaml/pyyaml/issues/121
+# The biggest reason to still use ruamel.yaml over pyyaml is 
+# https://github.com/yaml/pyyaml/issues/121
 # However I do not want to make pyyaml *also* a requirement so it will use it
 # if it can or fall back
 import ruamel.yaml
@@ -448,6 +449,7 @@ class Notefile(object):
         
         self.txt = None
         self.data = None
+        self._write_count = 0
     
     def read(self,_sha256=None):
         """
@@ -505,7 +507,10 @@ class Notefile(object):
             debug('Note not modified. Not saving')
             self.make_links() # Rebuild the links in case they were broken
             return
-            
+        
+        # reset the data
+        self.data = data # Will now be a PSSed but that is fine
+        
         data['last-updated'] = now_string()
         data['notefile version'] = __version__
         
@@ -515,7 +520,7 @@ class Notefile(object):
         except TypeError:
             pass # Likely due to python2 and ordering
         
-        # Make the write atomic by writing and swapping
+        # Make the write atomic
         tmpfile = tmpfileinpath(self.destnote)   
         with open(tmpfile,'wt') as file:
             yaml.dump(data,file)
@@ -523,8 +528,10 @@ class Notefile(object):
         debug("Wrote '{}'".format(self.destnote))
         
         self.make_links()
-
+        
+        self._write_count += 1
         return self # for convenience
+    save = write
     def ismod(self):
         """
         Compare data0 (when read()) to data (before write())
@@ -767,6 +774,9 @@ class Notefile(object):
             return False # Still broken but not repairable
         
         return True
+    
+    def __str__(self):
+        return "Notefile('{}')".format(self.filename0)
 
 ################################################################################   
 ################################## functions ###################################
@@ -1887,12 +1897,6 @@ Notes:
     for name in ['add','edit','tag','repair','copy','change_tag']:
         parsers[name].add_argument('--no-hash',action='store_false',dest='hashfile',
             help='Do *not* compute the SHA256 of the basefile. Will not be able to repair orphaned notes')
-        parsers[name].add_argument('--link',choices=['source','symlink','both'],
-            default='both',
-            help=("['%(default)s'] Specify how to handle symlinks. "
-                  "If 'source', will add the notefile to the source only (non-recursively). "
-                  "If 'symlink', will add the notefile to *just* the symlink file. "
-                  "If 'both', will add the notefile the source (non-recursivly) and then symlimk to that notefile"))
         
         if name == 'copy': # Neither of these make sense with copy
             continue
@@ -1905,7 +1909,17 @@ Notes:
         
         parsers[name].add_argument('--no-refresh',action='store_true',
             help='Never refresh file metadata when a notefile is modified')
-
+    
+    # link
+    for name in ['add','edit','tag','repair','copy','change_tag','cat']:
+        parsers[name].add_argument('--link',choices=['source','symlink','both'],
+            default='both',
+            help=("['%(default)s'] Specify how to handle symlinks. "
+                  "If 'source', will add the notefile to the source only (non-recursively). "
+                  "If 'symlink', will add the notefile to *just* the symlink file. "
+                  "If 'both', will add the notefile the source (non-recursivly) and then symlimk to that notefile. "
+                  "(acts of 'source' if used in cat)"))
+                  
     # Search path
     for name in ['change_tag', 'export', 'find', 'grep', 'query', 'search_tags']:
         parsers[name].add_argument('-p','--path',default='.',help='[%(default)s] Specify path')
