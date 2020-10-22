@@ -2,7 +2,11 @@
 
 (**_newest_** on *top*)
 
-## 20200103.0:
+## 20201022.0:
+
+* Changed `search-tags -t` to `-c` where `-c` is `--count`. Show counts rather than just a list
+
+## 20201003.0:
 
 * Fixed a minor bug with `cat -f` and the proper formatting
 

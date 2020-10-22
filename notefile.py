@@ -4,7 +4,7 @@
 Write notesfile sidecar files
 """
 from __future__ import division, print_function, unicode_literals
-__version__ = '20201012.0'
+__version__ = '20201022.0'
 __author__ = 'Justin Winokur'
 
 import sys
@@ -1880,8 +1880,8 @@ Notes:
         help=('Specify tag(s) to list. If empty, lists them all. '
               'Multiple arguments are considered an ANY query unless --all is set.'))
     parsers['search_tags'].add_argument('--filter',action='store_true',help=argparse.SUPPRESS)
-    parsers['search_tags'].add_argument('-t','--tag-only',action='store_true',
-        help=('Print just the tag names and not the files'))   
+    parsers['search_tags'].add_argument('-c','--count',action='store_true',
+        help=('Print the number of items rather than the items themselves'))   
     
     parsers['export'] = subpar.add_parser('export',help="Export all notesfiles to YAML")
     
@@ -2222,8 +2222,8 @@ def cliactions(args):
                           match_any=args.match_any,
                           symlink_result=args.symlink,
                           **findopts)
-        if args.tag_only:
-            res = list(res.keys())
+        if args.count:
+            res = {k:len(v) for k,v in res.items()}
         yaml.dump(res,stream)
         
     if args.command == 'export':
