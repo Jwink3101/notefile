@@ -701,12 +701,12 @@ def test_grep_and_listtags_and_export_and_find_and_change():
         res = {k:set(v) for k,v in res.items()}
     assert {'tag1': {'./noenter/file3.txt','./file1.txt'}} == res   
     
-    # Just test the --tag-only mode
-    call('search-tags -o out --tag-only')
+    # Just test the --count mode
+    call('search-tags -o out --count')
     with open('out') as file:
         res = yaml.load(file)
-    assert set(res) == {'tag1','tag2'}
-
+    assert res == {'tag1': 3, 'tag2': 1}
+    
     ## Fancy Queries
     call('search-tags -o out "tag1" "tag2"')
     with open('out') as file:
