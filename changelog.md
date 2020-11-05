@@ -2,6 +2,10 @@
 
 (**_newest_** on *top*)
 
+## 20201105.0:
+
+* Adds `--all-tags` to `search-tags` result which shows all tags that match
+
 ## 20201022.0:
 
 * Changed `search-tags -t` to `-c` where `-c` is `--count`. Show counts rather than just a list

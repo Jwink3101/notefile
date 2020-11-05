@@ -723,8 +723,6 @@ def test_grep_and_listtags_and_export_and_find_and_change():
         res = {k:set(v) for k,v in res.items()}
     assert {'tag1': {'./file1.txt'}, 'tag2': {'./file1.txt'}} == res
     
-
-    
     ## Link Excludes
     # Add this after the previous
     with open('file6.txt','wt') as file:
@@ -1615,6 +1613,42 @@ def test_empty_find():
     assert _read_res() == {'./ne1.txt', './ne2.txt'}
     
     os.chdir(TESTDIR)
+    
+def test_searchtags_opts():
+    """Minor test of --count and --all-tags"""
+    def load(out='out'):
+        with open(out) as f:
+            return dict(yaml.load(f))
+    
+    os.chdir(TESTDIR)
+    dirpath = os.path.join(TESTDIR,'tagsearch')
+    cleanmkdir(dirpath)
+    os.chdir(dirpath)
+
+    with open('A.txt','wt') as f: f.write('A')
+    with open('B.txt','wt') as f: f.write('B')
+    with open('C.txt','wt') as f: f.write('C')
+    with open('D.txt','wt') as f: f.write('D')
+    
+    for f,t in itertools.combinations_with_replacement('ABCD',2):
+        call('tag -t {t} {f}.txt'.format(t=t,f=f))
+
+    # Search with default. only key should be 'd'
+    call('search-tags -o out d')
+    assert set(load()) == {'d'}
+    
+    # Now include all tags that also have d
+    call('search-tags -o out --all-tags d')
+    assert set(load()) == set('abcd')
+
+    # Check count mode like the above
+    call('search-tags -o out --count d')
+    assert load() == {'d': 4}
+    
+    call('search-tags -o out --all-tags --count d')
+    assert load() == {'a': 1, 'b': 2, 'c': 3, 'd': 4}
+    
+    os.chdir(TESTDIR)
 
 
 if __name__ == '__main__': 
@@ -1649,7 +1683,8 @@ if __name__ == '__main__':
     test_hidden_note_exclusion()
     test_alternative_fields()
     test_empty_find()
-    
+    test_searchtags_opts()
+    print('-'*80)
     print('ALL TESTS PASS') # In case we do not get to this from a sys.exit()
     pass
     

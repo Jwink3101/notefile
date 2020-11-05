@@ -4,7 +4,7 @@
 Write notesfile sidecar files
 """
 from __future__ import division, print_function, unicode_literals
-__version__ = '20201022.0'
+__version__ = '20201105.0'
 __author__ = 'Justin Winokur'
 
 import sys
@@ -13,7 +13,6 @@ import shutil
 import warnings
 import copy
 # Many imports are done lazily since they aren't always needed
-
 
 if sys.version_info[0] > 2:
     unicode = str
@@ -295,7 +294,6 @@ def find_by_size_mtime_hash(path,size,mtime,sha,excludes=None,matchcase=False,ma
                 possible.append(file)
     return possible
 
-
 def symlink_file(src,dstdir):
     """
     Create a relative symlink from src to the dstdir. Note that the dest is
@@ -322,7 +320,13 @@ def symlink_file(src,dstdir):
     
     os.symlink(src,dst)
     debug("symlink '{}' --> '{}'".format(src,dst))
-    
+
+def _dot_sort(file):
+    file = file.lower()
+    if file.startswith('.'):
+        return file[1:]
+    return file
+
 ################################################################################
 ############################### Notefile Object ################################
 ################################################################################
@@ -589,7 +593,7 @@ class Notefile(object):
             except KeyError:
                 pass
         else:
-            raise ValueError(('Must specify an editor. Possible enviormental variables: '
+            raise ValueError(('Must specify an editor. Possible enviorment variables: '
                               ', '.join("'{}'".format(e) for e in editor_names)))
         
         tagtxt = '<< Comma-seperated tags. DO NOT MODIFY THIS LINE >>'
@@ -816,13 +820,6 @@ def copy_note(src,dst,
             del dst_note.data[key]
             
     dst_note.write()
-
-
-def _dot_sort(file):
-    file = file.lower()
-    if file.startswith('.'):
-        return file[1:]
-    return file
 
 def find_notes(path='.',
                excludes=None,matchcase=False,
@@ -1202,6 +1199,7 @@ def search_tags(path='.',tags=tuple(),
                 maxdepth=None,
                 exclude_links=False,include_orphaned=False,
                 match_any=True,
+                all_tags=False,
                 symlink_result=None):
     """
     Search notes for tags
@@ -1233,9 +1231,13 @@ def search_tags(path='.',tags=tuple(),
         If True, will ALSO return orphaned notes. 
         Otherwise, they are excluded   
     
-        
     match_any [True]
         Whether to match any expr
+    
+    all_tags [False]
+        If True, returns a dictionary of *only* the queried tags. If True,
+        will match on the queried tags but return a dict of all tags that
+        were found
     
     symlink_result [None]
         If specified, will make symlinks in '<symlink_result>/<tag>'
@@ -1255,6 +1257,7 @@ def search_tags(path='.',tags=tuple(),
                        exclude_links=exclude_links,
                        include_orphaned=include_orphaned,
                        return_note=True) # no need to send noteopts)
+                       
     qtags = set(t.lower() for t in tags)
     match = any if match_any else all
     res = defaultdict(list)
@@ -1272,8 +1275,12 @@ def search_tags(path='.',tags=tuple(),
             
         # Test and then add each one
         if match(qtag in ntags for qtag in qtags):
-            for t in qtags.intersection(ntags):
-                res[t].append(note.filename0)
+            if all_tags:
+                for t in ntags:
+                    res[t].append(note.filename0)
+            else:
+                for t in qtags.intersection(ntags):
+                    res[t].append(note.filename0)
         
     res =  {k:sorted(res[k]) for k in sorted(res)}
 
@@ -1750,15 +1757,15 @@ notefile -- Tool for managing notes, tags, etc in
     epilog ="""\
 Notes:
 
-* The hidden and visible settings are for creating notes. The setting is
+- The hidden and visible settings are for creating notes. The setting is
   ignored if either a hidden or visible note already exits. If both exist,
   it will use the setting (and depending on the use, may throw an 
   error/warning)
   
-* metadata is refreshed if mtime or size have changed.
+- metadata is refreshed if mtime or size have changed.
   Or if `--force-refresh` and never if `--no-refresh`
 
-* If there exists *different* notefiles for a symlink and its source, 
+- If there exists *different* notefiles for a symlink and its source, 
   the notefile may be overwritten if `--link` is not set properly. 
   Use caution!
     
@@ -1881,7 +1888,10 @@ Notes:
               'Multiple arguments are considered an ANY query unless --all is set.'))
     parsers['search_tags'].add_argument('--filter',action='store_true',help=argparse.SUPPRESS)
     parsers['search_tags'].add_argument('-c','--count',action='store_true',
-        help=('Print the number of items rather than the items themselves'))   
+        help=('Print the number of items rather than the items themselves')) 
+    parsers['search_tags'].add_argument('-t','--all-tags',action='store_true',
+        help=('Display all tags for the of the files that matched opposed to '
+              '*just* the queried ones'))
     
     parsers['export'] = subpar.add_parser('export',help="Export all notesfiles to YAML")
     
@@ -1993,7 +2003,7 @@ Notes:
     for name in ['add','edit','cat','grep','query']:
         parsers[name].add_argument('--note-field',default=NOTEFIELD,metavar='name',
             help=("['notes'] Specify the field to write or query notes. "
-                  "Can also be set by NOTEFILE_NOTEFIELD enviormental variable. " 
+                  "Can also be set by NOTEFILE_NOTEFIELD enviorment variable. " 
                   "Setting it here takes precedance"))
 
     # This sorts the optional arguments or each parser.
@@ -2221,6 +2231,7 @@ def cliactions(args):
                           include_orphaned=False,
                           match_any=args.match_any,
                           symlink_result=args.symlink,
+                          all_tags=args.all_tags,
                           **findopts)
         if args.count:
             res = {k:len(v) for k,v in res.items()}
