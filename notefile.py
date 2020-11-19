@@ -4,7 +4,7 @@
 Write notesfile sidecar files
 """
 from __future__ import division, print_function, unicode_literals
-__version__ = '20201105.0'
+__version__ = '20201119.0'
 __author__ = 'Justin Winokur'
 
 import sys
@@ -326,6 +326,23 @@ def _dot_sort(file):
     if file.startswith('.'):
         return file[1:]
     return file
+
+def yamltxt(data):        
+    """Get YAML txt"""
+
+    if sys.version_info[0] == 2: # Issues with the io.StringIO in py2. Probably fixable but I just don't care
+        debug('Dammit! Switch to python3 already! Writing then reading')
+        warnings.warn('python2 will be deprecated shortly')
+        import tempfile
+        with tempfile.NamedTemporaryFile(delete=False) as file:
+            yaml.dump(pss(data),f)
+        with open(file.name,'rt') as file:
+            return file.read()
+             
+    import io
+    f = io.StringIO()
+    yaml.dump(pss(data),f)
+    return f.getvalue()
 
 ################################################################################
 ############################### Notefile Object ################################
@@ -692,7 +709,9 @@ class Notefile(object):
             
         txt = self.data.get(self.note_field,'')
         if not isinstance(txt,(str,unicode)):
-            raise TypeError('Cannot cat non-string notes. cat the full YAML instead')
+            warnings.warn('Non-string note. Converting to YAML')
+            txt = yamltxt(txt)
+        self.txt = txt
         return txt
         
     def data2txt(self):
@@ -702,19 +721,8 @@ class Notefile(object):
         txt =  getattr(self,'txt',None)
         if txt:
             return txt
-            
-        if sys.version_info[0] == 2: # Issues with the io.StringIO in py2. Probably fixable but I just don't care
-            debug('Dammit! Switch to python3 already! Writing then reading')
-            warnings.warn('python2 will be deprecated shortly')
-            self.write()
-            self.read()
-            return self.txt
-        
-        import io
-        f = io.StringIO()
-        yaml.dump(self.data,f)
-        self.txt = f.getvalue()
-        return self.txt
+
+        return yamltxt(self.data)
     
     def isempty(self):
         if self.data is None:

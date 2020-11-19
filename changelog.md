@@ -2,6 +2,10 @@
 
 (**_newest_** on *top*)
 
+## 20201119.0:
+
+* Allow `cat` on non-string notes. Still does not allow edit
+
 ## 20201105.0:
 
 * Adds `--all-tags` to `search-tags` result which shows all tags that match
