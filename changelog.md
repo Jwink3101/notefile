@@ -2,6 +2,14 @@
 
 (**_newest_** on *top*)
 
+## 20210104.0:
+
+* Adds `mod` (which also encompasses `tag`) to add notes to multiple files at the same time.
+    * `add` is now deprecated but not sure when will be removed
+* Refactor CLI. Still a mess but now easier to add new commands
+* Moves some of the logic for `grep` and `query` into the Notefile object. This incurs a trivial performance cost but (a) adds those to Python object interaction and (b) makes more sense from design.
+* **note**: A larger refactor of the CLI is underway
+
 ## 20201119.0:
 
 * Allow `cat` on non-string notes. Still does not allow edit

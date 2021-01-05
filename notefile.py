@@ -4,7 +4,7 @@
 Write notesfile sidecar files
 """
 from __future__ import division, print_function, unicode_literals
-__version__ = '20201119.0'
+__version__ = '20210104.0'
 __author__ = 'Justin Winokur'
 
 import sys
@@ -12,6 +12,7 @@ import os
 import shutil
 import warnings
 import copy
+from collections import defaultdict
 # Many imports are done lazily since they aren't always needed
 
 if sys.version_info[0] > 2:
@@ -320,6 +321,7 @@ def symlink_file(src,dstdir):
     
     os.symlink(src,dst)
     debug("symlink '{}' --> '{}'".format(src,dst))
+    return src
 
 def _dot_sort(file):
     file = file.lower()
@@ -347,7 +349,9 @@ def yamltxt(data):
 ################################################################################
 ############################### Notefile Object ################################
 ################################################################################
-
+class QueryError(ValueError):
+    pass
+    
 class Notefile(object):
     """
     Main notes object
@@ -553,6 +557,42 @@ class Notefile(object):
         self._write_count += 1
         return self # for convenience
     save = write
+    
+    def copyto(self,dst,noteopts=None):
+        """
+        copy from src to dst
+    
+        Inputs:
+        -------
+        dst
+            Destination file. Must not have ANY notes
+            
+        noteopts [{}]
+            Options for the NEW note
+        """
+        if noteopts is None:
+            noteopts = {}
+        
+        dst_note = Notefile(dst,**noteopts)
+        if exists_or_link(dst_note.destnote0) or exists_or_link(dst_note.destnote):
+            raise ValueError("Cannot copy notes to '{}' since it has notes already".format(dst_note.filename0)) 
+        dst_note.read() # Will set metadata, etc
+    
+        self.read()
+    
+        for key,val in self.data.items():
+            if key in METADATA:
+                continue
+            dst_note.data[key] = val
+    
+        # Remove any empty keys as they may be leftover from the default
+        for key in list(dst_note.data):
+            if not dst_note.data[key]:
+                del dst_note.data[key]
+            
+        dst_note.write()
+        return dst_note
+    
     def ismod(self):
         """
         Compare data0 (when read()) to data (before write())
@@ -661,10 +701,14 @@ class Notefile(object):
         if self.data is None:
             raise ValueError('Cannot edit empty data. Use read() or set data attribute')
 
+        if note is None: 
+            note = ''
+        
         if replace:
             self.data[self.note_field] = note
         else:
-            self.data[self.note_field] += '\n' + note.strip() # Could cause an error if not an str
+            self.data[self.note_field] += '\n' + note
+        self.data[self.note_field] = self.data[self.note_field].strip()
         
         return self # for convenience
         
@@ -770,6 +814,152 @@ class Notefile(object):
         
         return False
     
+    def grep(self,expr,
+            matchcase=False,
+            full_note=False,full_word=False,
+            fixed_strings=False,
+            match_any=True):
+        """
+        Search the content of notes for expr
+    
+        Inputs:
+        -------
+        expr ['']
+            Expression to search. Can be regex. Also can pass a tuple or list
+    
+        matchcase [False]
+            Whether or not to consider case in the expression
+    
+        full_note [False]
+            Whether to search the entire note text or just the "notes" section
+    
+        fixed_strings [False]
+            Match the string exactly. i.e. does a re.escape() on the pattern
+    
+        full_word [False]
+            If True, matches the full word. Basically add \b to each pattern
+    
+        match_any [True]
+            Whether to match any expr
+    
+        Returns: Bool
+        """
+        import re
+        flags = re.MULTILINE | re.UNICODE
+        if not matchcase:
+            flags |= re.IGNORECASE
+        
+        if isinstance(expr,(str,unicode)):
+            expr = (expr,)
+    
+        if fixed_strings:
+            expr = [re.escape(e) for e in expr]
+    
+        if full_word:
+            expr = [r'\b' + e + r'\b' for e in expr]
+    
+        # For all, you need individual regexes but for any, can make a single one
+        if match_any:
+            requery = re.compile('|'.join(expr),flags=flags)
+            query = lambda qtext: bool(requery.search(qtext))
+        else:
+            requeries = [re.compile(e,flags=flags) for e in expr]
+            query = lambda qtext: all(r.search(qtext) for r in requeries)
+        
+        # Do a fast test before paring
+        txt = getattr(self,'txt',None)
+        
+        if txt and not query(txt):
+            return False
+        
+        if not self.data: 
+            self.read()
+        txt = self.txt
+        
+        if full_note:
+            return query(txt)
+            
+        qtext = self.data.get(self.note_field,'') 
+        if not isinstance(qtext,(str,unicode)):
+            warnings.warn('Note is {}. Converting to string'.format(unicode(type(qtext))))
+            qtext = unicode(qtext)# Make it a string
+        
+        return query(qtext)
+    
+    def query(self,expr,
+        grep_match_any=True,
+        matchcase=False,
+        full_word=False,fixed_strings=False,
+        allow_exception=False):
+        """
+        Perform python queries on notes:
+    
+        Inputs:
+        -------
+        expr ['']
+            Query expression. See query_help() for details
+    
+        grep_match_any [True]
+            How to handle multiple grep calls
+            
+        matchcase [False]
+            Whether or not to consider case in grep function
+      
+        fixed_strings [False]
+            Match the string exactly for grep. i.e. does a re.escape() on the pattern
+    
+        full_word [False]
+            If True, matches the full word. Basically add \b to each pattern
+
+        allow_exception [False]
+            If True, raises a warning instead of an exception
+
+        Returns:
+            boolean of whether or not it matched    
+        """
+        from functools import partial
+        import re
+        
+        if not self.data:
+            self.read()
+        
+        ns = {
+            're':re,
+            'note':self,
+            'data':self.data,
+            'tags':self.data['tags'],
+            'notes':self.data.get(self.note_field,''),
+            'text':getattr(self,'txt',''),
+        }
+        
+        ns['grep'] = partial(self.grep,
+                             matchcase=matchcase,
+                             full_word=full_word,
+                             fixed_strings=fixed_strings,
+                             match_any=grep_match_any)
+        ns['g'] = ns['grep']
+        ns['tany'] = lambda *tags: any(t.lower() in self.data['tags'] for t in tags)
+        ns['tall'] = lambda *tags: all(t.lower() in self.data['tags'] for t in tags)
+        ns['t'] = ns['tany']
+
+        full_expr = [i.strip() for e in expr for i in e.split(';') if i.strip()]
+        full_expr[-1] = '_res = ' + full_expr[-1]
+        
+        for ii,line in enumerate(full_expr):
+            try:
+                exec(line,ns)
+            except Exception as E:
+                err = E.__class__.__name__
+                desc = unicode(E) 
+                etxt = 'Line {} `{}` raised {}. MSG: "{}". Note: "{}"'.format(ii,line,err,desc,self.filename0)
+                if allow_exception:
+                    warnings.warn('Query Error: {}'.format(etxt))
+                    ns['_res'] = False
+                else:
+                    raise QueryError(etxt)
+        
+        return bool(ns['_res'])
+        
     def _isbroken_broken_from_hide(self):
         """
         Returns whether a link note is broken from being hidden
@@ -793,42 +983,6 @@ class Notefile(object):
 ################################################################################   
 ################################## functions ###################################
 ################################################################################   
-def copy_note(src,dst,
-              noteopts=None):
-    """
-    copy from src to dst
-    
-    Inputs:
-    -------
-    src,dst
-        Source and Dest. Dest must not have ANY notes
-    
-    noteopts [{}]
-        Options for the new note
-    """
-    if noteopts is None:
-        noteopts = {}
-    dst_note = Notefile(dst,**noteopts)
-    if exists_or_link(dst_note.destnote0) or exists_or_link(dst_note.destnote):
-        raise ValueError("Cannot copy notes to '{}' since it has notes already".format(dst_note.filename0)) 
-    dst_note.read() # Will set metadata, etc
-    
-    src_note = Notefile(src) # SRC is assumed to have it's OWN notefile (symlink or file)
-    src_note.read()
-    
-    
-    for key,val in src_note.data.items():
-        if key in METADATA:
-            continue
-        dst_note.data[key] = val
-    
-    # Remove any empty keys as they may be leftover from the default
-    for key in list(dst_note.data):
-        if not dst_note.data[key]:
-            del dst_note.data[key]
-            
-    dst_note.write()
-
 def find_notes(path='.',
                excludes=None,matchcase=False,
                maxdepth=None,
@@ -992,38 +1146,14 @@ def grep(path='.',expr='',
     filename
         Filename of matches
     """
-    import re
-    flags = re.MULTILINE | re.UNICODE
-    if not expr_matchcase:
-        flags = flags | re.IGNORECASE
-    if isinstance(expr,(str,unicode)):
-        expr = (expr,)
-    
-    if fixed_strings:
-        expr = [re.escape(e) for e in expr]
-    
-    if full_word:
-        expr = [r'\b' + e + r'\b' for e in expr]
-    
-    # For all, you need individual regexes but for any, can make a single one
-    if match_any:
-        requery = re.compile('|'.join(expr),flags=flags)
-        query = lambda qtext: bool(requery.search(qtext))
-    else:
-        requeries = [re.compile(e,flags=flags) for e in expr]
-        query = lambda qtext: all(r.search(qtext) for r in requeries)
     
     notes = find_notes(path=path,
                        excludes=excludes,matchcase=matchcase,
                        maxdepth=maxdepth,
                        exclude_links=exclude_links,
                        include_orphaned=include_orphaned,
-                       return_note=True) # no need to send noteopts
-    
-    def _sym(src):
-        if symlink_result:
-            symlink_file(src,symlink_result)
-        return src
+                       return_note=True,
+                       noteopts={'note_field':note_field})
     
     # If the results will be symlinked, we want to have already traversed
     # so run this now
@@ -1031,32 +1161,24 @@ def grep(path='.',expr='',
         notes = list(notes)
     
     for note in notes:
-        # Since reading the YAML is slow, we query the note itself.
-        # If full_mode, we're done. Otherwise, we then read the YAML and
-        # apply the query again
-                
-        with open(note.destnote,'rt') as f:
-                qtext = f.read()
+        if not note.grep(
+                expr=expr,
+                matchcase=expr_matchcase,
+                full_note=full_note,full_word=full_word,
+                fixed_strings=fixed_strings,
+                match_any=match_any):
+            continue
         
-        if not query(qtext):
-            continue
-                        
-        if full_note:
-            yield _sym(note.filename0) # non-link version
-            continue
-        note.read()
-        qtext = note.data.get(note_field,'') 
-        if not isinstance(qtext,(str,unicode)):
-            warnings.warn('Note is {}. Converting to string'.format(unicode(type(qtext))))
-            qtext = unicode(qtext)# Make it a string
-        if query(qtext):
-            yield _sym(note.filename0) # non-link version
+        if symlink_result:
+            symlink_file(note.filename0,symlink_result)
+        
+        yield note.filename0
+        
 
-class QueryError(ValueError):
-    pass
+
 
 def query(path='.',
-          expr=None,
+          expr=None,match_any=True,
           expr_matchcase=False,
           excludes=None,matchcase=False,
           maxdepth=None,
@@ -1124,29 +1246,14 @@ def query(path='.',
     import re
     from functools import partial
     
-    flags = re.MULTILINE | re.UNICODE
-    if not expr_matchcase:
-        flags = flags | re.IGNORECASE
-    
-    if isinstance(expr,(str,unicode)):
-        expr = (expr,)
-
-    def _grep(expr,note=None):
-        if fixed_strings: expr = re.escape(expr)
-        if full_word: expr = r'\b' + expr + r'\b'
-        return bool(re.search(expr,note,flags=flags))
-    def _tany(ntags,*tags):
-        return any(t.lower() in ntags for t in tags)
-    def _tall(ntags,*tags):
-        return all(t.lower() in ntags for t in tags)
-        
     notes = find_notes(path=path,
                        excludes=excludes,
                        matchcase=matchcase,
                        maxdepth=maxdepth,
                        exclude_links=exclude_links,
                        include_orphaned=include_orphaned,
-                       return_note=True) # no need to send noteopts
+                       return_note=True,
+                       noteopts={'note_field':note_field})
     
     # If the results will be symlinked, we want to have already traversed
     # so run this now
@@ -1154,54 +1261,20 @@ def query(path='.',
         notes = list(notes)
     
     for note in notes:
-        note.read()
-        note.write = lambda *a,**k:None # disable write
-        
-        note.data['tags'] = set(t.lower() for t in note.data.get('tags',[]))
-        namespace = {
-            'note':note,
-            'data':note.data,
-            'tags':note.data['tags'],
-            'notes':note.data.get(note_field,''),
-            'text':getattr(note,'txt',''),
-        }
-        
-        if not isinstance(namespace['notes'],(str,unicode)):
-            warnings.warn('Note is {}. Converting to string'.format(unicode(type(namespace['notes']))))
-            namespace['notes'] = unicode(namespace['notes']) # Make it a string
-        
-        namespace['grep'] = partial(_grep,note=namespace['notes'])
-        namespace['g'] = namespace['grep']
-        namespace['tany'] = partial(_tany,note.data['tags'])
-        namespace['tall'] = partial(_tall,note.data['tags'])
-        namespace['t'] = namespace['tany']
-        
-        namespace['re'] = re
-        
-        full_expr = [i.strip() for e in expr for i in e.split(';') if i.strip()]
-        full_expr[-1] = '_res = ' + full_expr[-1]
-            
-        for ii,line in enumerate(full_expr):
-            try:
-                exec(line,namespace)
-            except Exception as E:
-                err = E.__class__.__name__
-                desc = unicode(E) 
-                etxt = 'Line {} `{}` raised {}. MSG: "{}". Note: "{}"'.format(ii,line,err,desc,note.filename0)
-                if allow_exception:
-                    warnings.warn('Query Error: {}'.format(etxt))
-                    namespace['_res'] = False
-                else:
-                    raise  QueryError(etxt)
-        
-        if not bool(namespace['_res']):
+        if not note.query(
+                expr=expr,
+                matchcase=expr_matchcase,
+                full_word=full_word,
+                fixed_strings=fixed_strings,
+                grep_match_any=match_any,
+                allow_exception=allow_exception):
             continue
-
+        
         if symlink_result:
-            symlink_file(note.filename0,symlink_result) # use the non-link version
+            symlink_file(note.filename0,symlink_result)
         
         yield note.filename0
-
+        
 def search_tags(path='.',tags=tuple(),
                 excludes=None,matchcase=False,
                 maxdepth=None,
@@ -1778,8 +1851,9 @@ Notes:
   Use caution!
     
 """
-
     import argparse
+    
+    common_args = defaultdict(set)
     parsers = {}
     parsers['main'] = argparse.ArgumentParser(\
         description=description,
@@ -1795,8 +1869,13 @@ Notes:
     parsers['main'].add_argument('-v','--version', action='version', version='%(prog)s-' + __version__)
 
     ## Modifiers
-
-    parsers['add'] = subpar.add_parser('add',help='Add notes to a file')
+    parsers['edit'] = subpar.add_parser('edit',
+        help="Launch $EDITOR to interactivly edit the notes for a file") 
+    parsers['edit'].add_argument('file',help='Specify file to edit')
+    common_args['edit'].update({'no-hash','force-refresh','no-refresh','link',
+                                'hide_vis','full_file','note_field'})
+                                
+    parsers['add'] = subpar.add_parser('add',help='[DEPRECATED] Add notes to a file')
     parsers['add'].add_argument('file',help='Specify file for additional notes')
     parsers['add'].add_argument('note',nargs='+',
         help=('Notes to add to a file. Use quotes as needed. '
@@ -1804,18 +1883,35 @@ Notes:
               "read from stdin"))
     parsers['add'].add_argument('-r','--replace',action='store_true',
         help='Replace rather than append the new note')
-        
-    parsers['edit'] = subpar.add_parser('edit',
-        help="Launch $EDITOR to interactivly edit the notes for a file") 
-    parsers['edit'].add_argument('file',help='Specify file to edit')
+    common_args['add'].update({'no-hash','force-refresh','no-refresh','link',
+                               'hide_vis','note_field'})
     
-    parsers['tag'] = subpar.add_parser('tag',
-        help="Add or remove tags from file. Note that tags are converted to lowercase") 
-    parsers['tag'].add_argument('-r','--remove',default=[],
+#     parsers['tag'] = subpar.add_parser('tag',
+#         help="Add or remove tags from file. Note that tags are converted to lowercase") 
+#     parsers['tag'].add_argument('-r','--remove',default=[],
+#         action='append',help='Specify tags to remove')
+#     parsers['tag'].add_argument('-t','--tag','-a','--add',default=[],
+#         action='append',help='Specify tags to add')
+#     parsers['tag'].add_argument('file',help='File(s) to tag',nargs='+')
+#     common_args['tag'].update({'no-hash','force-refresh','no-refresh','link','hide_vis'})
+
+    parsers['mod'] = subpar.add_parser('mod',aliases=['tag'],
+        help=("Add or remove tags  and/or add or replaces notes from file(s). "
+              "Note that tags are converted to lowercase"))
+    parsers['mod'].add_argument('-r','--remove',default=[],
         action='append',help='Specify tags to remove')
-    parsers['tag'].add_argument('-t','--tag','-a','--add',default=[],
+    parsers['mod'].add_argument('-t','--tag','-a','--add',default=[],
         action='append',help='Specify tags to add')
-    parsers['tag'].add_argument('file',help='File(s) to tag',nargs='+')
+    parsers['mod'].add_argument('file',help='File(s) to tag',nargs='+')
+    parsers['mod'].add_argument('-R','--replace',action='store_true',
+        help='Replace rather than append the new note')
+    parsers['mod'].add_argument('-n','--note',action='append',default=[],
+        help=('Notes to add (or replace). Each argument is its own line. '
+              'Specify `--note ""` to add empty line. Notes will come _after_ stdin if applicable'))
+    parsers['mod'].add_argument('-s','--stdin',action='store_true',
+        help=('Read note from stdin. Prepended to any --note arguments')) 
+    common_args['mod'].update({'no-hash','force-refresh','no-refresh','link',
+                               'hide_vis','note_field'})
 
     parsers['copy'] = subpar.add_parser('copy',
         help="Copy the notes from SRC to DST. DST must NOT have any notes.") 
@@ -1823,8 +1919,8 @@ Notes:
         help=("Source file. If a link, must have it's OWN notefile or link to a "
               "notefile (i.e. not created with 'source' mode)"))
     parsers['copy'].add_argument('DST',help='Destination file. Must not have ANY notes')
+    common_args['copy'].update({'no-hash','link','hide_vis'})
     
-        
     parsers['repair'] = subpar.add_parser('repair',
         help=("Verify basefile and metadata. Note that unless `--force-refresh`, "
               "files with matching mtime and size are *NOT* rehashed. "))
@@ -1846,19 +1942,23 @@ Notes:
     parsers['repair'].add_argument('-m','--mtime',action='store_true',
         help=('Require mtime be the same for orphaned notes. Could speed '
               'up search by reducing the number of files to be hashed'))
-    
+    common_args['repair'].update({'no-hash','force-refresh','link','search_exclude','dry_run'})
+
     parsers['change_tag'] = subpar.add_parser('change-tag',help='Change one tag to another')
     parsers['change_tag'].add_argument('old_tag',help='Old tag you will be changing')
     parsers['change_tag'].add_argument('new_tag',help='New tag you will be using')
     parsers['change_tag'].add_argument('-s','--silent',action='store_true',
         help='Do NOT list notes that were modified')
-    
+    common_args['change_tag'].update({'link','path','search_exclude','outfile',
+                                      'dry_run','no-refresh','force-refresh'})
     
     ## Queries
     parsers['cat'] = subpar.add_parser('cat',help="Print the notes")
     parsers['cat'].add_argument('file',help='Specify file to cat')
     parsers['cat'].add_argument('-t','--tags',action='store_true',
-        help='Print tags rather than notes') 
+        help='Print tags rather than notes')
+    common_args['cat'].update({'link','outfile','full_file','note_field'})
+ 
     
     parsers['find'] = subpar.add_parser('find',help="Find and list all notes",
         epilog=('An empty note means NO FIELD is defined '
@@ -1867,7 +1967,9 @@ Notes:
         help='ONLY returns empty notes. Slower default find')
     parsers['find'].add_argument('--non-empty',action='store_true',
         help='ONLY returns NON empty notes. Slower default find')
-             
+    common_args['find'].update({'path','search_exclude','outfile',
+                                'print0','symlink_res'})
+            
 
     parsers['grep'] = subpar.add_parser('grep',help="Search notes for a given string")
     parsers['grep'].add_argument('expr',nargs='+',
@@ -1876,6 +1978,8 @@ Notes:
               'Use advanced regex strings for more control. May need to escape them for bash parsing'))    
     parsers['grep'].add_argument('-f','--full',action='store_true',
         help='Search all fields of the note rather than just the "notes" field')
+    common_args['grep'].update({'path','expr_match','search_exclude','note_field',
+                                'match_all','outfile','print0','symlink_res'})
 
     
     parsers['query'] = subpar.add_parser('query',help="Advanced queries on notes",
@@ -1887,6 +1991,8 @@ Notes:
               "evaluate to True or False as the query"))
     parsers['query'].add_argument('-e','--allow-exception',action='store_true',
         help=('Allow exceptions in the query. Still prints a warning to stderr for each one'))
+    common_args['query'].update({'path','expr_match','search_exclude','note_field',
+                                 'outfile','print0','symlink_res'})
 
     parsers['search_tags'] = subpar.add_parser('search-tags',
         help=("List all files with the specific tag(s) or all tags. "
@@ -1900,120 +2006,107 @@ Notes:
     parsers['search_tags'].add_argument('-t','--all-tags',action='store_true',
         help=('Display all tags for the of the files that matched opposed to '
               '*just* the queried ones'))
-    
+    common_args['search_tags'].update({'path','search_exclude','match_all',
+                                       'outfile','symlink_res'})
+
     parsers['export'] = subpar.add_parser('export',help="Export all notesfiles to YAML")
+    common_args['export'].update({'path','search_exclude','outfile'})
+
     
     parsers['vis'] = subpar.add_parser('vis',help='Change the visibility of file(s)/dir(s)')
     parsers['vis'].add_argument('mode',choices=['hide', 'show'],
         help='Visibility mode for file(s)/dir(s) ')
     parsers['vis'].add_argument('path',default=['.'],nargs='*',help='[.] files(s)/dir(s)')
+    common_args['vis'].update({'search_exclude','dry_run'})
 
     ## Common arguments for when there are more than one command using it
     # Could use various parent parsers but this is honestly just as easy!
+    for name,flags in common_args.items():
+        if 'no-hash' in flags:
+            parsers[name].add_argument('--no-hash',action='store_false',dest='hashfile',
+                help='Do *not* compute the SHA256 of the basefile. Will not be able to repair orphaned notes')
+        
+        if 'force-refresh' in flags:
+            parsers[name].add_argument('--force-refresh',action='store_true',
+                help='Force %(prog)s to refresh the metadata of files when the notefile is modified')
+        
+        if 'no-refresh' in flags:
+            parsers[name].add_argument('--no-refresh',action='store_true',
+                help='Never refresh file metadata when a notefile is modified')
+        
+        if 'link' in flags:
+            parsers[name].add_argument('--link',choices=['source','symlink','both'],
+                default='both',
+                help=("['%(default)s'] Specify how to handle symlinks. "
+                      "If 'source', will add the notefile to the source only (non-recursively). "
+                      "If 'symlink', will add the notefile to *just* the symlink file. "
+                      "If 'both', will add the notefile the source (non-recursivly) and then symlimk to that notefile. "
+                      "(acts of 'source' if used in cat)"))
+        
+        if 'path' in flags:
+            parsers[name].add_argument('-p','--path',default='.',help='[%(default)s] Specify path')
     
-    # Modification Flags. 
-    for name in ['add','edit','tag','repair','copy','change_tag']:
-        parsers[name].add_argument('--no-hash',action='store_false',dest='hashfile',
-            help='Do *not* compute the SHA256 of the basefile. Will not be able to repair orphaned notes')
-        
-        if name == 'copy': # Neither of these make sense with copy
-            continue
-        
-        parsers[name].add_argument('--force-refresh',action='store_true',
-            help='Force %(prog)s to refresh the metadata of files when the notefile is modified')
-        
-        if name == 'repair': # no-refresh doesn't make sense with repair
-            continue
-        
-        parsers[name].add_argument('--no-refresh',action='store_true',
-            help='Never refresh file metadata when a notefile is modified')
+        if 'expr_match' in flags:
+            parsers[name].add_argument('--match-expr-case',action='store_true',dest='match_expr_case',
+                help='Match case on grep expression')
+            parsers[name].add_argument('-F','--fixed-strings',action='store_true',
+                help='Match the string literally without regex patterns for grep expression')
+            parsers[name].add_argument('--full-word',action='store_true',
+                help='Matches the full word(s) of the grep expression. (adds \b)')
     
-    # link
-    for name in ['add','edit','tag','repair','copy','change_tag','cat']:
-        parsers[name].add_argument('--link',choices=['source','symlink','both'],
-            default='both',
-            help=("['%(default)s'] Specify how to handle symlinks. "
-                  "If 'source', will add the notefile to the source only (non-recursively). "
-                  "If 'symlink', will add the notefile to *just* the symlink file. "
-                  "If 'both', will add the notefile the source (non-recursivly) and then symlimk to that notefile. "
-                  "(acts of 'source' if used in cat)"))
-                  
-    # Search path
-    for name in ['change_tag', 'export', 'find', 'grep', 'query', 'search_tags']:
-        parsers[name].add_argument('-p','--path',default='.',help='[%(default)s] Specify path')
+        if 'hide_vis' in flags:
+            parsers[name].add_argument('-H','--hidden',action='store_true',default=HIDDEN,
+                help='Override default and make new notes hidden')
+            parsers[name].add_argument('-V','--visible',action='store_false',dest='hidden',
+                help='Override default and make new notes visible')
     
-    # grep and query:
-    for name in ['grep','query']:
-        parsers[name].add_argument('--match-expr-case',action='store_true',dest='match_expr_case',
-            help='Match case on grep expression')
-        parsers[name].add_argument('-F','--fixed-strings',action='store_true',
-            help='Match the string literally without regex patterns for grep expression')
-        parsers[name].add_argument('--full-word',action='store_true',
-            help='Matches the full word(s) of the grep expression. (adds \b)')
+        if 'search_exclude' in flags:
+            parsers[name].add_argument('--exclude',action='append',default=[],
+                help=('Specify a glob pattern to exclude when looking for notes. '
+                      "Directories are also matched with a trailing '/'. Can specify multiple times."))
+            parsers[name].add_argument('--match-exclude-case',action='store_true',
+                dest='match_case',help='Match case on exclude patterns')
+            parsers[name].add_argument('--max-depth',
+                type=int,metavar='N',default=None,dest='maxdepth',
+                help='Specify the maximum depth to search for notefiles. The current directory is 0')
         
-    # Hidden settings ( Repair hidden respects source hidden)
-    # Note that change_tag will only work on existing so no need to set hidden
-    for name in ['add', 'copy', 'edit', 'tag']:
-        parsers[name].add_argument('-H','--hidden',action='store_true',default=HIDDEN,
-            help='Override default and make new notes hidden')
-        parsers[name].add_argument('-V','--visible',action='store_false',dest='hidden',
-            help='Override default and make new notes visible')
+            if name != 'repair':
+                parsers[name].add_argument('--exclude-links',action='store_true',
+                    help='Do not include symlinked notefiles')
+        
+        if 'match_all' in flags:
+            parsers[name].add_argument('--all',action='store_false',dest='match_any',
+                help='Match ALL expressions')   
     
-    # Add exclude options:
-    for name in  ['change_tag', 'export', 'find', 'grep', 'query', 'repair', 'search_tags', 'vis']:
-        parsers[name].add_argument('--exclude',action='append',default=[],
-            help=('Specify a glob pattern to exclude when looking for notes. '
-                  "Directories are also matched with a trailing '/'. Can specify multiple times."))
-        parsers[name].add_argument('--match-exclude-case',action='store_true',
-            dest='match_case',help='Match case on exclude patterns')
-        parsers[name].add_argument('--max-depth',
-            type=int,metavar='N',default=None,dest='maxdepth',
-            help='Specify the maximum depth to search for notefiles. The current directory is 0')
-        
-        if name == 'repair': continue
-        parsers[name].add_argument('--exclude-links',action='store_true',
-            help='Do not include symlinked notefiles')
+        if 'outfile' in flags:
+            parsers[name].add_argument('-o','--out-file',help='Specify file rather than stdout',metavar='FILE')
     
-    # Queries
-    for name in ['grep','search_tags']:
-        parsers[name].add_argument('--all',action='store_false',dest='match_any',
-                                   help='Match ALL expressions')        
-
-    # add outfiles
-    for name in ['search_tags','cat','grep','query','export','find','change_tag']:
-        parsers[name].add_argument('-o','--out-file',help='Specify file rather than stdout',metavar='FILE')
+        if 'dry_run' in flags:
+            parsers[name].add_argument('--dry-run',action='store_true',
+                help='Do not make any changes')
+    
+        if 'print0' in flags:
+            parsers[name].add_argument('-0','--print0',action='store_true',
+                help=("Terminate lines with a nul byte for use with `xargs -0` when "
+                      "filenames have spaces"))
+    
+        if 'full_file' in flags:
+            parsers[name].add_argument('-f','--full',action='store_true',
+                help='Prints/Edits the entire YAML notefile')
+    
+        if 'symlink_res' in flags:
+            parsers[name].add_argument('--symlink',default=None,metavar='DIR',
+                help=('Create symlinks in DIR to the found files. If used in '
+                      'search-tags, will also have subdirs with the name (or filter). '
+                      'If there are name conflicts, will add `.N` to the filename '
+                      'and print a warning to stderr'))       
         
-    # dry run
-    for name in ['repair','vis','change_tag']:
-        parsers[name].add_argument('--dry-run',action='store_true',
-            help='Do not make any changes')
-
-    # Null print0
-    for name in ['find','grep','query']:
-        parsers[name].add_argument('-0','--print0',action='store_true',
-        help=("Terminate lines with a nul byte for use with `xargs -0` when "
-              "filenames have spaces"))
-
-    # full file
-    for name in ['cat','edit']:
-        parsers[name].add_argument('-f','--full',action='store_true',
-            help='Prints/Edits the entire YAML notefile') 
-
-    # symlink results
-    for name in ['find','grep','search_tags','query']:
-        parsers[name].add_argument('--symlink',default=None,metavar='DIR',
-            help=('Create symlinks in DIR to the found files. If used in '
-                  'search-tags, will also have subdirs with the name (or filter). '
-                  'If there are name conflicts, will add `.N` to the filename '
-                  'and print a warning to stderr'))
-
-    # Notefield
-    for name in ['add','edit','cat','grep','query']:
-        parsers[name].add_argument('--note-field',default=NOTEFIELD,metavar='name',
-            help=("['notes'] Specify the field to write or query notes. "
-                  "Can also be set by NOTEFILE_NOTEFIELD enviorment variable. " 
-                  "Setting it here takes precedance"))
-
+        if 'note_field' in flags:
+            parsers[name].add_argument('--note-field',default=NOTEFIELD,metavar='name',
+                help=("['notes'] Specify the field to write or query notes. "
+                      "Can also be set by NOTEFILE_NOTEFIELD enviorment variable. " 
+                      "Setting it here takes precedance"))
+        
     # This sorts the optional arguments or each parser.
     # It is a bit of a hack. The biggest issue is that this happens on every 
     # call but it takes about 10 microseconds
@@ -2050,7 +2143,7 @@ Notes:
     try:
         cliactions(args)        
     except Exception as E:
-        if DEBUG:
+        if DEBUG or True: #TODO Remove 
             raise
         print('ERROR: ' + str(E))
         sys.exit(1)
@@ -2083,7 +2176,16 @@ def cliactions(args):
                     )
     
     ## Modification Actions
+    if args.command == 'edit':      
+        note = Notefile(args.file,**noteopts)
+        note.read()
+        note.interactive_edit(full=args.full)
+        if not args.no_refresh:
+            note.repair_metadata(force=args.force_refresh)
+        note.write()
+        
     if args.command == 'add':
+        warnings.warn('DEPRECATION WARNING: `add` is deprecated. Use `mod`')
         args.note = ' '.join(args.note)
         if args.note.strip() == '-':
             args.note = sys.stdin.read()        
@@ -2095,23 +2197,22 @@ def cliactions(args):
         if not args.no_refresh:
             note.repair_metadata(force=args.force_refresh)
         note.write()
+    
+    if args.command in {'mod','tag'}:
         
-    if args.command == 'edit':      
-        note = Notefile(args.file,**noteopts)
-        note.read()
-        note.interactive_edit(full=args.full)
-        if not args.no_refresh:
-            note.repair_metadata(force=args.force_refresh)
-        note.write()
-           
-    if args.command == 'tag':
-        if not (args.tag or args.remove):
-            raise ValueError('Must specify at least one tag to add or remove')
+        if not ( args.tag or args.remove or args.note or args.stdin ):
+            raise ValueError('Must specify tags or notes to add (or remove)')
+        
+        addnote = [sys.stdin.read().strip()] if args.stdin else []
+        addnote = '\n'.join(addnote + args.note)
+        
         for file in args.file:
-            note = Notefile(file,**noteopts)
+            note = Notefile(file,**noteopts) # see above for all this incldes
             note.read()
             
             note.modify_tags(add=args.tag,remove=args.remove)
+            note.add_note(addnote,replace=args.replace) # also does strip()
+    
             if not args.no_refresh:
                 note.repair_metadata(force=args.force_refresh)
             note.write()
@@ -2135,7 +2236,8 @@ def cliactions(args):
                 print("{}Moved '{}' --> '{}'".format(t,old,new))
     
     if args.command == 'copy':
-        copy_note(args.SRC,args.DST,noteopts=noteopts)
+        src = Notefile(args.SRC,**noteopts)
+        src.copyto(args.DST,noteopts=noteopts)
          
     if args.command == 'vis':
         t = '(DRYRUN) ' if args.dry_run else ''

@@ -94,6 +94,7 @@ def test_main_note():
         file.write('this is a\ntest file')
     
     ## Add
+    # Will soon be deprecated
     call('--debug add main.txt "this is a note"')
     data = read_note('main.txt')
     assert "this is a note" == data['notes'].strip()
@@ -106,7 +107,7 @@ def test_main_note():
     data = read_note('main.txt')
     assert "this is a note" == data['notes'].strip()
     
-    ## Tags
+    ## Tags -- Test with `tag` command and then `mod`
     call('tag -t test -t "two words" main.txt')
     data = read_note('main.txt')
     assert {'test',"two words"} == set(data['tags'])
@@ -119,8 +120,25 @@ def test_main_note():
     data = read_note('main.txt')
     assert {'new'} == set(data['tags'])
     
-    # Test that when the note is unchanged
+    call('mod -r new -t newer -R -n "new note" main.txt')
+    data = read_note('main.txt')
+    assert {'newer'} == set(data['tags'])
+    assert data['notes'] == 'new note'
     
+    call('mod -n "" -n "line break?" main.txt')
+    data = read_note('main.txt')
+    assert data['notes'] == 'new note\n\nline break?'
+    
+    call('mod -R -n field --note-field other main.txt')
+    data = read_note('main.txt')
+    assert data['notes'] == 'new note\n\nline break?' # even though -R, this is the old field
+    assert data['other'] == 'field'
+    
+    call('mod -R -n new? --note-field other main.txt')
+    data = read_note('main.txt')
+    assert data['other'] == 'new?'
+    
+    # Test that when the note is unchanged    
     with open('new.txt','wt') as file:
         file.write('NEW file')
     
