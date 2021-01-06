@@ -652,6 +652,12 @@ def test_grep_and_listtags_and_export_and_find_and_change():
         res = set(f.strip() for f in file.read().splitlines() if f.strip())
     assert {'./noenter/file3.txt', './file1.txt', './file4.exc', './file2.txt'} == res
 
+    call('grep MyFiLe --export -o out')
+    with open('out') as file:
+        res = yaml.load(file) # Should be a dict
+        res = dict(res) # will fail otherwise
+    assert {'./noenter/file3.txt', './file1.txt', './file4.exc', './file2.txt'} == set(res)
+
     call('grep -o out MyFiLe --match-expr-case')
     with open('out') as file:
         res = set(f.strip() for f in file.read().splitlines() if f.strip())
@@ -966,6 +972,12 @@ def test_queries():
 
     call("""query "g('w.*?1')" -o out""")
     assert _read_res() == {'./file1.txt', './file2.txt', './file3.txt'}
+    
+    call("""query "g('w.*?1')" --export -o out""")
+    with open('out') as f: 
+        res = yaml.load(f) # Should be a dict
+        res = dict(res)    # otherwise will fail
+    assert set(res) == {'./file1.txt', './file2.txt', './file3.txt'}
     
     call("""query "g('w.*?1')" --fixed-strings -o out""")
     assert _read_res() == set()

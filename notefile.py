@@ -4,7 +4,7 @@
 Write notesfile sidecar files
 """
 from __future__ import division, print_function, unicode_literals
-__version__ = '20210104.0'
+__version__ = '20210106.0'
 __author__ = 'Justin Winokur'
 
 import sys
@@ -1172,7 +1172,7 @@ def grep(path='.',expr='',
         if symlink_result:
             symlink_file(note.filename0,symlink_result)
         
-        yield note.filename0
+        yield note
         
 
 
@@ -1273,7 +1273,7 @@ def query(path='.',
         if symlink_result:
             symlink_file(note.filename0,symlink_result)
         
-        yield note.filename0
+        yield note
         
 def search_tags(path='.',tags=tuple(),
                 excludes=None,matchcase=False,
@@ -1979,7 +1979,7 @@ Notes:
     parsers['grep'].add_argument('-f','--full',action='store_true',
         help='Search all fields of the note rather than just the "notes" field')
     common_args['grep'].update({'path','expr_match','search_exclude','note_field',
-                                'match_all','outfile','print0','symlink_res'})
+                                'match_all','outfile','print0','symlink_res','export'})
 
     
     parsers['query'] = subpar.add_parser('query',help="Advanced queries on notes",
@@ -1992,7 +1992,7 @@ Notes:
     parsers['query'].add_argument('-e','--allow-exception',action='store_true',
         help=('Allow exceptions in the query. Still prints a warning to stderr for each one'))
     common_args['query'].update({'path','expr_match','search_exclude','note_field',
-                                 'outfile','print0','symlink_res'})
+                                 'outfile','print0','symlink_res','export'})
 
     parsers['search_tags'] = subpar.add_parser('search-tags',
         help=("List all files with the specific tag(s) or all tags. "
@@ -2018,7 +2018,7 @@ Notes:
         help='Visibility mode for file(s)/dir(s) ')
     parsers['vis'].add_argument('path',default=['.'],nargs='*',help='[.] files(s)/dir(s)')
     common_args['vis'].update({'search_exclude','dry_run'})
-
+    
     ## Common arguments for when there are more than one command using it
     # Could use various parent parsers but this is honestly just as easy!
     for name,flags in common_args.items():
@@ -2080,6 +2080,10 @@ Notes:
     
         if 'outfile' in flags:
             parsers[name].add_argument('-o','--out-file',help='Specify file rather than stdout',metavar='FILE')
+    
+        if 'export' in flags:
+            parsers[name].add_argument('--export',action='store_true',
+                help='Export found notes to YAML')
     
         if 'dry_run' in flags:
             parsers[name].add_argument('--dry-run',action='store_true',
@@ -2272,6 +2276,7 @@ def cliactions(args):
         print(note.cat(tags=args.tags,full=args.full),file=stream)
             
     if args.command == 'grep':
+        notes = {} if args.export else None
         end = b'\x00' if args.print0 else b'\n'
         for note in grep(expr=args.expr,
                          expr_matchcase=args.match_expr_case,
@@ -2283,13 +2288,19 @@ def cliactions(args):
                          symlink_result=args.symlink,
                          note_field=getattr(args,'note_field',NOTEFIELD),
                          **findopts):
+            if args.export:
+                notes[note.filename0] = note.data
+                continue # export trumps print0
+                
             # python2 will not have a buffer but can accept bytes regardless of mode
             if hasattr(stream,'buffer'):
-                stream.buffer.write(note.encode('utf8') + end)
+                stream.buffer.write(note.filename0.encode('utf8') + end)
             else: # Will deprecate when not using python2
-                stream.write(note.encode('utf8') + end)
-    
+                stream.write(note.filename0.encode('utf8') + end)
+        if args.export:
+            yaml.dump(pss(notes),stream)
     if args.command == 'query':
+        notes = {} if args.export else None
         end = b'\x00' if args.print0 else b'\n'
         for note in query(expr=args.expr,
                           expr_matchcase=args.match_expr_case,
@@ -2300,13 +2311,18 @@ def cliactions(args):
                           note_field=getattr(args,'note_field',NOTEFIELD),
                           allow_exception=args.allow_exception,
                           **findopts):
+            
+            if args.export:
+                notes[note.filename0] = note.data
+                continue # export trumps print0
             # python2 will not have a buffer but can accept bytes regardless of mode
             if hasattr(stream,'buffer'):
-                stream.buffer.write(note.encode('utf8') + end)
+                stream.buffer.write(note.filename0.encode('utf8') + end)
             else: # Will deprecate when not using python2
-                stream.write(note.encode('utf8') + end)
-                
-
+                stream.write(note.filename0.encode('utf8') + end)
+        
+        if args.export:
+            yaml.dump(pss(notes),stream)
     if args.command == 'find':
         if args.empty and args.non_empty:
             raise ValueError('Cannot specify both --empty and --non-empty')

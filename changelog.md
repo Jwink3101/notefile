@@ -2,6 +2,11 @@
 
 (**_newest_** on *top*)
 
+## 20210106.0:
+
+* Adds `--export` to grep and query. More to come
+* Apparently breaks python2. May try to fix otherwise will update documentation
+
 ## 20210104.0:
 
 * Adds `mod` (which also encompasses `tag`) to add notes to multiple files at the same time.
