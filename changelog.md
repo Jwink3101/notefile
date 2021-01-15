@@ -2,6 +2,13 @@
 
 (**_newest_** on *top*)
 
+## 20210114.0:
+
+* Allows `export` of specific paths and no longer accepts `--path` for it
+    * `export` can also accept stdin if given `-`. This now compliments `--export` on some flags but, for now, I'll keep both
+* All paths are now `normpath`ed so change "`./item`" to "`item`". Tests updated
+* Fixed python2 but I am not going to do anything else to preserve it!!!
+
 ## 20210106.0:
 
 * Adds `--export` to grep and query. More to come

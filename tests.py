@@ -79,7 +79,9 @@ def find_links(path='.'):
             link = os.readlink(filepath)
             fulldest = os.path.normpath(os.path.join(dirpath,link))
             working = os.path.isfile(fulldest)
-            res.add((filepath,link,fulldest,working))
+            res.add((os.path.normpath(filepath),
+                     os.path.normpath(link),
+                     fulldest,working))
     return res
 
 ##########################
@@ -193,7 +195,7 @@ def test_odd_filenames():
     call('search-tags') # This outputs YAML so no -0
 
     # Capture to test
-    gold = {'./spac es.txt', './unic°de and spaces and no ext', './unic·de.txt', './sub dir/dir2/dir 3/hi'}
+    gold = {'spac es.txt', 'unic°de and spaces and no ext', 'unic·de.txt', 'sub dir/dir2/dir 3/hi'}
     
     for cmd,nul in itertools.product(['find','grep "this"'],[True,False]):
         if nul:
@@ -565,7 +567,7 @@ def test_maxdepth():
         a,b = os.path.split(notepath)
         shutil.move(notepath,os.path.join(a,'BLA' + b))
         
-        filepaths.append('./' + filepath)
+        filepaths.append('' + filepath)
         notepaths.append(notepath)
 
     # Do repairs first
@@ -650,33 +652,33 @@ def test_grep_and_listtags_and_export_and_find_and_change():
     call('grep -o out MyFiLe')
     with open('out') as file:
         res = set(f.strip() for f in file.read().splitlines() if f.strip())
-    assert {'./noenter/file3.txt', './file1.txt', './file4.exc', './file2.txt'} == res
+    assert {'noenter/file3.txt', 'file1.txt', 'file4.exc', 'file2.txt'} == res
 
     call('grep MyFiLe --export -o out')
     with open('out') as file:
         res = yaml.load(file) # Should be a dict
         res = dict(res) # will fail otherwise
-    assert {'./noenter/file3.txt', './file1.txt', './file4.exc', './file2.txt'} == set(res)
+    assert {'noenter/file3.txt', 'file1.txt', 'file4.exc', 'file2.txt'} == set(res)
 
     call('grep -o out MyFiLe --match-expr-case')
     with open('out') as file:
         res = set(f.strip() for f in file.read().splitlines() if f.strip())
-    assert {'./file2.txt'} == res
+    assert {'file2.txt'} == res
     
     call('grep -o out MyFiLe --exclude "*.exc" --exclude noEnter')
     with open('out') as file:
         res = set(f.strip() for f in file.read().splitlines() if f.strip())
-    assert {'./file1.txt','./file2.txt'} == res
+    assert {'file1.txt','file2.txt'} == res
 
     call('grep -o out MyFiLe --exclude "*.exc" --exclude noEnter --match-exclude-case')
     with open('out') as file:
         res = set(f.strip() for f in file.read().splitlines() if f.strip())
-    assert {'./noenter/file3.txt','./file1.txt','./file2.txt'} == res
+    assert {'noenter/file3.txt','file1.txt','file2.txt'} == res
     
     call('grep -o out MyFiLe YouRFile')
     with open('out') as file:
         res = set(f.strip() for f in file.read().splitlines() if f.strip())
-    assert {'./noenter/file3.txt', './file1.txt', './file4.exc', './file2.txt','./file5.txt'} == res
+    assert {'noenter/file3.txt', 'file1.txt', 'file4.exc', 'file2.txt','file5.txt'} == res
     
     # Test grep with full
     nf = notefile.Notefile('file1.txt')
@@ -692,7 +694,7 @@ def test_grep_and_listtags_and_export_and_find_and_change():
     call('grep special -f -o out')
     with open('out') as file:
         res = set(f.strip() for f in file.read().splitlines() if f.strip())
-    assert res == {'./file1.txt'}
+    assert res == {'file1.txt'}
     
     ### Tags
     
@@ -701,7 +703,7 @@ def test_grep_and_listtags_and_export_and_find_and_change():
         res = yaml.load(file)
         # Convert to dict of sets for ordering
         res = {k:set(v) for k,v in res.items()}
-    assert {'tag1': {'./noenter/file3.txt', './file4.exc', './file1.txt'}, 'tag2': {'./file1.txt'}} == res
+    assert {'tag1': {'noenter/file3.txt', 'file4.exc', 'file1.txt'}, 'tag2': {'file1.txt'}} == res
     
 
     call('search-tags -o out tag1')
@@ -709,21 +711,21 @@ def test_grep_and_listtags_and_export_and_find_and_change():
         res = yaml.load(file)
         # Convert to dict of sets for ordering
         res = {k:set(v) for k,v in res.items()}
-    assert {'tag1': {'./noenter/file3.txt', './file4.exc', './file1.txt'}} == res
+    assert {'tag1': {'noenter/file3.txt', 'file4.exc', 'file1.txt'}} == res
     
     call('search-tags -o out tag1 --exclude "*.EXC" --match-exclude-case')
     with open('out') as file:
         res = yaml.load(file)
         # Convert to dict of sets for ordering
         res = {k:set(v) for k,v in res.items()}
-    assert {'tag1': {'./noenter/file3.txt','./file4.exc','./file1.txt'}} == res   
+    assert {'tag1': {'noenter/file3.txt','file4.exc','file1.txt'}} == res   
 
     call('search-tags -o out tag1 --exclude "*.EXC"')
     with open('out') as file:
         res = yaml.load(file)
         # Convert to dict of sets for ordering
         res = {k:set(v) for k,v in res.items()}
-    assert {'tag1': {'./noenter/file3.txt','./file1.txt'}} == res   
+    assert {'tag1': {'noenter/file3.txt','file1.txt'}} == res   
     
     # Just test the --count mode
     call('search-tags -o out --count')
@@ -737,15 +739,15 @@ def test_grep_and_listtags_and_export_and_find_and_change():
         res = yaml.load(file)
         # Convert to dict of sets for ordering
         res = {k:set(v) for k,v in res.items()}
-    assert {'tag1': {'./file1.txt', './file4.exc', './noenter/file3.txt'}, 
-            'tag2': {'./file1.txt'}} == res
+    assert {'tag1': {'file1.txt', 'file4.exc', 'noenter/file3.txt'}, 
+            'tag2': {'file1.txt'}} == res
     
     call('search-tags -o out --all "tag1" "tag2"')
     with open('out') as file:
         res = yaml.load(file)
         # Convert to dict of sets for ordering
         res = {k:set(v) for k,v in res.items()}
-    assert {'tag1': {'./file1.txt'}, 'tag2': {'./file1.txt'}} == res
+    assert {'tag1': {'file1.txt'}, 'tag2': {'file1.txt'}} == res
     
     ## Link Excludes
     # Add this after the previous
@@ -761,26 +763,26 @@ def test_grep_and_listtags_and_export_and_find_and_change():
     call('grep -o out link')
     with open('out') as file:
         res = set(f.strip() for f in file.read().splitlines() if f.strip())
-    assert {'./link.txt', './file6.txt'} == res
+    assert {'link.txt', 'file6.txt'} == res
     
     call('grep -o out link --exclude-links')
     with open('out') as file:
         res = set(f.strip() for f in file.read().splitlines() if f.strip())
-    assert {'./file6.txt'} == res
+    assert {'file6.txt'} == res
 
     call('search-tags -o out link')
     with open('out') as file:
         res = yaml.load(file)
         # Convert to dict of sets for ordering
         res = {k:set(v) for k,v in res.items()}
-    assert {'link': {'./link.txt', './file6.txt'}} == res
+    assert {'link': {'link.txt', 'file6.txt'}} == res
 
     call('search-tags -o out link --exclude-links')
     with open('out') as file:
         res = yaml.load(file)
         # Convert to dict of sets for ordering
         res = {k:set(v) for k,v in res.items()}
-    assert {'link': {'./file6.txt'}} == res
+    assert {'link': {'file6.txt'}} == res
     
     ## Export & find. Mostly test for exclusions
     def _read(filename,export=True):
@@ -795,27 +797,27 @@ def test_grep_and_listtags_and_export_and_find_and_change():
     for cmd in ['export','find']:
         call('{} -o out'.format(cmd))
         res = _read('out',export=cmd=='export')
-        assert {'./file6.txt', './file5.txt', './link.txt', 
-                './noenter/file3.txt', './file2.txt', './file4.exc', 
-                './file1.txt'} == res
+        assert {'file6.txt', 'file5.txt', 'link.txt', 
+                'noenter/file3.txt', 'file2.txt', 'file4.exc', 
+                'file1.txt'} == res
 
         call('{} -o out --exclude-links'.format(cmd))
         res = _read('out',export=cmd=='export')
-        assert {'./file6.txt', './file5.txt',
-                './noenter/file3.txt', './file2.txt', './file4.exc', 
-                './file1.txt'} == res
+        assert {'file6.txt', 'file5.txt',
+                'noenter/file3.txt', 'file2.txt', 'file4.exc', 
+                'file1.txt'} == res
 
         call('{} -o out --exclude "*.exC"'.format(cmd))
         res = _read('out',export=cmd=='export')
-        assert {'./file6.txt', './file5.txt', './link.txt', 
-                './noenter/file3.txt', './file2.txt', 
-                './file1.txt'} == res
+        assert {'file6.txt', 'file5.txt', 'link.txt', 
+                'noenter/file3.txt', 'file2.txt', 
+                'file1.txt'} == res
 
         call('{} -o out --exclude "*.exC" --match-exclude-case'.format(cmd))
         res = _read('out',export=cmd=='export')
-        assert {'./file6.txt', './file5.txt', './link.txt', 
-                './noenter/file3.txt', './file2.txt', './file4.exc', 
-                './file1.txt'} == res
+        assert {'file6.txt', 'file5.txt', 'link.txt', 
+                'noenter/file3.txt', 'file2.txt', 'file4.exc', 
+                'file1.txt'} == res
     
     ## Changing tags
     
@@ -826,7 +828,7 @@ def test_grep_and_listtags_and_export_and_find_and_change():
         res = yaml.load(file)
         # Convert to dict of sets for ordering
         res = {k:set(v) for k,v in res.items()}
-    assert res == {'tagtwo': {'./file1.txt'}}
+    assert res == {'tagtwo': {'file1.txt'}}
     
     # Dry run
     call('search-tags -o out0') # to compare against
@@ -845,7 +847,7 @@ def test_grep_and_listtags_and_export_and_find_and_change():
     with open('out') as file:
         res = yaml.load(file)
         res = {k:set(v) for k,v in res.items()}
-    assert res == {'tag1': {'./file4.exc'}}
+    assert res == {'tag1': {'file4.exc'}}
         
     # Not Tested:
     #   * Exclude links. This should be fine because it's the same logic as the
@@ -878,12 +880,12 @@ def test_grep_w_multiple_expr():
     call('grep -o out me you')
     with open('out') as file:
         res = set(f.strip() for f in file.read().splitlines() if f.strip())
-    assert {'./file1.txt', './file2.txt', './file3.txt'} == res
+    assert {'file1.txt', 'file2.txt', 'file3.txt'} == res
 
     call('grep -o out --all me you')
     with open('out') as file:
         res = set(f.strip() for f in file.read().splitlines() if f.strip())
-    assert {'./file1.txt'} == res
+    assert {'file1.txt'} == res
     
     
     ## Test grep with regex
@@ -900,22 +902,22 @@ def test_grep_w_multiple_expr():
     call('grep -o out "te.*st"') 
     with open('out') as file:
         res = set(f.strip() for f in file.read().splitlines() if f.strip())
-    assert {'./file4.txt','./file5.txt'} == res
+    assert {'file4.txt','file5.txt'} == res
     
     call('grep -o out -F "te.*st"')
     with open('out') as file:
         res = set(f.strip() for f in file.read().splitlines() if f.strip())
-    assert {'./file4.txt'} == res
+    assert {'file4.txt'} == res
         
     call('grep -o out the')
     with open('out') as file:
         res = set(f.strip() for f in file.read().splitlines() if f.strip())
-    assert {'./file6.txt','./file7.txt'} == res
+    assert {'file6.txt','file7.txt'} == res
 
     call('grep -o out --full-word the')
     with open('out') as file:
         res = set(f.strip() for f in file.read().splitlines() if f.strip())
-    assert {'./file7.txt'} == res
+    assert {'file7.txt'} == res
     
     
     os.chdir(TESTDIR)
@@ -959,25 +961,25 @@ def test_queries():
     
     # Tests with grep and tags
     call("""query "grep('word1') and grep('word2') and not grep('word3')" -o out""")
-    assert _read_res() == {'./file3.txt'}
+    assert _read_res() == {'file3.txt'}
     
     call("""query "g('word1') and 'tag1' in tags" -o out""") # include tags
-    assert _read_res() == {'./file1.txt'}
+    assert _read_res() == {'file1.txt'}
     
     call("""query "g('d1')" -o out""")
-    assert _read_res() == {'./file1.txt', './file2.txt', './file3.txt'}
+    assert _read_res() == {'file1.txt', 'file2.txt', 'file3.txt'}
     
     call("""query "g('d1')" --full-word -o out""")
-    assert _read_res() == {'./file3.txt'}
+    assert _read_res() == {'file3.txt'}
 
     call("""query "g('w.*?1')" -o out""")
-    assert _read_res() == {'./file1.txt', './file2.txt', './file3.txt'}
+    assert _read_res() == {'file1.txt', 'file2.txt', 'file3.txt'}
     
     call("""query "g('w.*?1')" --export -o out""")
     with open('out') as f: 
         res = yaml.load(f) # Should be a dict
         res = dict(res)    # otherwise will fail
-    assert set(res) == {'./file1.txt', './file2.txt', './file3.txt'}
+    assert set(res) == {'file1.txt', 'file2.txt', 'file3.txt'}
     
     call("""query "g('w.*?1')" --fixed-strings -o out""")
     assert _read_res() == set()
@@ -985,45 +987,45 @@ def test_queries():
         
     # Excludes and case
     call("""query "g('RANDOM')" -o out""")
-    assert _read_res() == {'./file4.txt', './file4.exc'}
+    assert _read_res() == {'file4.txt', 'file4.exc'}
     
     call("""query "g('RANDOM')" --match-expr-case -o out""")
-    assert _read_res() == {'./file4.exc'}
+    assert _read_res() == {'file4.exc'}
     
     call("""query "g('RANDOM')" --exclude '*.eXc' -o out""")
-    assert _read_res() == {'./file4.txt'}
+    assert _read_res() == {'file4.txt'}
 
     call("""query "g('RANDOM')" --exclude '*.eXc' --match-exclude-case -o out""")
-    assert _read_res() == {'./file4.txt','./file4.exc'}
+    assert _read_res() == {'file4.txt','file4.exc'}
     
     call("""query "any('T{}'.format(a) in tags for a in '123')" -o out""") #Should be none since tags are always lowercase
     assert _read_res() == set()
     
     call("""query "any('t{}'.format(a) in tags for a in '123')" -o out""")
-    assert _read_res() == {'./file5.txt', './file6.txt', './file7.txt'}
+    assert _read_res() == {'file5.txt', 'file6.txt', 'file7.txt'}
 
     call("""query "all('t{}'.format(a) in tags for a in '123')" -o out""")
-    assert _read_res() == {'./file5.txt'}
+    assert _read_res() == {'file5.txt'}
 
     # Test tall and tany
     call("""query -o out "tany('t1','t2')" """)
-    assert _read_res() == {'./file5.txt', './file6.txt', './file7.txt'}
+    assert _read_res() == {'file5.txt', 'file6.txt', 'file7.txt'}
     
     call("""query -o out "tall('t1','t2')" """)
-    assert _read_res() == {'./file5.txt', './file7.txt'}
+    assert _read_res() == {'file5.txt', 'file7.txt'}
     
     call("""query -o out "tany('t1','t2','t999')" """)
-    assert _read_res() == {'./file5.txt', './file6.txt', './file7.txt'}
+    assert _read_res() == {'file5.txt', 'file6.txt', 'file7.txt'}
     
     call("""query -o out "tall('t1','t2','t999')" """)
     assert _read_res() == set()
     
     # Multiline
-    call("""query "a = g('word1');b = 't3' in tags; c=note.filename == './file6.txt'; (a or b) and not c" -o out""")
-    assert {'./file2.txt', './file5.txt', './file3.txt', './file1.txt'} == _read_res()
+    call("""query "a = g('word1');b = 't3' in tags; c=note.filename == 'file6.txt'; (a or b) and not c" -o out""")
+    assert {'file2.txt', 'file5.txt', 'file3.txt', 'file1.txt'} == _read_res()
     
-    call("""query "a = g('word1')" "b = 't3' in tags; c=note.filename == './file6.txt'" "(a or b) and not c" -o out""")
-    assert {'./file2.txt', './file5.txt', './file3.txt', './file1.txt'} == _read_res()
+    call("""query "a = g('word1')" "b = 't3' in tags; c=note.filename == 'file6.txt'" "(a or b) and not c" -o out""")
+    assert {'file2.txt', 'file5.txt', 'file3.txt', 'file1.txt'} == _read_res()
     
     # Test output methods
     call("""query "'t1' in tags" -0 -o out""")
@@ -1049,11 +1051,11 @@ def test_queries():
         assert True
     # use .get() to handle this better
     call("""query "note.data.get('other',{}).get('f1') == 'file8'" -o out""")
-    assert _read_res() == {'./file8.txt'}
+    assert _read_res() == {'file8.txt'}
     
     # Do the error again but with `--allow-exception`
     call("""--debug query --allow-exception  -o out "note.data['other']['f1'] == 'file8'" """)
-    assert _read_res() == {'./file8.txt'}
+    assert _read_res() == {'file8.txt'}
     os.chdir(TESTDIR)
 
 
@@ -1444,57 +1446,57 @@ def test_symlink_result():
     ## Find
     call('find --symlink links')
     links = find_links() # set of (link,link-dest,resolved-dest,working)
-    assert links == {('./links/file2.txt', '../file2.txt', 'file2.txt', True), 
-                     ('./links/file1.txt', '../file1.txt', 'file1.txt', True), 
-                     ('./links/file1.1.txt', '../sub/file1.txt', 'sub/file1.txt', True)} # Notice it is file1.1.txt
+    assert links == {('links/file2.txt', '../file2.txt', 'file2.txt', True), 
+                     ('links/file1.txt', '../file1.txt', 'file1.txt', True), 
+                     ('links/file1.1.txt', '../sub/file1.txt', 'sub/file1.txt', True)} # Notice it is file1.1.txt
     shutil.rmtree('links')
     
     ## grep -- all
     call('grep --symlink links ""')
     links = find_links() # set of (link,link-dest,resolved-dest,working)
-    assert links == {('./links/file2.txt', '../file2.txt', 'file2.txt', True), 
-                     ('./links/file1.txt', '../file1.txt', 'file1.txt', True), 
-                     ('./links/file1.1.txt', '../sub/file1.txt', 'sub/file1.txt', True)} # Notice it is file1.1.txt
+    assert links == {('links/file2.txt', '../file2.txt', 'file2.txt', True), 
+                     ('links/file1.txt', '../file1.txt', 'file1.txt', True), 
+                     ('links/file1.1.txt', '../sub/file1.txt', 'sub/file1.txt', True)} # Notice it is file1.1.txt
     shutil.rmtree('links')
     
     ## grep -- specific 1
     call('grep --symlink links "note1"')    
     links = find_links() # set of (link,link-dest,resolved-dest,working)
-    assert links == {('./links/file1.txt', '../file1.txt', 'file1.txt', True), 
-                     ('./links/file1.1.txt', '../sub/file1.txt', 'sub/file1.txt', True)} # Notice it is file1.1.txt
+    assert links == {('links/file1.txt', '../file1.txt', 'file1.txt', True), 
+                     ('links/file1.1.txt', '../sub/file1.txt', 'sub/file1.txt', True)} # Notice it is file1.1.txt
     shutil.rmtree('links')
 
     ## grep -- specific 2 -- will *not* rename the link
     call('grep --symlink links "note 3"')    
     links = find_links() # set of (link,link-dest,resolved-dest,working)
-    assert links == {('./links/file1.txt', '../sub/file1.txt', 'sub/file1.txt', True)} # Notice it is **NOT** file1.1.txt
+    assert links == {('links/file1.txt', '../sub/file1.txt', 'sub/file1.txt', True)} # Notice it is **NOT** file1.1.txt
     shutil.rmtree('links')
     
     ## tags -- all
     call('search-tags --symlink links')
     links = find_links() # set of (link,link-dest,resolved-dest,working)
-    assert links == {('./links/sub/file1.txt', '../../sub/file1.txt', 'sub/file1.txt', True), 
-                     ('./links/tag1/file1.1.txt', '../../sub/file1.txt', 'sub/file1.txt', True), 
-                     ('./links/tag1/file1.txt', '../../file1.txt', 'file1.txt', True), 
-                     ('./links/tag1/file2.txt', '../../file2.txt', 'file2.txt', True), 
-                     ('./links/tag2/file1.txt', '../../sub/file1.txt', 'sub/file1.txt', True), 
-                     ('./links/tag2/file2.txt', '../../file2.txt', 'file2.txt', True)}
+    assert links == {('links/sub/file1.txt', '../../sub/file1.txt', 'sub/file1.txt', True), 
+                     ('links/tag1/file1.1.txt', '../../sub/file1.txt', 'sub/file1.txt', True), 
+                     ('links/tag1/file1.txt', '../../file1.txt', 'file1.txt', True), 
+                     ('links/tag1/file2.txt', '../../file2.txt', 'file2.txt', True), 
+                     ('links/tag2/file1.txt', '../../sub/file1.txt', 'sub/file1.txt', True), 
+                     ('links/tag2/file2.txt', '../../file2.txt', 'file2.txt', True)}
     shutil.rmtree('links')
     
     ## tags -- tag1 OR sub
     call('search-tags --symlink links tag1 sub')
     links = find_links() # set of (link,link-dest,resolved-dest,working)
-    assert links == {('./links/sub/file1.txt', '../../sub/file1.txt', 'sub/file1.txt', True), 
-                     ('./links/tag1/file1.1.txt', '../../sub/file1.txt', 'sub/file1.txt', True), 
-                     ('./links/tag1/file1.txt', '../../file1.txt', 'file1.txt', True), 
-                     ('./links/tag1/file2.txt', '../../file2.txt', 'file2.txt', True)}
+    assert links == {('links/sub/file1.txt', '../../sub/file1.txt', 'sub/file1.txt', True), 
+                     ('links/tag1/file1.1.txt', '../../sub/file1.txt', 'sub/file1.txt', True), 
+                     ('links/tag1/file1.txt', '../../file1.txt', 'file1.txt', True), 
+                     ('links/tag1/file2.txt', '../../file2.txt', 'file2.txt', True)}
     shutil.rmtree('links')
     
     ## tags -- tag1 AND sub
     call('search-tags --symlink links --all tag1 sub')
     links = find_links() # set of (link,link-dest,resolved-dest,working)
-    assert links == {('./links/sub/file1.txt', '../../sub/file1.txt', 'sub/file1.txt', True), 
-                     ('./links/tag1/file1.txt', '../../sub/file1.txt', 'sub/file1.txt', True)} # no .1
+    assert links == {('links/sub/file1.txt', '../../sub/file1.txt', 'sub/file1.txt', True), 
+                     ('links/tag1/file1.txt', '../../sub/file1.txt', 'sub/file1.txt', True)} # no .1
     shutil.rmtree('links')
     
     os.chdir(TESTDIR) 
@@ -1523,13 +1525,13 @@ def test_hidden_note_exclusion():
     call('find -o out')
     with open('out') as f:
         res = set(f.read().split())
-    assert res == {'./.hidden/file1.txt', './vis_hiddennote.txt', './vis.txt'}
+    assert res == {'.hidden/file1.txt', 'vis_hiddennote.txt', 'vis.txt'}
     
     # Now do a find but exclude .*
     call('find --exclude ".*" -o out')
     with open('out') as f:
         res = set(f.read().split())
-    assert res == {'./vis_hiddennote.txt', './vis.txt'}
+    assert res == {'vis_hiddennote.txt', 'vis.txt'}
     
     os.chdir(TESTDIR) 
 
@@ -1550,9 +1552,9 @@ def test_alternative_fields():
 
     # Grep and query with grep()    
     call('grep -o out Default')
-    assert _read_res() == {'./note.txt'}
+    assert _read_res() == {'note.txt'}
     call("""query -o out "g('Default')" """)
-    assert _read_res() == {'./note.txt'}
+    assert _read_res() == {'note.txt'}
     
     call('grep -o out --note-field alt Default')
     assert _read_res() == set()
@@ -1565,9 +1567,9 @@ def test_alternative_fields():
     assert _read_res() == set()
     
     call('grep -o out --note-field alt Alternative')
-    assert _read_res() == {'./note.txt'}
+    assert _read_res() == {'note.txt'}
     call("""query -o out --note-field alt "g('Alternative')" """)
-    assert _read_res() == {'./note.txt'}
+    assert _read_res() == {'note.txt'}
     
 
     # Test with non-text stuff
@@ -1587,9 +1589,9 @@ def test_alternative_fields():
         assert True
         
     call('grep -o out --note-field other alt') # Should still work
-    assert _read_res() == {'./file.txt'}
+    assert _read_res() == {'file.txt'}
     call("""query -o out --note-field other "g('alt')" """) # Should still work
-    assert _read_res() == {'./file.txt'}
+    assert _read_res() == {'file.txt'}
 
     # Test the copy when note was never set
     with open('new.txt','w') as f:f.write('this is new')
@@ -1627,20 +1629,20 @@ def test_empty_find():
     
     # Find should do all of them 
     call('find -o out')
-    assert _read_res() == {'./ne1.txt', './ee1.txt', './ee2.txt', './ne2.txt'}
+    assert _read_res() == {'ne1.txt', 'ee1.txt', 'ee2.txt', 'ne2.txt'}
 
     # Make sure empty considered other fields
     call('find --empty -o out')
-    assert _read_res() == {'./ee1.txt', './ee2.txt'}
+    assert _read_res() == {'ee1.txt', 'ee2.txt'}
     
     call('find --non-empty -o out')
-    assert _read_res() == {'./ne1.txt', './ne2.txt'}
+    assert _read_res() == {'ne1.txt', 'ne2.txt'}
     
     call('query "note.isempty()" -o out')
-    assert _read_res() == {'./ee1.txt', './ee2.txt'}
+    assert _read_res() == {'ee1.txt', 'ee2.txt'}
     
     call('query "not note.isempty()" -o out')
-    assert _read_res() == {'./ne1.txt', './ne2.txt'}
+    assert _read_res() == {'ne1.txt', 'ne2.txt'}
     
     os.chdir(TESTDIR)
     
@@ -1719,22 +1721,32 @@ if __name__ == '__main__':
     pass
     
 os.chdir(TESTDIR)
-## Manual Testing
-# Not everything gets tested automatically but it should be easy enough to test
-# manually. The following is a list of key items to test manually
-#
-# * Adding Notes via stdin: 
-#     * `-r`
-#     * Default
-# Editing notes
-#     * regular & --full
-#     * Tags in edited notes
-#     * link modes (this is a different pathway than `add` but the link-logic
-#       goes through the same codes
-#     * --no-hash does not set a hash!
 
+"""
+# Manual Testing
 
+Not everything gets tested automatically but it should be easy enough to test
+manually. The following is a list of key items to test manually
 
+* Adding Notes via stdin: 
+    * `-r`
+    * Default
+Editing notes
+    * regular & --full
+    * Tags in edited notes
+    * link modes (this is a different pathway than `add` but the link-logic
+      goes through the same codes
+    * --no-hash does not set a hash!
+
+Export of stdin notes with and without -0
+In this, we exclude some from the stdin list so we can see it
+
+   $ cd testdirs/grep/
+   $ ../../notefile.py find --exclude "file*.txt" | ../../notefile.py export -
+   $ ../../notefile.py find --exclude "file*.txt" -0 | ../../notefile.py export -0 -
+
+and make sure it is just "file4.exc" and "link.txt"
+"""
 
 
 

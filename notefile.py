@@ -4,7 +4,7 @@
 Write notesfile sidecar files
 """
 from __future__ import division, print_function, unicode_literals
-__version__ = '20210106.0'
+__version__ = '20210114.0'
 __author__ = 'Justin Winokur'
 
 import sys
@@ -156,9 +156,9 @@ def get_filenames(filename):
             vis_note = name + NOTESEXT
             hid_note = '.' + vis_note
         
-    filename = os.path.join(base,name)
-    vis_note = os.path.join(base,vis_note)
-    hid_note = os.path.join(base,hid_note)
+    filename = os.path.normpath(os.path.join(base,name))
+    vis_note = os.path.normpath(os.path.join(base,vis_note))
+    hid_note = os.path.normpath(os.path.join(base,hid_note))
     
     return filename,vis_note,hid_note
 
@@ -1470,25 +1470,31 @@ def export(path='.',
         Otherwise, they are excluded       
     
     
-    """       
-    notes = find_notes(path=path,
-                       excludes=excludes,
-                       matchcase=matchcase,
-                       maxdepth=maxdepth,
-                       exclude_links=exclude_links,
-                       include_orphaned=include_orphaned,
-                       return_note=True) # no need to send noteopts)
-    
+    """  
     res = {}
     res['description'] = 'notefile export'
     res['time'] = now_string()
     res['notefile version'] = __version__
     res['notes'] = {}
     
-    for note in notes:
-        note.read()
-        res['notes'][note.filename0] = pss(note.data)
+    if isinstance(path,(str,unicode)):
+        path = [path]
     
+    for apath in path:
+        if os.path.isdir(apath):
+            notes = find_notes(path=apath,
+                               excludes=excludes,
+                               matchcase=matchcase,
+                               maxdepth=maxdepth,
+                               exclude_links=exclude_links,
+                               include_orphaned=include_orphaned,
+                               return_note=True) # See below
+        else:
+            notes = [Notefile(apath)] #TODO: noteopts?
+
+        for note in notes:
+            note.read()
+            res['notes'][note.filename0] = pss(note.data) 
     try:
         res = ruamel.yaml.comments.CommentedMap(res)
         res.yaml_set_start_comment('YAML Formatted notefile export')
@@ -1895,23 +1901,26 @@ Notes:
 #     parsers['tag'].add_argument('file',help='File(s) to tag',nargs='+')
 #     common_args['tag'].update({'no-hash','force-refresh','no-refresh','link','hide_vis'})
 
-    parsers['mod'] = subpar.add_parser('mod',aliases=['tag'],
-        help=("Add or remove tags  and/or add or replaces notes from file(s). "
-              "Note that tags are converted to lowercase"))
-    parsers['mod'].add_argument('-r','--remove',default=[],
-        action='append',help='Specify tags to remove')
-    parsers['mod'].add_argument('-t','--tag','-a','--add',default=[],
-        action='append',help='Specify tags to add')
-    parsers['mod'].add_argument('file',help='File(s) to tag',nargs='+')
-    parsers['mod'].add_argument('-R','--replace',action='store_true',
-        help='Replace rather than append the new note')
-    parsers['mod'].add_argument('-n','--note',action='append',default=[],
-        help=('Notes to add (or replace). Each argument is its own line. '
-              'Specify `--note ""` to add empty line. Notes will come _after_ stdin if applicable'))
-    parsers['mod'].add_argument('-s','--stdin',action='store_true',
-        help=('Read note from stdin. Prepended to any --note arguments')) 
-    common_args['mod'].update({'no-hash','force-refresh','no-refresh','link',
-                               'hide_vis','note_field'})
+    # This is the LAST TIME I will try to support python2 as well!!!
+    # When I remove it, add aliases=['tag']
+    for name in ['mod','tag']:
+        parsers[name] = subpar.add_parser(name,
+            help=("Add or remove tags  and/or add or replaces notes from file(s). "
+                  "Note that tags are converted to lowercase"))
+        parsers[name].add_argument('-r','--remove',default=[],
+            action='append',help='Specify tags to remove')
+        parsers[name].add_argument('-t','--tag','-a','--add',default=[],
+            action='append',help='Specify tags to add')
+        parsers[name].add_argument('file',help='File(s) to tag',nargs='+')
+        parsers[name].add_argument('-R','--replace',action='store_true',
+            help='Replace rather than append the new note')
+        parsers[name].add_argument('-n','--note',action='append',default=[],
+            help=('Notes to add (or replace). Each argument is its own line. '
+                  'Specify `--note ""` to add empty line. Notes will come _after_ stdin if applicable'))
+        parsers[name].add_argument('-s','--stdin',action='store_true',
+            help=('Read note from stdin. Prepended to any --note arguments')) 
+        common_args[name].update({'no-hash','force-refresh','no-refresh','link',
+                                   'hide_vis','note_field'})
 
     parsers['copy'] = subpar.add_parser('copy',
         help="Copy the notes from SRC to DST. DST must NOT have any notes.") 
@@ -2010,7 +2019,10 @@ Notes:
                                        'outfile','symlink_res'})
 
     parsers['export'] = subpar.add_parser('export',help="Export all notesfiles to YAML")
-    common_args['export'].update({'path','search_exclude','outfile'})
+    parsers['export'].add_argument('path',nargs='*',default=['.'],
+        help=("['.'] Specify the path(s) to export. Recurses into directories. "
+              "Specify any input as '-' to read from stdin. See also, `--print0`"))
+    common_args['export'].update({'search_exclude','outfile','print0'})
 
     
     parsers['vis'] = subpar.add_parser('vis',help='Change the visibility of file(s)/dir(s)')
@@ -2092,7 +2104,7 @@ Notes:
         if 'print0' in flags:
             parsers[name].add_argument('-0','--print0',action='store_true',
                 help=("Terminate lines with a nul byte for use with `xargs -0` when "
-                      "filenames have spaces"))
+                      "filenames have spaces. Assume stdin, if used, does the same"))
     
         if 'full_file' in flags:
             parsers[name].add_argument('-f','--full',action='store_true',
@@ -2292,11 +2304,9 @@ def cliactions(args):
                 notes[note.filename0] = note.data
                 continue # export trumps print0
                 
-            # python2 will not have a buffer but can accept bytes regardless of mode
-            if hasattr(stream,'buffer'):
-                stream.buffer.write(note.filename0.encode('utf8') + end)
-            else: # Will deprecate when not using python2
-                stream.write(note.filename0.encode('utf8') + end)
+            buffer = getattr(stream,'buffer',stream)
+            buffer.write(note.filename0.encode('utf8') + end)
+        
         if args.export:
             yaml.dump(pss(notes),stream)
     if args.command == 'query':
@@ -2315,14 +2325,13 @@ def cliactions(args):
             if args.export:
                 notes[note.filename0] = note.data
                 continue # export trumps print0
-            # python2 will not have a buffer but can accept bytes regardless of mode
-            if hasattr(stream,'buffer'):
-                stream.buffer.write(note.filename0.encode('utf8') + end)
-            else: # Will deprecate when not using python2
-                stream.write(note.filename0.encode('utf8') + end)
+                
+            buffer = getattr(stream,'buffer',stream)
+            buffer.write(note.filename0.encode('utf8') + end)
         
         if args.export:
             yaml.dump(pss(notes),stream)
+            
     if args.command == 'find':
         if args.empty and args.non_empty:
             raise ValueError('Cannot specify both --empty and --non-empty')
@@ -2340,11 +2349,9 @@ def cliactions(args):
                                noteopts=None,
                                empty=empty,
                                **findopts):
-            # python2 will not have a buffer but can accept bytes regardless of mode
-            if hasattr(stream,'buffer'):
-                stream.buffer.write(note.filename0.encode('utf8') + end)
-            else: # Will deprecate when not using python2
-                stream.write(note.filename0.encode('utf8') + end)
+            
+            buffer = getattr(stream,'buffer',stream)
+            buffer.write(note.filename0.encode('utf8') + end)
             
             notes.append(note)
         
@@ -2364,6 +2371,15 @@ def cliactions(args):
         yaml.dump(res,stream)
         
     if args.command == 'export':
+        if '-' in args.path:
+            debug('reading from stdin')
+            d = b'\x00' if args.print0 else b'\n'
+            stdin = getattr(sys.stdin,'buffer',sys.stdin) # python2 or 3
+            paths = [p.decode() for p in stdin.read().split(d) if p]
+            findopts['path'] = args.path = args.path[:args.path.index('-')] \
+                                         + paths \
+                                         + args.path[args.path.index('-')+1:]
+            
         res = export(include_orphaned=False,**findopts)
         yaml.dump(res,stream)
         
