@@ -4,7 +4,7 @@
 Write notesfile sidecar files
 """
 from __future__ import division, print_function, unicode_literals
-__version__ = '20210114.0'
+__version__ = '20210130.0'
 __author__ = 'Justin Winokur'
 
 import sys
@@ -35,18 +35,22 @@ def debug(*args,**kwargs):
         print('DEBUG:',*args,**kwargs)
 
 #### Set up YAML
-# ruamel.yaml is does a nice job with formatting but it is slow to load YAML.
+# ruamel_yaml is does a nice job with formatting but it is slow to load YAML.
 # pyyaml is faster to load YAML anyway and *much* faster with CLoader if it
 # is available.
 #
-# The biggest reason to still use ruamel.yaml over pyyaml is 
+# The biggest reason to still use ruamel_yaml over pyyaml is 
 # https://github.com/yaml/pyyaml/issues/121
 # However I do not want to make pyyaml *also* a requirement so it will use it
 # if it can or fall back
-import ruamel.yaml
-from ruamel.yaml.scalarstring import LiteralScalarString as PreservedScalarString 
+try:
+    import ruamel_yaml
+    from ruamel_yaml.scalarstring import LiteralScalarString as PreservedScalarString 
+except ImportError:
+    import ruamel.yaml as ruamel_yaml
+    from ruamel.yaml.scalarstring import LiteralScalarString as PreservedScalarString 
 
-yaml = ruamel.yaml.YAML()
+yaml = ruamel_yaml.YAML()
 
 def pss(item):
     """
@@ -79,7 +83,7 @@ try:
     def _load_yaml(txt):
         return pyyaml.load(txt,Loader=Loader)
 except ImportError:
-    debug('no pyyaml. Fallback to ruamel.yaml to load')
+    debug('no pyyaml. Fallback to ruamel_yaml to load')
     def _load_yaml(txt):
         return yaml.load(txt)    
 #### /Set up YAML
@@ -540,7 +544,7 @@ class Notefile(object):
         data['notefile version'] = __version__
         
         try:
-            data = ruamel.yaml.comments.CommentedMap(data)
+            data = ruamel_yaml.comments.CommentedMap(data)
             data.yaml_set_start_comment('YAML Formatted notes created with notefile version {}'.format(__version__))
         except TypeError:
             pass # Likely due to python2 and ordering
@@ -1496,7 +1500,7 @@ def export(path='.',
             note.read()
             res['notes'][note.filename0] = pss(note.data) 
     try:
-        res = ruamel.yaml.comments.CommentedMap(res)
+        res = ruamel_yaml.comments.CommentedMap(res)
         res.yaml_set_start_comment('YAML Formatted notefile export')
     except TypeError:
         pass # Likely due to python2 and ordering
