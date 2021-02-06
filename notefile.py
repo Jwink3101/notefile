@@ -4,7 +4,7 @@
 Write notesfile sidecar files
 """
 from __future__ import division, print_function, unicode_literals
-__version__ = '20210130.0'
+__version__ = '20210206.0'
 __author__ = 'Justin Winokur'
 
 import sys
@@ -464,7 +464,6 @@ class Notefile(object):
                 debug("Linked Note: '{}' --> '{}'".format(self.filename,dest0))
             
                 self.filename,self.vis_note,self.hid_note = get_filenames(dest)
-        
         
         # Get the actual notefile path (destnote) regardless of hidden settings
         # And whether it exists
@@ -2163,7 +2162,7 @@ Notes:
     try:
         cliactions(args)        
     except Exception as E:
-        if DEBUG or True: #TODO Remove 
+        if DEBUG: #TODO Remove 
             raise
         print('ERROR: ' + str(E))
         sys.exit(1)

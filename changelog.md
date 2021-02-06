@@ -2,6 +2,10 @@
 
 (**_newest_** on *top*)
 
+## 20210206.0:
+
+* Minor fix for error formatting (left a debug). Minor cleanup
+
 ## 20210130.0:
 
 * Changed `ruamel.yaml` to `ruamel_yaml`
