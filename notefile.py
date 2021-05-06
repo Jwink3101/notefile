@@ -4,7 +4,7 @@
 Write notesfile sidecar files
 """
 from __future__ import division, print_function, unicode_literals
-__version__ = '20210206.0'
+__version__ = '20210506.0'
 __author__ = 'Justin Winokur'
 
 import sys
@@ -1191,7 +1191,7 @@ def query(path='.',
           symlink_result=None,
           note_field=NOTEFIELD,
           allow_exception=False):
-    """
+    r"""
     Perform python queries on notes:
     
     Inputs:
@@ -1388,7 +1388,7 @@ def change_tag(oldtag,newtag,
     Inputs:
     -------
     oldtag,newtag
-        The old and new tag names
+        The old and new tag names. newtag can be a single item or a list
         
     path ['.']
         Where to search
@@ -1428,7 +1428,11 @@ def change_tag(oldtag,newtag,
                        return_note=True,
                        noteopts=noteopts)
 
-    oldtag,newtag = oldtag.lower().strip(),newtag.lower().strip()
+    if isinstance(newtag,(str,unicode)):
+        newtag = [newtag]
+        
+    oldtag = oldtag.lower().strip()
+    newtag = [t.lower().strip() for t in newtag]
     for note in notes:
         note.read()
         
@@ -1958,7 +1962,7 @@ Notes:
 
     parsers['change_tag'] = subpar.add_parser('change-tag',help='Change one tag to another')
     parsers['change_tag'].add_argument('old_tag',help='Old tag you will be changing')
-    parsers['change_tag'].add_argument('new_tag',help='New tag you will be using')
+    parsers['change_tag'].add_argument('new_tag',help='New tag(s) you will be using',nargs='*')
     parsers['change_tag'].add_argument('-s','--silent',action='store_true',
         help='Do NOT list notes that were modified')
     common_args['change_tag'].update({'link','path','search_exclude','outfile',

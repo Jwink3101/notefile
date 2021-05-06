@@ -6,6 +6,10 @@
 
 * Minor fix for error formatting (left a debug). Minor cleanup
 
+## 20210506.0
+
+* Made `change-tag` allow you to change one tag to many
+
 ## 20210130.0:
 
 * Changed `ruamel.yaml` to `ruamel_yaml`

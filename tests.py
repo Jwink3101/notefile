@@ -45,7 +45,9 @@ def cleanmkdir(dirpath):
 
 cleanmkdir(TESTDIR)
 os.chdir(TESTDIR)
-
+with open('.ignore','at') as f: # For backups, etc
+    pass
+    
 def read_note(filepath,**kwargs):
     note = notefile.Notefile(filepath,**kwargs)
     note.read()
@@ -841,13 +843,15 @@ def test_grep_and_listtags_and_export_and_find_and_change():
         res0,res1 = yaml.load(out0),yaml.load(out1)
     assert res0 == res1
     
-    
-    call('change-tag --exclude "*.exc" tag1 tagone')
-    call('search-tags tag1 -o out')
+    # exclude and multiple changes
+    call('change-tag --exclude "*.exc" tag1 tagone "tag one"') 
+    call('search-tags -o out')
     with open('out') as file:
         res = yaml.load(file)
         res = {k:set(v) for k,v in res.items()}
-    assert res == {'tag1': {'file4.exc'}}
+    assert res['tag1'] == {'file4.exc'}
+    assert res['tag one'] == res['tagone'] # Both are there and changed
+    
         
     # Not Tested:
     #   * Exclude links. This should be fine because it's the same logic as the
