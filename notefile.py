@@ -4,7 +4,7 @@
 Write notesfile sidecar files
 """
 from __future__ import division, print_function, unicode_literals
-__version__ = '20210506.0'
+__version__ = '20210531.0'
 __author__ = 'Justin Winokur'
 
 import sys
@@ -944,8 +944,8 @@ class Notefile(object):
         ns['tany'] = lambda *tags: any(t.lower() in self.data['tags'] for t in tags)
         ns['tall'] = lambda *tags: all(t.lower() in self.data['tags'] for t in tags)
         ns['t'] = ns['tany']
-
-        full_expr = [i.strip() for e in expr for i in e.split(';') if i.strip()]
+    
+        full_expr = [i.strip() for e in expr for i in e.replace('\n',';').split(';') if i.strip()]
         full_expr[-1] = '_res = ' + full_expr[-1]
         
         for ii,line in enumerate(full_expr):
@@ -1824,6 +1824,13 @@ Limited multi-line support exists. Multiple lines can be delineated by separate
 arguments and/or ';'. However, the last line must evaluate the query. Example:
 
     $ notefile query "tt = ['a','b','c']" "all(t in tags for t in tt)"
+    
+Can also pass STDIN with the expression `-` to make quoting a bit less onerous 
+    
+    $ notefile query - <<EOF
+    > tt = ['a','b','c']
+    > all(t in tags for t in tt)
+    > EOF
 
 tany and/or tall could also be used:
     
@@ -2004,7 +2011,7 @@ Notes:
     parsers['query'].add_argument('expr',nargs='+',
         help=("Query expression. See 'query -h' for details. Can be multiple lines "
               "delineated by multiple arguments and/or ';' but the last line must "
-              "evaluate to True or False as the query"))
+              "evaluate to True or False as the query. Set as a single '-' to read stdin"))
     parsers['query'].add_argument('-e','--allow-exception',action='store_true',
         help=('Allow exceptions in the query. Still prints a warning to stderr for each one'))
     common_args['query'].update({'path','expr_match','search_exclude','note_field',
@@ -2319,6 +2326,13 @@ def cliactions(args):
     if args.command == 'query':
         notes = {} if args.export else None
         end = b'\x00' if args.print0 else b'\n'
+
+        if len(args.expr) == 1 and args.expr[0] == '-': # Note that I don't know how to test this but I can do so manually
+            expr = sys.stdin.read()
+            if not isinstance(expr,(str,unicode)):
+                expr = expr.decode()
+            args.expr = [l for l in expr.split('\n') if l.strip()]
+        
         for note in query(expr=args.expr,
                           expr_matchcase=args.match_expr_case,
                           include_orphaned=False,

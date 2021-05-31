@@ -2,6 +2,10 @@
 
 (**_newest_** on *top*)
 
+## 20210531.0
+
+* Allow multi-line queries for the args. Note that they still do not do indentation, etc. Also accepts `-` as expression and will read from stdin to enable "heredocument" specification (so you don't have to escape quotes as much)
+
 ## 20210206.0:
 
 * Minor fix for error formatting (left a debug). Minor cleanup

@@ -1030,7 +1030,11 @@ def test_queries():
     
     call("""query "a = g('word1')" "b = 't3' in tags; c=note.filename == 'file6.txt'" "(a or b) and not c" -o out""")
     assert {'file2.txt', 'file5.txt', 'file3.txt', 'file1.txt'} == _read_res()
+
+    call("""query "a = g('word1')\nb = 't3' in tags\nc=note.filename == 'file6.txt'\n(a or b) and not c" -o out""")
+    assert {'file2.txt', 'file5.txt', 'file3.txt', 'file1.txt'} == _read_res()
     
+
     # Test output methods
     call("""query "'t1' in tags" -0 -o out""")
     with open('out','rb') as f:
