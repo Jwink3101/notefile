@@ -4,7 +4,7 @@
 Write notesfile sidecar files
 """
 from __future__ import division, print_function, unicode_literals
-__version__ = '20210531.0'
+__version__ = '20210911.0'
 __author__ = 'Justin Winokur'
 
 import sys
@@ -15,8 +15,9 @@ import copy
 from collections import defaultdict
 # Many imports are done lazily since they aren't always needed
 
-if sys.version_info[0] > 2:
-    unicode = str
+PY2 = sys.version_info[0] <= 2
+if not PY2:
+    unicode = str # Will be deprecated soon and some features may not work
 
 NOTESEXT = '.notes.yaml'
 NOHASH = '** not computed **'
@@ -2026,6 +2027,8 @@ Notes:
     parsers['search_tags'].add_argument('--filter',action='store_true',help=argparse.SUPPRESS)
     parsers['search_tags'].add_argument('-c','--count',action='store_true',
         help=('Print the number of items rather than the items themselves')) 
+    parsers['search_tags'].add_argument('--count-order',action='store_true',
+        help='Order by number of tags, not alphabetical')
     parsers['search_tags'].add_argument('-t','--all-tags',action='store_true',
         help=('Display all tags for the of the files that matched opposed to '
               '*just* the queried ones'))
@@ -2387,8 +2390,13 @@ def cliactions(args):
                           symlink_result=args.symlink,
                           all_tags=args.all_tags,
                           **findopts)
+        if args.count_order:
+            py2warn()
+            res = {k:v for k,v in sorted(res.items(),
+                                         key=lambda kv:(-len(kv[1]),kv[0]))}
         if args.count:
             res = {k:len(v) for k,v in res.items()}
+        
         yaml.dump(res,stream)
         
     if args.command == 'export':
@@ -2408,6 +2416,11 @@ def cliactions(args):
     stream.flush()
     if args.out_file is not None:
         stream.close()
+
+def py2warn():
+    if not PY2:
+        return
+    print('WARNING: Some features do not support python2',file=sys.stderr)
 
 if __name__ == '__main__':
     cli()

@@ -852,6 +852,22 @@ def test_grep_and_listtags_and_export_and_find_and_change():
     assert res['tag1'] == {'file4.exc'}
     assert res['tag one'] == res['tagone'] # Both are there and changed
     
+    # Check ordering
+    if sys.version_info >= (3,7):
+        for file in os.listdir('.'):
+            if file.endswith('.txt'):
+                call('mod -t zzz {}'.format(file))
+        call('search-tags -o out -c')
+        with open('out') as file:
+            res = yaml.load(file)
+        assert list(res)[-1] == 'zzz'
+        
+        call('search-tags -o out -c --count-order')
+        with open('out') as file:
+            res = yaml.load(file)
+        assert list(res)[0] == 'zzz'
+    else:
+        print('WARNING: Not checking --count-order with this version of python')
         
     # Not Tested:
     #   * Exclude links. This should be fine because it's the same logic as the
