@@ -2,6 +2,10 @@
 
 (**_newest_** on *top*)
 
+## 20210928.0
+
+* Fixes as issue with flags in the `$EDITOR` environment variables
+
 ## 20210911.0
 
 * Adds --count-order to search-tags

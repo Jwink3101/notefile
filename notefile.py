@@ -4,7 +4,7 @@
 Write notesfile sidecar files
 """
 from __future__ import division, print_function, unicode_literals
-__version__ = '20210911.0'
+__version__ = '20210928.0'
 __author__ = 'Justin Winokur'
 
 import sys
@@ -642,7 +642,7 @@ class Notefile(object):
    
     def interactive_edit(self,full=False):    
         """Launch the editor. Does *NOT* write()"""
-        import subprocess
+        import subprocess,shlex
         if self.data is None:
             raise ValueError('Cannot edit empty data. Use read() or set data attribute')
             
@@ -675,7 +675,7 @@ class Notefile(object):
         with open(tmpfile,'wt') as file:
             file.write(content)
 
-        subprocess.check_call([editor,file.name])
+        subprocess.check_call(shlex.split(editor) + [file.name])
 
         with open(tmpfile,'rt') as f:
             newtxt = f.read()
