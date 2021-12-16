@@ -4,7 +4,7 @@
 Write notesfile sidecar files
 """
 from __future__ import division, print_function, unicode_literals
-__version__ = '20210928.0'
+__version__ = '20211216.0'
 __author__ = 'Justin Winokur'
 
 import sys
@@ -658,10 +658,12 @@ class Notefile(object):
                               ', '.join("'{}'".format(e) for e in editor_names)))
         
         tagtxt = '<< Comma-seperated tags. DO NOT MODIFY THIS LINE >>'
+        info = "# filename: {}\n# notedest: {}".format(self.filename,self.destnote)
         
         if full:
             self.data2txt()
-            content = self.txt
+            txt = self.txt if self.txt else ''
+            content = txt + info + '\n'
         else:
             content = self.data.get(self.note_field,'') # in case it's a dict
             if not isinstance(content,(str,unicode)):
@@ -669,7 +671,7 @@ class Notefile(object):
             content += '\n\n' + tagtxt + '\n'
             tags = self.data.get('tags',[])
             tags = sorted(t for t in set(tt.strip().lower() for tt in tags) if t)
-            content += ', '.join(tags) + '\n'
+            content += ', '.join(tags) + '\n' + '\n' + info + '\n'
         
         tmpfile = tmpfileinpath(self.destnote)
         with open(tmpfile,'wt') as file:
@@ -692,6 +694,8 @@ class Notefile(object):
                     break
                 note.append(line)
             for line in lines: # Get tags with the remaining lines
+                if line.startswith('# filename: '):
+                    break
                 tags.extend(line.split(','))
                 
             self.data[self.note_field] = '\n'.join(note)
@@ -822,7 +826,7 @@ class Notefile(object):
             matchcase=False,
             full_note=False,full_word=False,
             fixed_strings=False,
-            match_any=True):
+            match_any=True,*expr2):
         """
         Search the content of notes for expr
     
@@ -854,7 +858,9 @@ class Notefile(object):
             flags |= re.IGNORECASE
         
         if isinstance(expr,(str,unicode)):
-            expr = (expr,)
+            expr = [expr]
+    
+        expr = list(expr) + list(expr2)
     
         if fixed_strings:
             expr = [re.escape(e) for e in expr]
@@ -936,11 +942,11 @@ class Notefile(object):
             'text':getattr(self,'txt',''),
         }
         
-        ns['grep'] = partial(self.grep,
-                             matchcase=matchcase,
-                             full_word=full_word,
-                             fixed_strings=fixed_strings,
-                             match_any=grep_match_any)
+        ns['grep'] = lambda *expr: self.grep(expr,
+                                             matchcase=matchcase,
+                                             full_word=full_word,
+                                             fixed_strings=fixed_strings,
+                                             match_any=grep_match_any)
         ns['g'] = ns['grep']
         ns['tany'] = lambda *tags: any(t.lower() in self.data['tags'] for t in tags)
         ns['tall'] = lambda *tags: all(t.lower() in self.data['tags'] for t in tags)
@@ -1892,7 +1898,7 @@ Notes:
     ## Modifiers
     parsers['edit'] = subpar.add_parser('edit',
         help="Launch $EDITOR to interactivly edit the notes for a file") 
-    parsers['edit'].add_argument('file',help='Specify file to edit')
+    parsers['edit'].add_argument('file',help='Specify file(s) to edit',nargs='+')
     common_args['edit'].update({'no-hash','force-refresh','no-refresh','link',
                                 'hide_vis','full_file','note_field'})
                                 
@@ -2210,12 +2216,13 @@ def cliactions(args):
     
     ## Modification Actions
     if args.command == 'edit':      
-        note = Notefile(args.file,**noteopts)
-        note.read()
-        note.interactive_edit(full=args.full)
-        if not args.no_refresh:
-            note.repair_metadata(force=args.force_refresh)
-        note.write()
+        for file in args.file:
+            note = Notefile(file,**noteopts)
+            note.read()
+            note.interactive_edit(full=args.full)
+            if not args.no_refresh:
+                note.repair_metadata(force=args.force_refresh)
+            note.write()
         
     if args.command == 'add':
         warnings.warn('DEPRECATION WARNING: `add` is deprecated. Use `mod`')

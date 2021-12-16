@@ -2,6 +2,13 @@
 
 (**_newest_** on *top*)
 
+## 
+
+* Adds information to edit
+* Can edit more than one file at a time
+* Fixes a bug in query with multiple grep expressions
+* (known bug): Cannot `edit --full` an empty note. Will fix later
+
 ## 20210928.0
 
 * Fixes as issue with flags in the `$EDITOR` environment variables
