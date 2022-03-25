@@ -19,7 +19,7 @@ from setuptools import setup
 
 setup(
     name="notefile",
-    py_modules=["notefile"],
+    packages=["notefile"],
     install_requires=["ruamel.yaml"],
     long_description=open("readme.md").read(),
     entry_points={"console_scripts": ["notefile=notefile.cli:cli"],},
@@ -31,3 +31,4 @@ setup(
     license="MIT",
     python_requires=">=3.8",
 )
+
