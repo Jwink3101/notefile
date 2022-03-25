@@ -2,7 +2,34 @@
 
 (**_newest_** on *top*)
 
-## 
+## 2-20220325.0
+
+**New Version**
+
+Way better backend that is much more usable. Many breaking changes on both the CLI and the Python API. Most notable on the Python side is `find_notes` is just `find`. The CLI is much easier to support and the help documents are better since they are broken up by need (e.g. exclusions are separate from queries). Another major change is that similar behavior is unified. For example, `grep` is just `find` with conditions. They all follow the same code paths (with minor optimizations) making testing and coding much easier. 
+
+The older one is still included. Just call with `v1`. For example:
+
+    $ notefile v1 search-tags ... 
+
+(since `search-tags` is now just `tags`) or
+
+```python
+import notefile.v1 as notefile
+# or
+from notefile.v1 import Notefile
+```
+
+Some highlights:
+
+- Updated CLI and Python API
+- JSON mode. Can write the notes in JSON format which is faster to parse. Note that the extension doesn't change since YAML is a superset of JSON but the code tries to parse as JSON first.
+- Better help 
+
+------
+# Version 1
+
+## 20211216.0
 
 * Adds information to edit
 * Can edit more than one file at a time

@@ -27,6 +27,12 @@ The format is YAML and should not be changed. However, this code does not assume
 
 Any other data can be added and will be preserved across all actions.
 
+## JSON vs YAML
+
+Notefile can write the notes as nicely-formatted YAML or as JSON (which is technically still YAML as YAML is a superset of JSON). JSON is that it is *much* faster to read than YAML but comes at cost of being hard to edit manually.
+
+The extension will **always** be `.yaml` as YAML is a superset of JSON and any YAML parser should be able to read JSON
+
 ## Install and Usage
 
 ### Install
@@ -37,7 +43,7 @@ Install right from github:
 
 ### Requirements
 
-The only *real* requirement is `ruamel.yaml`. However, if you have `pyyaml` ([website](https://pyyaml.org/)) installed, notefile will use that for reader as it is about 2x faster by default. Even better, if you [LibYAML](https://pyyaml.org/wiki/LibYAML), it will be about 25x faster
+The only *real* requirement is `ruamel.yaml`. However, if you have `pyyaml` ([website](https://pyyaml.org/)) installed, notefile will use that for parser as it is about 2x faster by default. Even better, if you [LibYAML](https://pyyaml.org/wiki/LibYAML), it will be about 25x faster
 
 To install LibYAML, see: (based on [these instructions](https://pyyaml.org/wiki/LibYAML)):
 
@@ -73,7 +79,7 @@ The most basic command will be
 
 which will launch `$EDITOR` (or try other global variables) to edit the notes. You can also use 
 
-    $ notefile tag -t mytag file.ext
+    $ notefile mod -t mytag file.ext
 
 to add tags.
 
@@ -149,7 +155,7 @@ For example, to search for all notes and perform a test do
 
 ```python
 import notefile
-for note in notefile.find_notes(return_note=True):
+for note in notefile.find(return_note=True):
     note.read() # Access to data attribute
     # test on note.data
 ```
@@ -162,9 +168,4 @@ Note that notefile does support setting alternative note fields (but not tags) s
 
 See [Changelog](changelog.md)
 
-## Known Issues
 
-The following may or may not be fixed but they are known issues:
-
-* repairs will look at symlinks. Resolution is to add a flag to skip links in looking for repairs
-s

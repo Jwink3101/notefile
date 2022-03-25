@@ -4,1779 +4,1367 @@
 Tests for notefile.
 
 Tests are run as if from the CLI but run in Python for the sake of test coverage
-"""
-from __future__ import division, print_function, unicode_literals
 
-import os
-import sys
+Generally, with the new design, there is reuse of capabilities given by argument 
+groups. So these test commands and argument groups. Once an argument group is tested in 
+one (e.g. search), it is not restest for search and find.
+
+"""
+
+import os, io, sys
 import shutil
 import shlex
 import hashlib
 import glob
 import itertools
+import copy
+from pathlib import Path
 import time
+import json
+import warnings
 
-import notefile # this *should* import the local version even if it is installed
-print('version',notefile.__version__)
-print('path',notefile.__file__) # This is just to see that it imported the right now
+import notefile  # this *should* import the local version even if it is installed
+import notefile.cli
+
+Notefile = notefile.Notefile
+
+print("version", notefile.__version__)
+print("path", notefile.__file__)  # This is just to see that it imported the right now
 notefile.DEBUG = False
-
-import ruamel.yaml
-yaml = ruamel.yaml.YAML()
 
 import pytest
 
-TESTDIR = os.path.abspath('testdirs')
+TESTDIR = Path("testdirs").resolve()
+TESTDIR.mkdir(parents=True, exist_ok=True)
+with (TESTDIR / ".ignore").open("wt") as f:
+    pass
 
-def call(s):
-    if sys.version_info[0] == 2:
-        cmd =  shlex.split(s.encode('utf8'))
-    else:
-        cmd = shlex.split(s)
-    return notefile.cli(cmd)
+
+class SysExitError(ValueError):
+    pass
+
+
+def call(s, capture=False):
+    try:
+        if capture:
+            try:
+                o, e = sys.stdout, sys.stderr
+                sys.stdout = io.StringIO()
+                sys.stdout.buffer = sys.stdout
+                sys.stderr = io.StringIO()
+                sys.stderr.buffer = sys.stderr
+
+                notefile.cli.cli(shlex.split(s))
+
+                sys.stdout.flush()
+                sys.stderr.flush()
+
+                return sys.stdout.getvalue(), sys.stderr.getvalue()
+            finally:
+                sys.stdout, sys.stderr = o, e
+                sys.stdout.flush()
+                sys.stderr.flush()
+
+        return notefile.cli.cli(shlex.split(s))
+    except SystemExit:
+        raise SysExitError()
+
 
 def cleanmkdir(dirpath):
-    notefile.DEBUG = False # Reset this
+    notefile.DEBUG = False  # Reset this
     try:
         shutil.rmtree(dirpath)
     except:
         pass
-    os.makedirs(dirpath)
+    Path(dirpath).mkdir(parents=True)
 
-cleanmkdir(TESTDIR)
-os.chdir(TESTDIR)
-with open('.ignore','at') as f: # For backups, etc
-    pass
-    
-def read_note(filepath,**kwargs):
-    note = notefile.Notefile(filepath,**kwargs)
-    note.read()
-    return note.data
 
-def ishidden(filename,check_dupe=True):
+def writefile(filepath, text="", append=False):
+    filepath = Path(filepath)
+    filepath.parent.mkdir(parents=True, exist_ok=True)
+    if append:
+        with filepath.open(mode="at") as f:
+            f.write("\n" + text)
+    else:
+        filepath.write_text(text)
+
+
+def readout(out):
+    with open(out, "rb") as f:
+        lines = f.read().replace(b"\x00", b"\n").decode().split("\n")
+    return {l for l in lines if l.strip()}
+
+
+def readtags(out):
+    with open(out) as f:
+        tags = notefile.nfyaml.load_yaml(f.read())
+    return {tag: (set(files) if isinstance(files, list) else files) for tag, files in tags.items()}
+
+
+def ishidden(filename, check_dupe=True):
     """
     returns whether a file exists and is hidden.
     Will assert that (a) the file exists and (b) there
     aren't a hidden and visible if check_dupe
     """
-    _,vis,hid = notefile.get_filenames(filename)
+    _, vis, hid = notefile.get_filenames(filename)
     if check_dupe and os.path.exists(vis) and os.path.exists(hid):
         assert False, "Duplicate hidden and visible"
 
-    check_vis = os.path.exists(vis) or os.path.islink(vis) # broken links still are fine
-    check_hid = os.path.exists(hid) or os.path.islink(hid) # broken links still are fine
+    check_vis = os.path.exists(vis) or os.path.islink(vis)  # broken links still are fine
+    check_hid = os.path.exists(hid) or os.path.islink(hid)  # broken links still are fine
     if not (check_hid or check_vis):
         assert False, "Neither file exists"
 
     return check_hid
 
 
-def find_links(path='.'):
-    res = set()
-    for dirpath, dirnames, filenames in os.walk(path):
-        for filename in filenames:
-            filepath = os.path.join(dirpath,filename)
-            if not os.path.islink(filepath):
-                continue
-            link = os.readlink(filepath)
-            fulldest = os.path.normpath(os.path.join(dirpath,link))
-            working = os.path.isfile(fulldest)
-            res.add((os.path.normpath(filepath),
-                     os.path.normpath(link),
-                     fulldest,working))
-    return res
-
-##########################
-
-def test_main_note():
+def test_mod():
+    """
+    Test CLI mod
+    """
     os.chdir(TESTDIR)
-    dirpath = os.path.join(TESTDIR,'main')
+    dirpath = TESTDIR / "mod"
     cleanmkdir(dirpath)
     os.chdir(dirpath)
-    
-    with open('main.txt','wt') as file:
-        file.write('this is a\ntest file')
-    
-    ## Add
-    # Will soon be deprecated
-    call('--debug add main.txt "this is a note"')
-    data = read_note('main.txt')
-    assert "this is a note" == data['notes'].strip()
 
-    call('add main.txt "this is a note"')
-    data = read_note('main.txt')
-    assert "this is a note\nthis is a note" == data['notes'].strip()
+    writefile("file1.txt", "file1.")
 
-    call('add -r main.txt "this is a note"')
-    data = read_note('main.txt')
-    assert "this is a note" == data['notes'].strip()
-    
-    ## Tags -- Test with `tag` command and then `mod`
-    call('tag -t test -t "two words" main.txt')
-    data = read_note('main.txt')
-    assert {'test',"two words"} == set(data['tags'])
+    call('mod -t tag1 -t tag2 -n"note1" file1.txt')
+    note1 = Notefile("file1.txt").read()
+    assert note1.data.notes == "note1"
+    assert set(note1.data.tags) == {"tag1", "tag2"}
 
-    call('tag -r "two words" -r "another" main.txt')
-    data = read_note('main.txt')
-    assert {'test'} == set(data['tags'])
-    
-    call('tag -r test -t new main.txt') # Add and remove at the same call
-    data = read_note('main.txt')
-    assert {'new'} == set(data['tags'])
-    
-    call('mod -r new -t newer -R -n "new note" main.txt')
-    data = read_note('main.txt')
-    assert {'newer'} == set(data['tags'])
-    assert data['notes'] == 'new note'
-    
-    call('mod -n "" -n "line break?" main.txt')
-    data = read_note('main.txt')
-    assert data['notes'] == 'new note\n\nline break?'
-    
-    call('mod -R -n field --note-field other main.txt')
-    data = read_note('main.txt')
-    assert data['notes'] == 'new note\n\nline break?' # even though -R, this is the old field
-    assert data['other'] == 'field'
-    
-    call('mod -R -n new? --note-field other main.txt')
-    data = read_note('main.txt')
-    assert data['other'] == 'new?'
-    
-    # Test that when the note is unchanged    
-    with open('new.txt','wt') as file:
-        file.write('NEW file')
-    
-    call('add new.txt ""') # Shouldn't change it
-    assert not os.path.exists('new.txt.notes.yaml'),'should not have written a note'
-    
-    call('tag -t atag new.txt')
-    hash0 = hashlib.sha1(open('new.txt.notes.yaml','rb').read()).digest()
-    
-    time.sleep(1.1) # Make sure the 'last-updated' would be modified
-    call('tag -t atag new.txt')
-    hash1 = hashlib.sha1(open('new.txt.notes.yaml','rb').read()).digest()
-    assert hash0 == hash1,'should *not* have written a new note'
-    
-    call('tag -r atag new.txt')
-    call('tag -t atag new.txt')
-    hash2 = hashlib.sha1(open('new.txt.notes.yaml','rb').read()).digest()
-    assert hash2 != hash0,'The mod date *should* have changed'
+    call('mod -t tag3 -r tag1 -n"more" file1.txt')
+    note1 = Notefile("file1.txt").read()
+    assert note1.data.notes == "note1\nmore"
+    assert set(note1.data.tags) == {"tag3", "tag2"}
 
-    os.chdir(TESTDIR)
-    
-def test_odd_filenames():
-    os.chdir(TESTDIR)
-    dirpath = os.path.join(TESTDIR,'oddnames')
-    cleanmkdir(dirpath)
-    os.chdir(dirpath)
-  
-    filenames = ['spac es.txt','unic·de.txt','unic°de and spaces and no ext','sub dir/dir2/dir 3/hi']
-    for filename in filenames:
-        dirname = os.path.dirname(filename)
-        try:
-            os.makedirs(dirname)
-        except OSError:
-            pass
-            
-        with open(filename,'wt') as file:
-            file.write('this is a\ntest file')
-        call('add "{}" "this is a note"'.format(filename))
-        call('tag -t mytag "{}" '.format(filename))
-        data = read_note(filename)
-        assert "this is a note" == data['notes'].strip()
-    
-    
-    # Test --print0. Need to test stdout (especially in python2) and file output
-    filenames = set(filenames)
-    
-    # Just to test stdout to make sure it doesn't throw errors
-    call('find')
-    call('find -0')
-    call('grep "this" ')
-    call('grep -0 "this" ')
-    call('search-tags') # This outputs YAML so no -0
+    call('mod --replace --note "new" file1.txt')
+    note1 = Notefile("file1.txt").read()
+    assert note1.data.notes == "new"
 
-    # Capture to test
-    gold = {'spac es.txt', 'unic°de and spaces and no ext', 'unic·de.txt', 'sub dir/dir2/dir 3/hi'}
-    
-    for cmd,nul in itertools.product(['find','grep "this"'],[True,False]):
-        if nul:
-            cmd += ' -0'
-        cmd += ' -o out'
-        call(cmd)
-        with open('out','rb') as file:
-            dat = file.read()
-    
-        dat = dat.replace(b'\n',b'\x00')
-        res = set(d.decode('utf8') for d in dat.split(b'\x00'))
-        res = set(r for r in res if r)
-
-        assert res == gold
-    
-    call('search-tags -o out')
-    with open('out') as file:
-        d = yaml.load(file)
-        res = set(d['mytag'])
-    assert res == gold
-
-    os.chdir(TESTDIR)
-    
-@pytest.mark.parametrize("repair_type", ['both','orphaned','metadata'])
-def test_repairs(repair_type):
-    """
-    Test repairs for the different repair types
-    """
-    os.chdir(TESTDIR)
-    dirpath = os.path.join(TESTDIR,'repairs')
-    cleanmkdir(dirpath)
-    os.chdir(dirpath)
-    
-    # Test files
-    with open('repair_meta.txt','wt') as file:
-        file.write('repair metadata')
-    with open('repair_meta_mtime.txt','wt') as file:
-        file.write('repair metadata from changing mtime')
-    
-    with open('repair_orphaned.txt','wt') as file:
-        file.write('repair orphaned')
-    with open('repair_orphanedDUPE.txt','wt') as file:
-        file.write('repair orphanedDUPE')
-    
-    # Initial Data    
-    call('add repair_meta.txt "Metadata repair please"')
-    meta0 = read_note('repair_meta.txt')
-
-    call('tag -t mtime repair_meta_mtime.txt')
-    meta0_mtime = read_note('repair_meta_mtime.txt')
-
-    call('add repair_orphaned.txt "orphaned repair please"')
-
-    call('add repair_orphanedDUPE.txt "orphaned repair please DUPE"')
-
-    # Break them
-    with open('repair_meta.txt','at') as file:
-        file.write('\nrepair metadata NOW')
-    
-    s = os.stat('repair_meta_mtime.txt')
-    os.utime('repair_meta_mtime.txt',(s.st_atime - 100,s.st_mtime - 100))
-    
-    shutil.move('repair_orphaned.txt','repair_orphaned_moved.txt')
-    shutil.copy2('repair_orphanedDUPE.txt','repair_orphanedDUPE1.txt')
-    shutil.move('repair_orphanedDUPE.txt','repair_orphanedDUPE2.txt')
-    
-    # Repair the whole directory
-    call('repair --type {} .'.format(repair_type))
-    
-    meta1 = read_note('repair_meta.txt')
-    meta1_mtime = read_note('repair_meta_mtime.txt')
-    
-    if repair_type in ['both','metadata']:
-        assert meta1['sha256'] != meta0['sha256']
-        assert abs(meta0_mtime['mtime'] - meta1_mtime['mtime'] - 100) < 0.1,'mtime not updated'
-    else:
-        assert meta1['sha256'] == meta0['sha256'] # Make sure it hasn't changed
-        
-    if repair_type in ['both','orphaned']:
-        assert os.path.exists('repair_orphaned_moved.txt.notes.yaml'),'not found'
-        assert not os.path.exists('repair_orphaned.txt.notes.yaml')
-              
-    else:
-        assert not os.path.exists('repair_orphaned_moved.txt.notes.yaml')
-        assert os.path.exists('repair_orphaned.txt.notes.yaml')
-    # Should *not* have been fixed either way
-    assert os.path.exists('repair_orphanedDUPE.txt.notes.yaml') 
-
-    ## Test the --mtime flag if repairing orphaned and for overwrite
-    if repair_type in ['both','orphaned']:
-        
-        with open('orphaned1.txt','wt') as file:file.write('1')
-        with open('orphaned2.txt','wt') as file:file.write('2')
-        
-        call('add orphaned1.txt ONE')
-        call('add orphaned2.txt TWO')
-        
-        shutil.move('orphaned1.txt','Morphaned1.txt')
-        shutil.move('orphaned2.txt','Morphaned2.txt')
-        
-        # Change mtime
-        os.utime('Morphaned1.txt',(100,100))
-        os.utime('Morphaned2.txt',(100,100))
-        
-        call('repair --type {} orphaned1.txt.notes.yaml'.format(repair_type))
-        call('repair --mtime --type {} orphaned2.txt.notes.yaml'.format(repair_type))
-        
-        # 1 was moved
-        assert os.path.exists('Morphaned1.txt.notes.yaml')
-        assert not os.path.exists('orphaned1.txt.notes.yaml')
-
-        # 2 was NOT moved
-        assert not os.path.exists('Morphaned2.txt.notes.yaml')
-        assert os.path.exists('orphaned2.txt.notes.yaml')
-    
-        ## Test for overwrite
-        with open('orphaned3.txt','wt') as file:file.write('3')
-        call('add orphaned3.txt Three')
-        shutil.move('orphaned3.txt','Morphaned3.txt')
-     
-        call('add Morphaned3.txt ThreeV2')
-     
-        call('repair --type {} orphaned3.txt.notes.yaml'.format(repair_type))
-        
-        assert os.path.exists('orphaned3.txt.notes.yaml'),'Should NOT have been moved'
-        
-        call('cat -o out Morphaned3.txt')
-        with open('out','rt') as f: note = f.read()
-        assert note.strip() ==  'ThreeV2','Should NOT have been changed'
-
-    os.chdir(TESTDIR)
-
-def test_repairs_searchpath():
-    os.chdir(TESTDIR)
-    dirpath = os.path.join(TESTDIR,'repairs-search','deeper')
-    cleanmkdir(dirpath)
-    os.chdir(dirpath)
-    
-    with open('file.txt','wt') as file:
-        file.write('New File')
-    
-    call('tag file.txt -t new')
-    
-    shutil.move('file.txt','../filemoved.txt')
-    
-    # Should not work
-    call('repair')
-    assert os.path.exists('file.txt.notes.yaml')
-
-    # Should work
-    call('repair --search-path ../')
-    assert not os.path.exists('file.txt.notes.yaml')
-    assert os.path.exists('../filemoved.txt.notes.yaml')
-    
-    
-    os.chdir(TESTDIR)
-
-def test_repair_dryrun():
-    """
-    Test that dry-run doesn't do anything
-    """
-    os.chdir(TESTDIR)
-    dirpath = os.path.join(TESTDIR,'repairs_dry')
-    cleanmkdir(dirpath)
-    os.chdir(dirpath)
-    
-    
-    with open('file.txt','wt') as file: file.write('New File')
-    call('add file.txt "testing a note"')
-    
-    call('cat -f -o out file.txt')
-    with open('out') as f: gold = f.read()
-    
-    # Make it need a metadata repair
-    with open('file.txt','at') as file: file.write('Updated File')
-    
-    call('repair --dry-run -t metadata file.txt ')
-    call('cat -f -o out file.txt')
-    with open('out') as f: assert f.read() == gold
-
-    call('repair -t metadata file.txt ')
-    call('cat -f -o out file.txt')
-    with open('out') as f: assert f.read() != gold
-    
-    
-    os.chdir(TESTDIR)
-    
-    
-
-@pytest.mark.parametrize("link", ['both','symlink','source'])
-def test_links(link):
-    """
-    Test different settings with symlinks
-    """
-    os.chdir(TESTDIR)
-    dirpath = os.path.join(TESTDIR,'links')
-    cleanmkdir(dirpath)
-    os.chdir(dirpath)
-   
-    with open('file.txt','wt') as file:
-        file.write('Main File')
-    
-    os.symlink('file.txt','link.txt')
-    
-    # Need to test multiple commands that modify the note
-    
-    call('add --link {} link.txt "link note"'.format(link))
-    
-    call('tag --link {} link.txt -t "link"'.format(link))
-
-    call('add file.txt "file note"')
-    call('tag file.txt -t file')
-    
-    if link == 'both':
-        assert os.path.exists('file.txt.notes.yaml')
-        assert os.path.exists('link.txt.notes.yaml')
-        assert os.path.islink('link.txt.notes.yaml')
-        
-        # make sure they are the same
-        assert hashlib.sha1(open('file.txt.notes.yaml','rb').read()).digest() == \
-               hashlib.sha1(open('link.txt.notes.yaml','rb').read()).digest()
-    if link == 'source':
-        assert os.path.exists('file.txt.notes.yaml')
-        assert not os.path.exists('link.txt.notes.yaml')
-    
-    if link == 'symlink':
-        assert os.path.exists('file.txt.notes.yaml')
-        assert os.path.exists('link.txt.notes.yaml')
-        assert not os.path.islink('link.txt.notes.yaml')
-    
-        # Make sure they are different
-        assert hashlib.sha1(open('file.txt.notes.yaml','rb').read()).digest() != \
-               hashlib.sha1(open('link.txt.notes.yaml','rb').read()).digest()
-
-    # Test repair on broken links. The notefile itself should still be
-    # okay
-    call('add link.txt "new note" --link {}'.format(link))
-    shutil.move('file.txt','moved.txt')
-    call('repair')
-
-    # Should repair file.txt.notes.yaml but should NOT repair the symlinked note
-    assert os.path.exists('moved.txt.notes.yaml') # Repaired
-    # NOT moved even if broken. exists required non-broken link so use islink too
-    if link != 'source':
-        assert os.path.exists('link.txt.notes.yaml') or os.path.islink('link.txt.notes.yaml') 
-    
-
-    os.chdir(TESTDIR)
-
-@pytest.mark.parametrize("link", ['both','symlink','source'])
-def test_link_overwrite(link):
-    """
-    Test for writing notes on links, etc. Also tests for using relative
-    paths
-    """
-    os.chdir(TESTDIR)
-    dirpath = os.path.join(TESTDIR,'link_overwrite')
-    cleanmkdir(dirpath)
-    os.chdir(dirpath) 
-    #notefile.DEBUG = True  
-    
-    with open('file.txt','wt') as file:
-        file.write('Main File')
-    os.makedirs('sub')
-    
-    os.symlink('../file.txt','sub/link.txt')
-    
-    call('add --link {} file.txt "file note"'.format(link))
-    call('add --link {} sub/link.txt "link note"'.format(link))
-    
-    gold = 'file note\nlink note'
+    # Monkey patch stdin
     try:
-        filetxt = read_note('file.txt',link=link)['notes'].strip()
-    except:
-        filetxt = ''
-    
+        stdin0 = sys.stdin
+        import io
+
+        sys.stdin = io.StringIO("stdin str")
+        call('mod -s -n"worked?" file1.txt')
+    finally:
+        sys.stdin = stdin0
+    note1 = Notefile("file1.txt").read()
+    assert note1.data.notes == "new\nstdin str\nworked?"
+
+    # This will run through the code for edit but with a special flag just for testing
     try:
-        linktxt = read_note('sub/link.txt',link=link)['notes'].strip()
-    except:
-        linktxt = ''
-    
-    # The `test_links` makes sure this all works. *just* test for overwrite
-    if link in ['both','source']: # source will read the source note
-        assert filetxt == linktxt == gold
-    
-    if link == 'source':
-        assert not os.path.exists('sub/link.txt.notes.yaml')
-        
-    if link == 'symlink':
-        assert filetxt == 'file note'
-        assert linktxt == 'link note'
-    
-    os.chdir(TESTDIR)
-    
-def test_excludes_repair():
-    """
-    Test exclusions in repair, etc
-    """
-    os.chdir(TESTDIR)
-    dirpath = os.path.join(TESTDIR,'excl_repair','noenter')
-    cleanmkdir(dirpath)
-    os.chdir(dirpath + '/..')
-    
+        # Regular
+        notefile.notefile._TESTEDIT = "test note"
+        note1.interactive_edit()
+        assert note1.data.notes == "test note"
 
-    with open('file1.txt','wt') as file:
-        file.write('FILE 1')
-        
-    with open('file2.txt','wt') as file:
-        file.write('FILE 2')
+        # full
+        note2 = copy.deepcopy(note1)
+        note2.data.notes = "mod full"
+        note2.data.tags = ["tag1"]
+        note2.data.other = {"other": "data"}
 
-    with open('noenter/file3.txt','wt') as file:
-        file.write('FILE 3')
+        notefile.notefile._TESTEDIT = note2.writes()
+        del note2  # not needed but to make sure I do not mess up
 
-    call('add file1.txt "file note1"')
+        note1.interactive_edit(full=True)
+        assert note1.data.other == {"other": "data"}
+        assert set(note1.data.tags) == {"tag1"}
+        assert note1.data.notes == "mod full"
+    finally:
+        notefile.notefile._TESTEDIT = False
 
-    call('add file2.txt "file note2"')
-
-    call('add noenter/file3.txt "file note3"')
-    
-    shutil.move('file1.txt','noenter/moved_file1.txt')
-    call('repair')
-    
-    assert os.path.exists('noenter/moved_file1.txt.notes.yaml')
-    assert not os.path.exists('file1.txt.notes.yaml')
-    
-    
-    # Test that both the grep for the missing base file (2) respects excludes
-    # and that the grep for orphaned files (3) respects it too.
-    shutil.move('file2.txt','noenter/moved_file2.txt')
-    shutil.move('noenter/file3.txt','moved_file3.txt')
-    call('repair --exclude noEnter') # Case shouldn't matter unless set
-    
-    assert not os.path.exists('noenter/moved_file2.txt.notes.yaml')
-    assert os.path.exists('file2.txt.notes.yaml')
-    
-    assert os.path.exists('noenter/file3.txt.notes.yaml')
-    assert not os.path.exists('moved_file3.txt.notes.yaml')
-    
     os.chdir(TESTDIR)
 
-def test_maxdepth():
+
+def test_create_opts():
     """
-    Test the use of the --maxdepth flag
-    in ['repair','grep','list_tags','export']
+    Test "new" options
     """
     os.chdir(TESTDIR)
-    dirpath = os.path.join(TESTDIR,'maxdepth')
-    cleanmkdir(dirpath)
-    os.chdir(dirpath)
-    
-    depths = ['', 'A', 'B', 'C', 'D']
-    
-    cleanmkdir('/'.join(depths[1:]))
-    
-    filepaths = []
-    notepaths = []
-    
-    for id,_ in enumerate(depths):
-        p = '/'.join(depths[1:(id+1)])
-        name = 'file' + ''.join(depths[1:(id+1)]) + '.txt'
-        filepath = os.path.join(p,name)
-        with open(filepath,'wt') as file:
-            file.write(filepath)
-        call('add {} "a note on {}"'.format(filepath,name))
-        call('tag {} -t "{}"'.format(filepath,name))
-        
-        # Damage the note
-        notepath = notefile.get_filenames(filepath)[1]
-        a,b = os.path.split(notepath)
-        shutil.move(notepath,os.path.join(a,'BLA' + b))
-        
-        filepaths.append('' + filepath)
-        notepaths.append(notepath)
-
-    # Do repairs first
-    for depth,_ in enumerate(depths):
-        call('repair --max-depth {}'.format(depth))
-
-        # make sure *only* notepaths[:(depth+1)] exist
-        # and the rest do not!
-        for note in notepaths[:(depth+1)]:
-            assert os.path.exists(note)
-        for note in notepaths[(depth+1):]:
-            assert not os.path.exists(note)
-    
-    # The rest
-    for depth,_ in enumerate(depths):
-        gold = set(filepaths[:(depth+1)])
-    
-        # grep
-        call('grep -o out --max-depth {} -- ""'.format(depth))
-        with open('out') as file:
-            res = set(f.strip() for f in file.read().splitlines() if f.strip())
-        assert res == gold
-
-        # search-tags
-        call('search-tags -o out --max-depth {}'.format(depth))
-        with open('out') as file:
-            _res = yaml.load(file)
-            res = set()
-            for v in _res.values():
-                res.update(v)
-        assert res == gold
-
-        # export
-        call('export -o out --max-depth {}'.format(depth))
-        with open('out') as file:
-            _res = yaml.load(file)
-            res = set(_res['notes'])  
-        assert res == gold
-    
-    os.chdir(TESTDIR)
-
-def test_grep_and_listtags_and_export_and_find_and_change():
-    """
-    Tests greping including for tags
-    """
-    os.chdir(TESTDIR)
-    dirpath = os.path.join(TESTDIR,'grep','noenter')
-    cleanmkdir(dirpath)
-    os.chdir(dirpath + '/..')
-    
-    with open('file1.txt','wt') as file:
-        file.write('FILE 1')
-        
-    with open('file2.txt','wt') as file:
-        file.write('FILE 2')
-
-    with open('noenter/file3.txt','wt') as file:
-        file.write('FILE 3')  
-        
-    with open('file4.exc','wt') as file:
-        file.write('FILE 4')
-
-    with open('file5.txt','wt') as file:
-        file.write('FILE 5')
-
-
-    call('add file1.txt "note for myfile 1"')
-    call('tag file1.txt -t tag1 -t tag2')
-
-    call('add file2.txt "note\nfor MyFiLe 2"')
-
-    call('add noenter/file3.txt "myfile 3 but do not find me"')
-    call('tag noenter/file3.txt -t tag1')
-
-    call('add file4.exc "myfile 4 but do not find me either"')
-    call('tag file4.exc -t tag1')
-    
-    call('add file5.txt "yourfile 5"')
-  
-    ## Greps
-    
-    call('grep -o out MyFiLe')
-    with open('out') as file:
-        res = set(f.strip() for f in file.read().splitlines() if f.strip())
-    assert {'noenter/file3.txt', 'file1.txt', 'file4.exc', 'file2.txt'} == res
-
-    call('grep MyFiLe --export -o out')
-    with open('out') as file:
-        res = yaml.load(file) # Should be a dict
-        res = dict(res) # will fail otherwise
-    assert {'noenter/file3.txt', 'file1.txt', 'file4.exc', 'file2.txt'} == set(res)
-
-    call('grep -o out MyFiLe --match-expr-case')
-    with open('out') as file:
-        res = set(f.strip() for f in file.read().splitlines() if f.strip())
-    assert {'file2.txt'} == res
-    
-    call('grep -o out MyFiLe --exclude "*.exc" --exclude noEnter')
-    with open('out') as file:
-        res = set(f.strip() for f in file.read().splitlines() if f.strip())
-    assert {'file1.txt','file2.txt'} == res
-
-    call('grep -o out MyFiLe --exclude "*.exc" --exclude noEnter --match-exclude-case')
-    with open('out') as file:
-        res = set(f.strip() for f in file.read().splitlines() if f.strip())
-    assert {'noenter/file3.txt','file1.txt','file2.txt'} == res
-    
-    call('grep -o out MyFiLe YouRFile')
-    with open('out') as file:
-        res = set(f.strip() for f in file.read().splitlines() if f.strip())
-    assert {'noenter/file3.txt', 'file1.txt', 'file4.exc', 'file2.txt','file5.txt'} == res
-    
-    # Test grep with full
-    nf = notefile.Notefile('file1.txt')
-    nf.read()
-    nf.data['new_field'] = "this is a special field"
-    nf.write()
-    
-    call('grep special -o out')
-    with open('out') as file:
-        res = set(f.strip() for f in file.read().splitlines() if f.strip())
-    assert len(res) == 0
-    
-    call('grep special -f -o out')
-    with open('out') as file:
-        res = set(f.strip() for f in file.read().splitlines() if f.strip())
-    assert res == {'file1.txt'}
-    
-    ### Tags
-    
-    call('search-tags -o out')
-    with open('out') as file:
-        res = yaml.load(file)
-        # Convert to dict of sets for ordering
-        res = {k:set(v) for k,v in res.items()}
-    assert {'tag1': {'noenter/file3.txt', 'file4.exc', 'file1.txt'}, 'tag2': {'file1.txt'}} == res
-    
-
-    call('search-tags -o out tag1')
-    with open('out') as file:
-        res = yaml.load(file)
-        # Convert to dict of sets for ordering
-        res = {k:set(v) for k,v in res.items()}
-    assert {'tag1': {'noenter/file3.txt', 'file4.exc', 'file1.txt'}} == res
-    
-    call('search-tags -o out tag1 --exclude "*.EXC" --match-exclude-case')
-    with open('out') as file:
-        res = yaml.load(file)
-        # Convert to dict of sets for ordering
-        res = {k:set(v) for k,v in res.items()}
-    assert {'tag1': {'noenter/file3.txt','file4.exc','file1.txt'}} == res   
-
-    call('search-tags -o out tag1 --exclude "*.EXC"')
-    with open('out') as file:
-        res = yaml.load(file)
-        # Convert to dict of sets for ordering
-        res = {k:set(v) for k,v in res.items()}
-    assert {'tag1': {'noenter/file3.txt','file1.txt'}} == res   
-    
-    # Just test the --count mode
-    call('search-tags -o out --count')
-    with open('out') as file:
-        res = yaml.load(file)
-    assert res == {'tag1': 3, 'tag2': 1}
-    
-    ## Fancy Queries
-    call('search-tags -o out "tag1" "tag2"')
-    with open('out') as file:
-        res = yaml.load(file)
-        # Convert to dict of sets for ordering
-        res = {k:set(v) for k,v in res.items()}
-    assert {'tag1': {'file1.txt', 'file4.exc', 'noenter/file3.txt'}, 
-            'tag2': {'file1.txt'}} == res
-    
-    call('search-tags -o out --all "tag1" "tag2"')
-    with open('out') as file:
-        res = yaml.load(file)
-        # Convert to dict of sets for ordering
-        res = {k:set(v) for k,v in res.items()}
-    assert {'tag1': {'file1.txt'}, 'tag2': {'file1.txt'}} == res
-    
-    ## Link Excludes
-    # Add this after the previous
-    with open('file6.txt','wt') as file:
-        file.write('FILE 6')
-    os.symlink('file6.txt','link.txt')
-    
-    call('add --link both link.txt "this is a link"')
-    call('tag --link both link.txt -t link')
-    call('tag file6.txt -t tag1')
-    call('tag file1.txt -t no_link')
-    
-    call('grep -o out link')
-    with open('out') as file:
-        res = set(f.strip() for f in file.read().splitlines() if f.strip())
-    assert {'link.txt', 'file6.txt'} == res
-    
-    call('grep -o out link --exclude-links')
-    with open('out') as file:
-        res = set(f.strip() for f in file.read().splitlines() if f.strip())
-    assert {'file6.txt'} == res
-
-    call('search-tags -o out link')
-    with open('out') as file:
-        res = yaml.load(file)
-        # Convert to dict of sets for ordering
-        res = {k:set(v) for k,v in res.items()}
-    assert {'link': {'link.txt', 'file6.txt'}} == res
-
-    call('search-tags -o out link --exclude-links')
-    with open('out') as file:
-        res = yaml.load(file)
-        # Convert to dict of sets for ordering
-        res = {k:set(v) for k,v in res.items()}
-    assert {'link': {'file6.txt'}} == res
-    
-    ## Export & find. Mostly test for exclusions
-    def _read(filename,export=True):
-        if export:
-            with open(filename) as file:
-                res = yaml.load(file)
-                # Just look at the files
-                return set(res['notes'].keys())
-        with open(filename) as file:
-            return set(l.strip() for l in file.readlines() if l.strip())
-            
-    for cmd in ['export','find']:
-        call('{} -o out'.format(cmd))
-        res = _read('out',export=cmd=='export')
-        assert {'file6.txt', 'file5.txt', 'link.txt', 
-                'noenter/file3.txt', 'file2.txt', 'file4.exc', 
-                'file1.txt'} == res
-
-        call('{} -o out --exclude-links'.format(cmd))
-        res = _read('out',export=cmd=='export')
-        assert {'file6.txt', 'file5.txt',
-                'noenter/file3.txt', 'file2.txt', 'file4.exc', 
-                'file1.txt'} == res
-
-        call('{} -o out --exclude "*.exC"'.format(cmd))
-        res = _read('out',export=cmd=='export')
-        assert {'file6.txt', 'file5.txt', 'link.txt', 
-                'noenter/file3.txt', 'file2.txt', 
-                'file1.txt'} == res
-
-        call('{} -o out --exclude "*.exC" --match-exclude-case'.format(cmd))
-        res = _read('out',export=cmd=='export')
-        assert {'file6.txt', 'file5.txt', 'link.txt', 
-                'noenter/file3.txt', 'file2.txt', 'file4.exc', 
-                'file1.txt'} == res
-    
-    ## Changing tags
-    
-    # Vanilla
-    call('change-tag tag2 tagTWO') # Just change one. See that it lowercases it
-    call('search-tags -o out tag2 tagtwo')
-    with open('out') as file:
-        res = yaml.load(file)
-        # Convert to dict of sets for ordering
-        res = {k:set(v) for k,v in res.items()}
-    assert res == {'tagtwo': {'file1.txt'}}
-    
-    # Dry run
-    call('search-tags -o out0') # to compare against
-    call('change-tag tag1 tag11 --dry-run -o out')
-    with open('out') as file:
-        lines = [l for l in file if l.strip()]
-        assert len(lines) == 5
-    call('search-tags -o out1') # to compare against
-    with open('out0') as out0, open('out1') as out1:
-        res0,res1 = yaml.load(out0),yaml.load(out1)
-    assert res0 == res1
-    
-    # exclude and multiple changes
-    call('change-tag --exclude "*.exc" tag1 tagone "tag one"') 
-    call('search-tags -o out')
-    with open('out') as file:
-        res = yaml.load(file)
-        res = {k:set(v) for k,v in res.items()}
-    assert res['tag1'] == {'file4.exc'}
-    assert res['tag one'] == res['tagone'] # Both are there and changed
-    
-    # Check ordering
-    if sys.version_info >= (3,7):
-        for file in os.listdir('.'):
-            if file.endswith('.txt'):
-                call('mod -t zzz {}'.format(file))
-        call('search-tags -o out -c')
-        with open('out') as file:
-            res = yaml.load(file)
-        assert list(res)[-1] == 'zzz'
-        
-        call('search-tags -o out -c --count-order')
-        with open('out') as file:
-            res = yaml.load(file)
-        assert list(res)[0] == 'zzz'
-    else:
-        print('WARNING: Not checking --count-order with this version of python')
-        
-    # Not Tested:
-    #   * Exclude links. This should be fine because it's the same logic as the
-    #     the others but there is no link that would work for this since the referent
-    #     gets changed
-    
-    os.chdir(TESTDIR)
-
-def test_grep_w_multiple_expr():
-    os.chdir(TESTDIR)
-    dirpath = os.path.join(TESTDIR,'multi-grep')
-    cleanmkdir(dirpath)
-    os.chdir(dirpath)
-    
-    with open('file1.txt','wt') as file:
-        file.write('FILE 1')
-        
-    with open('file2.txt','wt') as file:
-        file.write('FILE 2')
-    
-    with open('file3.txt','wt') as file:
-        file.write('FILE 3')
-
-
-    call('add file1.txt "match me or you"')
-    call('add file2.txt "match you"')
-    call('add file3.txt "what about me"')
-    
-    # tests
-    call('grep -o out me you')
-    with open('out') as file:
-        res = set(f.strip() for f in file.read().splitlines() if f.strip())
-    assert {'file1.txt', 'file2.txt', 'file3.txt'} == res
-
-    call('grep -o out --all me you')
-    with open('out') as file:
-        res = set(f.strip() for f in file.read().splitlines() if f.strip())
-    assert {'file1.txt'} == res
-    
-    
-    ## Test grep with regex
-    with open('file4.txt','wt') as file:file.write('FILE 4')
-    with open('file5.txt','wt') as file:file.write('FILE 5')
-    with open('file6.txt','wt') as file:file.write('FILE 6')
-    with open('file7.txt','wt') as file:file.write('FILE 7')
-    
-    call('add file4.txt "this is a te.*st"')
-    call('add file5.txt "This is a teblablabast"')
-    call('add file6.txt "These are their words"')
-    call('add file7.txt "these are the words"')
-    
-    call('grep -o out "te.*st"') 
-    with open('out') as file:
-        res = set(f.strip() for f in file.read().splitlines() if f.strip())
-    assert {'file4.txt','file5.txt'} == res
-    
-    call('grep -o out -F "te.*st"')
-    with open('out') as file:
-        res = set(f.strip() for f in file.read().splitlines() if f.strip())
-    assert {'file4.txt'} == res
-        
-    call('grep -o out the')
-    with open('out') as file:
-        res = set(f.strip() for f in file.read().splitlines() if f.strip())
-    assert {'file6.txt','file7.txt'} == res
-
-    call('grep -o out --full-word the')
-    with open('out') as file:
-        res = set(f.strip() for f in file.read().splitlines() if f.strip())
-    assert {'file7.txt'} == res
-    
-    
-    os.chdir(TESTDIR)
-
-def test_queries():
-    os.chdir(TESTDIR)
-    dirpath = os.path.join(TESTDIR,'queries')
+    dirpath = TESTDIR / "create"
     cleanmkdir(dirpath)
     os.chdir(dirpath)
 
-    def _read_res(out='out'):
-        with open(out) as file:
-            return set(f.strip() for f in file.read().splitlines() if f.strip())
+    ## --hidden and --visible
+    writefile("file1.txt", "file1.")
+    writefile("file2.txt", "file2..")
+    writefile("file3.txt", "file3...")
 
-    ## Setup
-    with open('file1.txt','wt') as file:file.write('file1')
-    with open('file2.txt','wt') as file:file.write('file2')
-    with open('file3.txt','wt') as file:file.write('file3')
-    
-    with open('file4.exc','wt') as file:file.write('file4')
-    with open('file4.txt','wt') as file:file.write('FILE4')
-    
-    with open('file5.txt','wt') as file:file.write('file5')
-    with open('file6.txt','wt') as file:file.write('file6')
-    with open('file7.txt','wt') as file:file.write('file7')
-    
-    with open('file8.txt','wt') as file:file.write('file8')    
-    
-    call('add file1.txt "word1" "word2" "word3" ')
-    call('add file2.txt "word1" "word3" ')
-    call('add file3.txt "word1" "word2" "d1" ')
-    call('tag -t tag1 file1.txt')
-    call('tag -t tag2 file2.txt')
-    
-    call('add file4.txt RaNdOM')
-    call('add file4.exc RANDOM')
-    
-    call('tag file5.txt -t T1 -t T2 -t T3 ')
-    call('tag file6.txt -t T1 -t T3 ')
-    call('tag file7.txt -t T1 -t T2 ')
-    
-    # Tests with grep and tags
-    call("""query "grep('word1') and grep('word2') and not grep('word3')" -o out""")
-    assert _read_res() == {'file3.txt'}
-    
-    call("""query "g('word1') and 'tag1' in tags" -o out""") # include tags
-    assert _read_res() == {'file1.txt'}
-    
-    call("""query "g('d1')" -o out""")
-    assert _read_res() == {'file1.txt', 'file2.txt', 'file3.txt'}
-    
-    call("""query "g('d1')" --full-word -o out""")
-    assert _read_res() == {'file3.txt'}
+    call('mod -n "note" file1.txt')
+    call('mod -n "note" -V file2.txt')
+    call('mod -n "note" -H file3.txt')
+    assert os.path.exists("file1.txt.notes.yaml") and not os.path.exists(".file1.txt.notes.yaml")
+    assert os.path.exists("file2.txt.notes.yaml") and not os.path.exists(".file2.txt.notes.yaml")
+    assert os.path.exists(".file3.txt.notes.yaml") and not os.path.exists("file3.txt.notes.yaml")
 
-    call("""query "g('w.*?1')" -o out""")
-    assert _read_res() == {'file1.txt', 'file2.txt', 'file3.txt'}
-    
-    call("""query "g('w.*?1')" --export -o out""")
-    with open('out') as f: 
-        res = yaml.load(f) # Should be a dict
-        res = dict(res)    # otherwise will fail
-    assert set(res) == {'file1.txt', 'file2.txt', 'file3.txt'}
-    
-    call("""query "g('w.*?1')" --fixed-strings -o out""")
-    assert _read_res() == set()
-    
-        
-    # Excludes and case
-    call("""query "g('RANDOM')" -o out""")
-    assert _read_res() == {'file4.txt', 'file4.exc'}
-    
-    call("""query "g('RANDOM')" --match-expr-case -o out""")
-    assert _read_res() == {'file4.exc'}
-    
-    call("""query "g('RANDOM')" --exclude '*.eXc' -o out""")
-    assert _read_res() == {'file4.txt'}
+    ## --no-hash
+    writefile("file4.txt", "file4....")
+    call('mod -n "note" file4.txt --no-hash')
+    note3 = Notefile("file3.txt").read()
+    note4 = Notefile("file4.txt").read()
+    assert "sha256" in note3.data and "sha256" not in note4.data
 
-    call("""query "g('RANDOM')" --exclude '*.eXc' --match-exclude-case -o out""")
-    assert _read_res() == {'file4.txt','file4.exc'}
-    
-    call("""query "any('T{}'.format(a) in tags for a in '123')" -o out""") #Should be none since tags are always lowercase
-    assert _read_res() == set()
-    
-    call("""query "any('t{}'.format(a) in tags for a in '123')" -o out""")
-    assert _read_res() == {'file5.txt', 'file6.txt', 'file7.txt'}
+    ## --no-refresh
+    writefile("file5.txt", "file5.....")
+    call('mod -n "note" file5.txt')
+    h1 = Notefile("file5.txt").read().data.sha256
 
-    call("""query "all('t{}'.format(a) in tags for a in '123')" -o out""")
-    assert _read_res() == {'file5.txt'}
+    writefile("file5.txt", "a", append=True)
+    call('mod -n "note2" file5.txt')
+    h2 = Notefile("file5.txt").read().data.sha256
+    assert h1 != h2
 
-    # Test tall and tany
-    call("""query -o out "tany('t1','t2')" """)
-    assert _read_res() == {'file5.txt', 'file6.txt', 'file7.txt'}
-    
-    call("""query -o out "tall('t1','t2')" """)
-    assert _read_res() == {'file5.txt', 'file7.txt'}
-    
-    call("""query -o out "tany('t1','t2','t999')" """)
-    assert _read_res() == {'file5.txt', 'file6.txt', 'file7.txt'}
-    
-    call("""query -o out "tall('t1','t2','t999')" """)
-    assert _read_res() == set()
-    
-    # Multiline
-    call("""query "a = g('word1');b = 't3' in tags; c=note.filename == 'file6.txt'; (a or b) and not c" -o out""")
-    assert {'file2.txt', 'file5.txt', 'file3.txt', 'file1.txt'} == _read_res()
-    
-    call("""query "a = g('word1')" "b = 't3' in tags; c=note.filename == 'file6.txt'" "(a or b) and not c" -o out""")
-    assert {'file2.txt', 'file5.txt', 'file3.txt', 'file1.txt'} == _read_res()
+    writefile("file5.txt", "a", append=True)
+    call('mod -n "note3" file5.txt --no-refresh')
+    h3 = Notefile("file5.txt").read().data.sha256
+    assert h2 == h3
 
-    call("""query "a = g('word1')\nb = 't3' in tags\nc=note.filename == 'file6.txt'\n(a or b) and not c" -o out""")
-    assert {'file2.txt', 'file5.txt', 'file3.txt', 'file1.txt'} == _read_res()
-    
+    ## Refresh after --no-hash
+    writefile("file6.txt", "file6......")
+    call('mod -n "note" file6.txt --no-hash')
+    assert "sha256" not in Notefile("file6.txt").read().data
 
-    # Test output methods
-    call("""query "'t1' in tags" -0 -o out""")
-    with open('out','rb') as f:
-        txt = f.read()
-    assert b'\n' not in txt
-    assert b'\x00' in txt
+    call('mod -n "note2" file6.txt')
+    assert "sha256" not in Notefile("file6.txt").read().data
 
-    call("""query "all('t{}'.format(a) in tags for a in '123')" -o out --symlink links""")    
-    assert os.readlink('links/file5.txt') == '../file5.txt'
-    
-    # Query other fields
-    note = notefile.Notefile('file8.txt').read()
-    note.data['other'] = {'f1':'file8'}    
-    note.write()
-    
-    # these SHOULD error since it is asking for keys that don't exists
-    # use `--debug` to raise the error
+    # Modifying the file SHOULD make it compute the hash unless --no-refresh is set again
+    writefile("file6.txt", "line", append=True)
+    call('mod -n "note3" file6.txt --no-refresh')
+    assert "sha256" not in Notefile("file6.txt").read().data
+
+    writefile("file6.txt", "line3", append=True)
+    call('mod -n "note4" file6.txt')
+    assert "sha256" in Notefile("file6.txt").read().data  # refreshed
+
+    ## Link mode
+    # Visible
+    writefile("file7.txt", "file7.......")
+    writefile("file8.txt", "file8........")
+    writefile("file9.txt", "file9.........")
+    os.symlink("file7.txt", "link7.txt")
+    os.symlink("file8.txt", "link8.txt")
+    os.symlink("file9.txt", "link9.txt")
+
+    call("mod -t link link7.txt --link both")
+    call("mod -t link link8.txt --link symlink")
+    call("mod -t link link9.txt --link source")
+
+    assert os.path.exists("link7.txt.notes.yaml") and os.path.exists("file7.txt.notes.yaml")
+    assert os.path.exists("link8.txt.notes.yaml") and not os.path.exists("file8.txt.notes.yaml")
+    assert not os.path.exists("link9.txt.notes.yaml") and os.path.exists("file9.txt.notes.yaml")
+
+    # Hidden
+    writefile("file10.txt", "file10..........")
+    writefile("file11.txt", "file11...........")
+    writefile("file12.txt", "file12............")
+    os.symlink("file10.txt", "link10.txt")
+    os.symlink("file11.txt", "link11.txt")
+    os.symlink("file12.txt", "link12.txt")
+
+    call("mod -t link link10.txt --hidden --link both")
+    call("mod -t link link11.txt --hidden --link symlink")
+    call("mod -t link link12.txt --hidden --link source")
+
+    assert os.path.exists(".link10.txt.notes.yaml") and os.path.exists(".file10.txt.notes.yaml")
+    assert os.path.exists(".link11.txt.notes.yaml") and not os.path.exists(".file11.txt.notes.yaml")
+    assert not os.path.exists(".link12.txt.notes.yaml") and os.path.exists(".file12.txt.notes.yaml")
+
+    # Visible on existing hidden
+    os.symlink("file10.txt", "link10-V.txt")
+    os.symlink("file11.txt", "link11-V.txt")
+    os.symlink("file12.txt", "link12-V.txt")
+
+    call("mod -t link2 link10-V.txt --visible --link both")
+    call("mod -t link2 link11-V.txt --visible --link symlink")
+    call("mod -t link2 link12-V.txt --visible --link source")
+
+    assert os.path.exists("link10-V.txt.notes.yaml") and os.path.exists(".file10.txt.notes.yaml")
+    assert os.path.exists("link11-V.txt.notes.yaml") and not os.path.exists(
+        ".file11.txt.notes.yaml"
+    )
+    assert not os.path.exists("link12-V.txt.notes.yaml") and os.path.exists(
+        ".file12.txt.notes.yaml"
+    )
+
+    assert (
+        Notefile("link10-V.txt").read().data.tags
+        == Notefile("link10.txt").read().data.tags
+        == Notefile("file10.txt").read().data.tags
+    )
+    assert Notefile("link11-V.txt").read().data.tags == ["link2"]
+    assert Notefile("link11.txt").read().data.tags == ["link"]
+    assert Notefile("file11.txt").read().data.tags == []
+    assert (
+        Notefile("link12-V.txt").read().data.tags
+        == Notefile("link12.txt").read().data.tags
+        == Notefile("file12.txt").read().data.tags
+    )
+
+    ## --format and rewrite-format
+    writefile("file13.txt", "file13.............")
+
+    call("mod -t note file13.txt --format json")
+    assert Notefile("file13.txt").read().format == "json"
+
+    call("mod -t note2 file13.txt --format yaml")  # should NOT change format
+    assert Notefile("file13.txt").read().format == "json"
+
+    call("mod -t note3 file13.txt --format yaml --rewrite-format")  # should now change format
+    assert Notefile("file13.txt").read().format == "yaml"
+
+    os.chdir(TESTDIR)
+
+
+def test_copy():
+    os.chdir(TESTDIR)
+    dirpath = TESTDIR / "copy"
+    cleanmkdir(dirpath)
+    os.chdir(dirpath)
+
+    writefile("file1.txt", "file1.")
+    writefile("file2.txt", "file2..")
+    writefile("file3.txt", "file3...")
+
+    call('mod -t tag1 -n"this note" file1.txt')
+    call("copy -H file1.txt file2.txt file3.txt")  # also test -H again
+
+    note1 = Notefile("file1.txt").read()
+    note2 = Notefile("file2.txt").read()
+    note3 = Notefile("file3.txt").read()
+    for key in set(note1.data).difference(notefile.notefile.METADATA):
+        assert note1.data[key] == note2.data[key] == note3.data[key], f"failed {key}"
+    assert note2.ishidden == note3.ishidden == True
+
     try:
-        call("""--debug query "note.data['other']['f1'] == 'file8'" """)
-        assert False,"no error"
-    except notefile.QueryError:
-        assert True
-    # use .get() to handle this better
-    call("""query "note.data.get('other',{}).get('f1') == 'file8'" -o out""")
-    assert _read_res() == {'file8.txt'}
-    
-    # Do the error again but with `--allow-exception`
-    call("""--debug query --allow-exception  -o out "note.data['other']['f1'] == 'file8'" """)
-    assert _read_res() == {'file8.txt'}
-    os.chdir(TESTDIR)
-
-
-def test_nohash():
-    os.chdir(TESTDIR)
-    dirpath = os.path.join(TESTDIR,'nohash')
-    cleanmkdir(dirpath)
-    os.chdir(dirpath)
-    
-    nohash = lambda filename: read_note(filename,hashfile=False).get('sha256',notefile.NOHASH) == notefile.NOHASH
-    
-    with open('file1.txt','wt') as file:
-        file.write('FILE 1')
-        
-    with open('file2.txt','wt') as file:
-        file.write('FILE 2')
-    
-    with open('file3.txt','wt') as file:
-        file.write('FILE 3')
-    
-    with open('file4.txt','wt') as file:
-        file.write('FILE 4')
-
-    with open('file5.txt','wt') as file:
-        file.write('FILE 5')
-    
-    
-    # make sure no hash is computed when read with nothing
-    assert nohash('file1.txt') 
-    assert nohash('file2.txt') 
-    
-    call('add file1.txt "testing" --no-hash') # Add note when none existed
-    assert nohash('file1.txt') 
-    
-    call('tag file2.txt file1.txt -t hi --no-hash') # Add tag to new and existing
-    assert nohash('file2.txt') 
-    
-    call('add file1.txt "append" --no-hash') # Add note to existing
-    assert nohash('file1.txt')
-    
-    ## NOTE: edit has to be tested manually! See bottom
-    
-    # Test that repair adds a hash as needed
-    
-    with open('file1.txt','at') as file:
-        file.write('FILE 1')
-        
-    with open('file2.txt','at') as file:
-        file.write('FILE 2')
-        
-    call('repair file1.txt')
-    assert not nohash('file1.txt') # SHOULD have a hash
-    
-    call('repair file2.txt --no-hash')
-    assert nohash('file2.txt') # still no hash
-    
-    # Test that we *can* repair file1.txt since it now has a hash but we cannot
-    # repair file2
-    shutil.move('file1.txt','fileA.txt')
-    shutil.move('file2.txt','fileB.txt')
-    
-    call('repair')
-    
-    ## Test edits and repairs with and without --no-hash or --
-    
-    # Add again to a no-hashed file
-    call('add --no-hash file3.txt Comment 1')
-    call('add file3.txt Comment 2') # Notice no --no-hash
-    assert nohash('file3.txt')
-    
-    # Modify the file and then add again with --nohash
-    with open('file3.txt','at') as file: file.write('new line')
-    call('add --no-hash file3.txt Comment 3')
-    assert nohash('file3.txt')
-    
-    # Modify the file and then add again withOUT --nohash. Should get hashed
-    with open('file3.txt','at') as file: file.write('new line2')
-    call('add file3.txt Comment 4')
-    assert not nohash('file3.txt')
-    
-    # Test repairs after --no-hash
-    call('add --no-hash file4.txt Comment 1')
-    call('repair --type metadata file4.txt') # Will not rehash since unmodified
-    assert nohash('file4.txt')
-    
-    # Edit the file then repair with --no-hash
-    with open('file4.txt','at') as file: file.write('new line2')
-    call('repair --type metadata --no-hash file4.txt') # Will not rehash since unmodified
-    assert nohash('file4.txt')
-    
-    # Repair again withOUT --no-hash but NON-edited file
-    call('repair --type metadata file4.txt') # Will not rehash since unmodified
-    assert nohash('file4.txt')
-    
-    # Edit the file then repair withOUT --no-hash
-    with open('file4.txt','at') as file: file.write('new line3')
-    call('repair --type metadata  file4.txt') # Will not rehash since unmodified
-    assert not nohash('file4.txt')
-    
-    # Test that repair with --force-refresh WILL rehash missing ones
-    call('add --no-hash file5.txt Comment 1')
-    call('repair --type metadata --force-refresh --dry-run file5.txt') # Make sure this doesn't add it
-    assert nohash('file5.txt')
-    call('repair --type metadata --force-refresh file5.txt') # Make sure this doesn't add it
-    assert not nohash('file5.txt')
-    
-    os.chdir(TESTDIR)
-
-@pytest.mark.parametrize("link", ['both','symlink','source'])
-def test_hidden(link):
-    os.chdir(TESTDIR)
-    dirpath = os.path.join(TESTDIR,'hidden')
-    cleanmkdir(dirpath)
-    os.chdir(dirpath)
-    
-    with open('file1.txt','wt') as file: file.write('file1')
-    with open('file2.txt','wt') as file: file.write('file2')
-    with open('file3.txt','wt') as file: file.write('file3')
-    
-    # test when and when not specified and make sire the mode doesn't change
-    call('add --hidden file1.txt "note 1"')
-    assert ishidden('file1.txt')
-    
-    call('add --hidden file1.txt "note 2"')
-    assert ishidden('file1.txt')
-    
-    call('add file1.txt "note 3"') # Doesn't change hide mode
-    assert ishidden('file1.txt')
-    
-    call('tag --hidden -t t1 file1.txt')
-    assert ishidden('file1.txt')
-    
-    call('tag -t t2 file1.txt')
-    assert ishidden('file1.txt')
-    
-    call('tag -t file2 file2.txt --visible')
-    assert not ishidden('file2.txt')
-    
-    # Test linking
-    os.symlink('file1.txt','link1.txt')
-    os.symlink('file2.txt','link2.txt')
-    os.symlink('file3.txt','link3.txt')
-    call('tag -t link1 link1.txt --visible --link {}'.format(link)) # make sure it doesn't change visibility
-    call('tag -t link2 link2.txt --hidden  --link {}'.format(link))
-    
-    if link in ['both','symlink']:
-        assert os.path.exists('link1.txt.notes.yaml')
-        assert os.path.exists('.link2.txt.notes.yaml')
-    else:
-        assert len(glob.glob('*link*.txt.notes.yaml')) == 0
-    
-    call('vis show link2.txt')
-    call('vis hide link1.txt')
-    # Make sure the refferents haven't changed
-    assert os.path.exists('.file1.txt.notes.yaml')
-    assert os.path.exists('file2.txt.notes.yaml')
-    
-    if link in ['both','symlink']:
-        # The link should have changed
-        assert os.path.exists('.link1.txt.notes.yaml')
-        assert os.path.exists('link2.txt.notes.yaml')
-    else:
-        assert len(glob.glob('*link*.txt.notes.yaml')) == 0
-    
-    
-    # Flip the links again to make sure the refferent hasn't changed
-    call('vis hide link2.txt')
-    call('vis show link1.txt')
-    # Make sure the refferents haven't changed
-    assert os.path.exists('.file1.txt.notes.yaml')
-    assert os.path.exists('file2.txt.notes.yaml')
-    if link in ['both','symlink']:
-        assert os.path.exists('link1.txt.notes.yaml')
-        assert os.path.exists('.link2.txt.notes.yaml')
-    else:
-        assert len(glob.glob('*link*.txt.notes.yaml')) == 0
-    
-    # Conflicts on show and hide
-    shutil.copy2('file2.txt.notes.yaml','.file2.txt.notes.yaml')
-    call('vis hide file2.txt')
-    assert os.path.exists('.file2.txt.notes.yaml') # Both still exist
-    assert os.path.exists('file2.txt.notes.yaml')
-    call('vis show file2.txt')
-    assert os.path.exists('.file2.txt.notes.yaml') # Both still exist
-    assert os.path.exists('file2.txt.notes.yaml')
-    
-    # This part tests broken links due to hiding and unhiding
-    # From the docs (as of testing):
-    #
-    # > Changing the visibility of a symlinked referent will cause the 
-    # > symlinked note to be broken. However, by design it will still 
-    # > properly read the note and will be fixed when editing or repairing 
-    # > metadata.
-    #
-    if link == 'both': # Doesn't apply to the others since they don't symlink the note
-        with open('file4.txt','wt') as file: file.write('file4')
-        os.symlink('file4.txt','link4.txt')
-        call('add --link {} -V link4.txt note'.format(link))
-        
-        # Make the file4 note hidden
-        call('vis hide file4.txt')
-        
-        assert os.path.islink('link4.txt.notes.yaml') # Still there (visible)
-        assert not os.path.exists('link4.txt.notes.yaml') # Broken will be False
-        assert not os.path.exists('.link4.txt.notes.yaml') # did not get hidden
-        
-        # Still can be read
-        call('cat -o out link4.txt')
-        with open('out','rt') as file:
-            assert file.read().strip() == 'note'
-        
-        # Can still be hidden with OUT repair
-        call('vis hide link4.txt')
-        assert ishidden('link4.txt')
-        
-        # Editing should (a) still work, (b) fix it
-        # (by design of sorts. See copy of doc)
-        call('add --link {} link4.txt notenew'.format(link))
-        assert os.path.islink('.link4.txt.notes.yaml') # Still there (hidden)
-        assert os.path.exists('.link4.txt.notes.yaml') # No longer broken
-        
-        # Break it again. Make sure it's broken
-        call('vis show file4.txt')
-        assert os.path.islink('.link4.txt.notes.yaml') # Still there (hidden)
-        assert not os.path.exists('.link4.txt.notes.yaml') # NOW it IS broken
-        
-        # Make sure dry-run does NOT repair
-        call('repair --dry-run --type metadata link4.txt')
-        assert os.path.islink('.link4.txt.notes.yaml') # Still there (hidden)
-        assert not os.path.exists('.link4.txt.notes.yaml') # No longer broken
-        
-        # Repair for real        
-        call('repair --type metadata link4.txt')
-        assert os.path.islink('.link4.txt.notes.yaml') # Still there (hidden)
-        assert os.path.exists('.link4.txt.notes.yaml') # No longer broken
-        
-    
-    # Test that the hidden stat is preserved
-    with open('repair1.txt','wt') as file: file.write('repair1')
-    with open('repair2.txt','wt') as file: file.write('repair2')
-    
-    call('add -V repair1.txt note1')
-    call('add -H repair2.txt note2')
-    shutil.move('repair1.txt','repairME1.txt')
-    shutil.move('repair2.txt','repairME2.txt')
-    call('repair -t orphaned')
-    
-    assert os.path.exists('repairME1.txt.notes.yaml')
-    assert not os.path.exists('.repairME1.txt.notes.yaml')
-    
-    assert not os.path.exists('repairME2.txt.notes.yaml')
-    assert os.path.exists('.repairME2.txt.notes.yaml')
-    
-    
-    
-    os.chdir(TESTDIR)
-
-@pytest.mark.parametrize("hide_flag,hash_flag", [('-H', ''), ('-H', '--no-hash'), ('-V', ''), ('-V', '--no-hash')])
-def test_copy_flags(hide_flag,hash_flag):
-    os.chdir(TESTDIR)
-    dirpath = os.path.join(TESTDIR,'copy_flags')
-    cleanmkdir(dirpath)
-    os.chdir(dirpath)
-
-    with open('file1.txt','wt') as file: file.write('file1')
-    with open('file2.txt','wt') as file: file.write('file2')
-    
-    call('add file1.txt "A Note"')
-    call('tag -t mytag file1.txt')
-    
-    # Add a new non-standard field and make sure that gets copied too
-    src = notefile.Notefile('file1.txt').read()
-    src.data['arb'] = {'my':'data'}
-    src.write()
-    
-    src_data = read_note('file1.txt')
-    
-    call('copy {} {} file1.txt file2.txt'.format(hide_flag,hash_flag))
-        
-    dst_data = read_note('file2.txt')
-    for key in ['notes','tags','arb']:
-        assert src_data[key] == dst_data[key]
-    
-    dhash = dst_data.get('sha256','')
-    if hash_flag == '--no-hash':
-        assert len(dhash) != 64
-    else:
-        assert len(dhash) == 64 
-    
-    if hide_flag == '-H':
-        assert     os.path.exists('.file2.txt.notes.yaml')
-        assert not os.path.exists('file2.txt.notes.yaml')
-    else:
-        assert not os.path.exists('.file2.txt.notes.yaml')
-        assert     os.path.exists('file2.txt.notes.yaml')
-    
-    # Test that you cannot copy again
-    try:
-        print('Expect exception or exit depending on debug flag')
-        call('copy {} {} file1.txt file2.txt'.format(hide_flag,hash_flag))
-        assert False, "expected error"
-    except BaseException: # BaseException includes SystemExit
+        call("copy file1.txt file2.txt --debug")  # --debug to get the error
+        assert False
+    except ValueError:
         pass
 
-    os.chdir(TESTDIR)   
-
-@pytest.mark.parametrize("link", ['both','symlink','source'])
-def test_copy_with_links(link):
     os.chdir(TESTDIR)
-    dirpath = os.path.join(TESTDIR,'copy_link')
+
+
+def test_replace():
+    os.chdir(TESTDIR)
+    dirpath = TESTDIR / "replace"
     cleanmkdir(dirpath)
     os.chdir(dirpath)
-    
-    with open('src1.txt','wt') as file: file.write('src1')
-    with open('src2.txt','wt') as file: file.write('src2')
-    with open('dst1.txt','wt') as file: file.write('dst1')
-    with open('dst2.txt','wt') as file: file.write('dst2')
-    os.symlink('src1.txt','linksrc.txt')
-    os.symlink('dst2.txt','linkdst.txt')
-    
-    ## SRC is a link
-    # Skip for 'source' mode since it is supposed to have its own notefile
-    if link in ['both','symlink']:
-        call('add --link {} linksrc.txt "my source"'.format(link))
-        call('tag --link {} -t mytag linksrc.txt'.format(link))
-    
-        # Add a new non-standard field and make sure that gets copied too
-        src = notefile.Notefile('linksrc.txt',link=link).read()
-        src.data['arb'] = {'my':'data'}
-        src.write()
-        src_data = read_note('linksrc.txt',link=link)
 
-        # --link flag is meaningless since dst isn't a link
-        call('copy linksrc.txt dst1.txt')
-        dst_data = read_note('dst1.txt')
-        for key in ['notes','tags','arb']:
-            assert src_data[key] == dst_data[key]
-    
-    ## DST is a link
-    call('add src2.txt "my source2"')
-    call('tag -t mytag2 src2.txt')
-    
-    # Add a new non-standard field and make sure that gets copied too
-    src = notefile.Notefile('src2.txt').read()
-    src.data['arb'] = {'my':'data'}
-    src.write()
-    src_data = read_note('src2.txt',link=link)
-      
-    call('copy --link {} src2.txt linkdst.txt'.format(link))
-    dst_data = read_note('linkdst.txt',link=link)
-    for key in ['notes','tags','arb']:
-        assert src_data[key] == dst_data[key]
-    
-    if link in ['both','symlink']:
-        assert os.path.exists('linkdst.txt.notes.yaml')
-    if link in ['both','source']:
-        assert os.path.exists('src2.txt.notes.yaml')
-    
-    if link == 'source':
-        assert not os.path.exists('linkdst.txt.notes.yaml')
-    
-    
-    os.chdir(TESTDIR)   
+    ## Regular
+    writefile("file1.txt", "file1.")
+    writefile("file2.txt", "file2..")
+    writefile("file3.txt", "file3...")
+    writefile("file4.txt", "file4....")
 
-def test_symlink_result():
-    """
-    Tests the output to --symlink for find, grep, and search-tags
-    """
-    os.chdir(TESTDIR)
-    dirpath = os.path.join(TESTDIR,'symlink_res')
-    cleanmkdir(dirpath)
-    os.chdir(dirpath)
-    
-    os.makedirs('sub')
-    with open('file1.txt','wt') as f:f.write('This is file1')
-    with open('file2.txt','wt') as f:f.write('This is file2')
-    with open('sub/file1.txt','wt') as f:f.write('This is file1 SUB')
-    
-    call('tag -t tag1 file1.txt')
-    call('add file1.txt "note1"')
-    
-    call('tag -t tag1 -t tag2 file2.txt')
-    call('add file2.txt "note2" "two lines"')
-    
-    call('tag -t tag1 -t tag2 -t sub sub/file1.txt')
-    call('add sub/file1.txt "note1SUB or note 3"')
-    
-    ## Find
-    call('find --symlink links')
-    links = find_links() # set of (link,link-dest,resolved-dest,working)
-    assert links == {('links/file2.txt', '../file2.txt', 'file2.txt', True), 
-                     ('links/file1.txt', '../file1.txt', 'file1.txt', True), 
-                     ('links/file1.1.txt', '../sub/file1.txt', 'sub/file1.txt', True)} # Notice it is file1.1.txt
-    shutil.rmtree('links')
-    
-    ## grep -- all
-    call('grep --symlink links ""')
-    links = find_links() # set of (link,link-dest,resolved-dest,working)
-    assert links == {('links/file2.txt', '../file2.txt', 'file2.txt', True), 
-                     ('links/file1.txt', '../file1.txt', 'file1.txt', True), 
-                     ('links/file1.1.txt', '../sub/file1.txt', 'sub/file1.txt', True)} # Notice it is file1.1.txt
-    shutil.rmtree('links')
-    
-    ## grep -- specific 1
-    call('grep --symlink links "note1"')    
-    links = find_links() # set of (link,link-dest,resolved-dest,working)
-    assert links == {('links/file1.txt', '../file1.txt', 'file1.txt', True), 
-                     ('links/file1.1.txt', '../sub/file1.txt', 'sub/file1.txt', True)} # Notice it is file1.1.txt
-    shutil.rmtree('links')
+    call('mod -t tag1 -t tagshared -n"note file 1" file1.txt')
+    call('mod -t tag2 -t tagshared -n"note FILE 2" file2.txt')
+    call('mod -t tag3 -t tagshared -n"note FiLe 3" file3.txt')
+    call('mod -t tag4 -t tagshared -n"NOTE FiLe 4" file4.txt')
 
-    ## grep -- specific 2 -- will *not* rename the link
-    call('grep --symlink links "note 3"')    
-    links = find_links() # set of (link,link-dest,resolved-dest,working)
-    assert links == {('links/file1.txt', '../sub/file1.txt', 'sub/file1.txt', True)} # Notice it is **NOT** file1.1.txt
-    shutil.rmtree('links')
-    
-    ## tags -- all
-    call('search-tags --symlink links')
-    links = find_links() # set of (link,link-dest,resolved-dest,working)
-    assert links == {('links/sub/file1.txt', '../../sub/file1.txt', 'sub/file1.txt', True), 
-                     ('links/tag1/file1.1.txt', '../../sub/file1.txt', 'sub/file1.txt', True), 
-                     ('links/tag1/file1.txt', '../../file1.txt', 'file1.txt', True), 
-                     ('links/tag1/file2.txt', '../../file2.txt', 'file2.txt', True), 
-                     ('links/tag2/file1.txt', '../../sub/file1.txt', 'sub/file1.txt', True), 
-                     ('links/tag2/file2.txt', '../../file2.txt', 'file2.txt', True)}
-    shutil.rmtree('links')
-    
-    ## tags -- tag1 OR sub
-    call('search-tags --symlink links tag1 sub')
-    links = find_links() # set of (link,link-dest,resolved-dest,working)
-    assert links == {('links/sub/file1.txt', '../../sub/file1.txt', 'sub/file1.txt', True), 
-                     ('links/tag1/file1.1.txt', '../../sub/file1.txt', 'sub/file1.txt', True), 
-                     ('links/tag1/file1.txt', '../../file1.txt', 'file1.txt', True), 
-                     ('links/tag1/file2.txt', '../../file2.txt', 'file2.txt', True)}
-    shutil.rmtree('links')
-    
-    ## tags -- tag1 AND sub
-    call('search-tags --symlink links --all tag1 sub')
-    links = find_links() # set of (link,link-dest,resolved-dest,working)
-    assert links == {('links/sub/file1.txt', '../../sub/file1.txt', 'sub/file1.txt', True), 
-                     ('links/tag1/file1.txt', '../../sub/file1.txt', 'sub/file1.txt', True)} # no .1
-    shutil.rmtree('links')
-    
-    os.chdir(TESTDIR) 
+    call("replace file1.txt file2.txt")
+    call("replace file1.txt file3.txt --field tags")
+    call("replace file1.txt file4.txt --all-fields")
 
+    note1 = Notefile("file1.txt").read()
+    note2 = Notefile("file2.txt").read()
+    note3 = Notefile("file3.txt").read()
+    note4 = Notefile("file4.txt").read()
 
-def test_hidden_note_exclusion():
-    """
-    Tests the output to --symlink for find, grep, and search-tags
-    """
-    os.chdir(TESTDIR)
-    dirpath = os.path.join(TESTDIR,'hidden_exc')
-    cleanmkdir(dirpath)
-    os.chdir(dirpath)
-    
-    os.makedirs('.hidden')
+    assert note1.data.notes == note2.data.notes
+    assert note1.data.tags != note2.data.tags
 
-    with open('vis.txt','wt') as f:f.write('visible')
-    with open('vis_hiddennote.txt','wt') as f:f.write('visible with a hidden note')
-    with open('.hid.txt','wt') as f:f.write('hidden')
-    with open('.hidden/file1.txt','wt') as f:f.write('This is in a hidden dir')
-    
-    call('tag -t vis vis.txt')
-    call('tag -t hid -H vis_hiddennote.txt')
-    call('tag -t vis .hidden/file1.txt')
-    
-    call('find -o out')
-    with open('out') as f:
-        res = set(f.read().split())
-    assert res == {'.hidden/file1.txt', 'vis_hiddennote.txt', 'vis.txt'}
-    
-    # Now do a find but exclude .*
-    call('find --exclude ".*" -o out')
-    with open('out') as f:
-        res = set(f.read().split())
-    assert res == {'vis_hiddennote.txt', 'vis.txt'}
-    
-    os.chdir(TESTDIR) 
+    assert note1.data.notes != note3.data.notes
+    assert note1.data.tags == note3.data.tags
 
-def test_alternative_fields():
-    os.chdir(TESTDIR)
-    dirpath = os.path.join(TESTDIR,'alt_field')
-    cleanmkdir(dirpath)
-    os.chdir(dirpath)
-    
-    def _read_res(out='out'):
-        with open(out) as file:
-            return set(f.strip() for f in file.read().splitlines() if f.strip())
-    
-    with open('note.txt','wt') as f:f.write('Im a note')
-    
-    call('add note.txt "Default" ')
-    call('add --note-field alt note.txt "Alternative"')
+    assert note1.data.notes == note4.data.notes
+    assert note1.data.tags == note4.data.tags
 
-    # Grep and query with grep()    
-    call('grep -o out Default')
-    assert _read_res() == {'note.txt'}
-    call("""query -o out "g('Default')" """)
-    assert _read_res() == {'note.txt'}
-    
-    call('grep -o out --note-field alt Default')
-    assert _read_res() == set()
-    call("""query -o out --note-field alt "g('Default')" """)
-    assert _read_res() == set()
-    
-    call('grep -o out Alternative')
-    assert _read_res() == set()
-    call("""query -o out "g('Alternative')" """)
-    assert _read_res() == set()
-    
-    call('grep -o out --note-field alt Alternative')
-    assert _read_res() == {'note.txt'}
-    call("""query -o out --note-field alt "g('Alternative')" """)
-    assert _read_res() == {'note.txt'}
-    
+    ## Appends
+    writefile("file5.txt", "file5.....")
 
-    # Test with non-text stuff
-    with open('file.txt','wt') as f:f.write('I am a file')
-    
-    note = notefile.Notefile('file.txt')
-    note.read()
-    note.data['notes'] = 'default'
-    note.data['other'] = dict(a='alt')
-    note.write()
+    call("replace file1.txt file5.txt")
+    call("replace file3.txt file5.txt --append")
+    note5 = Notefile("file5.txt").read()
 
-    # This should error since you cannot add to a dictionary
+    assert note5.data.notes == "note file 1\nnote FiLe 3"  # appended notes
+
+    call("mod -t newtag file5.txt")
+    call("replace file1.txt file5.txt --field tags --append")
+    note5 = Notefile("file5.txt").read()
+    assert set(note5.data.tags) == {"newtag", "tag1", "tagshared"}  # kep newtag
+
+    ## Appends on non-text fields
+    writefile("file6.txt", "file6......")
+    writefile("file7.txt", "file7.......")
+    note6 = Notefile("file6.txt").read()
+
+    note6.data.newstring = "this is a string field"
+    note6.data.newdict = {"this is": "a dict"}
+    note6.data.newlist = ["this is", "a", "list"]
+    note6.write()
+
+    call(
+        "replace file6.txt file7.txt --all-fields --append"
+    )  # This will work since new(dict/list() doesn't yet exists_action()
+    note7 = Notefile("file7.txt").read()
+    for key in {
+        "newdict",
+        "newstring",
+        "notes",
+        "newlist",
+        "tags",
+    }:  # set(note6.data).difference(notefile.notefile.METADATA)
+        assert note6.data[key] == note7.data[key], f"failed {key}"
+
+    call("replace file6.txt file7.txt --field newstring --append")
+    note7 = Notefile("file7.txt").read()
+    assert note7.data.newstring == "this is a string field\nthis is a string field"
+
     try:
-        call('--debug add --note-field other file.txt bla')    
+        call("replace file6.txt file7.txt --field newdict --append --debug")
         assert False
     except TypeError:
+        pass
+
+    try:
+        call("replace file6.txt file7.txt --field newlist --append --debug")
+        assert False
+    except TypeError:
+        pass
+
+    # Non-existing fields
+    call(
+        "replace file1.txt file7.txt --field newlist --append"
+    )  # even though newlist is on file7, it isn't on 1 so ignore
+    call("replace file1.txt file7.txt --field allnew --append")  # Not on either. Do nothing
+
+    os.chdir(TESTDIR)
+
+
+def test_change_viz_and_format():
+    """
+    Test changing viz and also formats
+    """
+    os.chdir(TESTDIR)
+    dirpath = TESTDIR / "formats"
+    cleanmkdir(dirpath)
+    os.chdir(dirpath)
+
+    # Viz first
+    writefile("file1.txt", "file1.")
+    writefile("file2.txt", "file2..")
+    call("mod -V -t tag -n note file1.txt")
+    call("mod -H -t tag -n note file2.txt")
+
+    note1 = Notefile("file1.txt").read()
+    note2 = Notefile("file2.txt").read()
+    assert not note1.ishidden and note2.ishidden
+
+    assert os.path.exists("file1.txt.notes.yaml") and not os.path.exists(
+        ".file1.txt.notes.yaml"
+    )  # verify the built-in settings
+    assert os.path.exists(".file2.txt.notes.yaml") and not os.path.exists("file2.txt.notes.yaml")
+
+    # Make sure they do not change
+    call("vis show file1.txt")
+    call("vis hide file2.txt")
+    note1 = Notefile("file1.txt").read()
+    note2 = Notefile("file2.txt").read()
+    assert not note1.ishidden and note2.ishidden
+
+    # Change one
+    call("vis show file2.txt")
+    note1 = Notefile("file1.txt").read()
+    note2 = Notefile("file2.txt").read()
+    assert not note1.ishidden and not note2.ishidden
+
+    # Change both
+    call("vis hide")
+    note1 = Notefile("file1.txt").read()
+    note2 = Notefile("file2.txt").read()
+    assert note1.ishidden and note2.ishidden
+
+    call("vis show --dry-run")
+    note1 = Notefile("file1.txt").read()
+    note2 = Notefile("file2.txt").read()
+    assert note1.ishidden and note2.ishidden
+
+    shutil.copy(".file1.txt.notes.yaml", "file1.txt.notes.yaml")
+    _, err = call("vis --debug show file1.txt", capture=True)
+    assert err == "WARNING: Both hidden and visible notes exist for file1.txt. Not changing mode\n"
+    os.unlink("file1.txt.notes.yaml")
+
+    ## JSON vs YAML
+    # Verify the mode.
+    try:
+        with open(note1.destnote) as f:
+            json.load(f)
+        assert False
+    except json.decoder.JSONDecodeError:
+        assert True  # Not JSON
+    try:
+        with open(note2.destnote) as f:
+            json.load(f)
+        assert False
+    except json.decoder.JSONDecodeError:
+        assert True  # Not JSON
+    note1 = Notefile("file1.txt").read()
+    note2 = Notefile("file2.txt").read()
+    assert note1.format == note2.format == "yaml"
+
+    call("format json file1.txt")
+    note1 = Notefile("file1.txt").read()
+    note2 = Notefile("file2.txt").read()
+    assert note1.format == "json" and note2.format == "yaml"
+    try:
+        with open(note1.destnote) as f:
+            json.load(f)
         assert True
-        
-    call('grep -o out --note-field other alt') # Should still work
-    assert _read_res() == {'file.txt'}
-    call("""query -o out --note-field other "g('alt')" """) # Should still work
-    assert _read_res() == {'file.txt'}
+    except json.decoder.JSONDecodeError:
+        assert False  # Not JSON
 
-    # Test the copy when note was never set
-    with open('new.txt','w') as f:f.write('this is new')
-    call('add --note-field other new.txt this is in other')
-    
-    with open('newcopy.txt','w') as f:f.write('will get copy')
-    call('copy new.txt newcopy.txt')
+    call("format json")
+    note1 = Notefile("file1.txt").read()
+    note2 = Notefile("file2.txt").read()
+    assert note1.format == note2.format == "json"
 
+    call("format yaml --dry-run")
+    note1 = Notefile("file1.txt").read()
+    note2 = Notefile("file2.txt").read()
+    assert note1.format == note2.format == "json"
 
-    os.chdir(TESTDIR) 
-
-def test_empty_find():
     os.chdir(TESTDIR)
-    dirpath = os.path.join(TESTDIR,'empty')
+
+
+def test_change_tag():
+    """
+    Test changing viz and also formats
+    """
+    os.chdir(TESTDIR)
+    dirpath = TESTDIR / "change-tag"
     cleanmkdir(dirpath)
     os.chdir(dirpath)
 
-    with open('ne1.txt','wt') as f: f.write('not empty 1')
-    with open('ne2.txt','wt') as f: f.write('not empty 2')
-    with open('ee1.txt','wt') as f: f.write('YES empty 1')
-    with open('ee2.txt','wt') as f: f.write('YES empty 2')
-    
-    call('add ne1.txt "note"')
-    call('add ne2.txt --note-field other "note"')
-    
-    call('add ee1.txt "note"') # Need to write something first then remove
-    call('add ee1.txt "" -r ')
-    
-    call('add ee2.txt --note-field other "note"') # Need to write something first then remove
-    call('add ee2.txt --note-field other "" -r ')
-    
-    def _read_res(out='out'):
-        with open(out) as file:
-            return set(f.strip() for f in file.read().splitlines() if f.strip())
-    
-    # Find should do all of them 
-    call('find -o out')
-    assert _read_res() == {'ne1.txt', 'ee1.txt', 'ee2.txt', 'ne2.txt'}
+    # Viz first
+    writefile("file1.txt", "file1.")
+    writefile("file2.txt", "file2..")
+    call("mod -t tag -t tag1 file1.txt")
+    call("mod -t tag -t tag2 file2.txt")
 
-    # Make sure empty considered other fields
-    call('find --empty -o out')
-    assert _read_res() == {'ee1.txt', 'ee2.txt'}
-    
-    call('find --non-empty -o out')
-    assert _read_res() == {'ne1.txt', 'ne2.txt'}
-    
-    call('query "note.isempty()" -o out')
-    assert _read_res() == {'ee1.txt', 'ee2.txt'}
-    
-    call('query "not note.isempty()" -o out')
-    assert _read_res() == {'ne1.txt', 'ne2.txt'}
-    
+    call("change-tag tag1 tag11 --dry-run -o tmp")
+
+    assert Path("tmp").read_text() == "# DRY RUN\nfile1.txt\n"
+    note1 = Notefile("file1.txt").read()
+    note2 = Notefile("file2.txt").read()
+    assert set(note1.data.tags) == {"tag", "tag1"}
+    assert set(note2.data.tags) == {"tag", "tag2"}
+
+    call("change-tag tag1 tag11 -o tmp -p file2.txt")
+
+    note1 = Notefile("file1.txt").read()
+    note2 = Notefile("file2.txt").read()
+    assert set(note1.data.tags) == {"tag", "tag1"}
+    assert set(note2.data.tags) == {"tag", "tag2"}
+
+    call(r"change-tag tag1 tag11 tag\ 1 -o tmp")
+
+    assert Path("tmp").read_text() == "file1.txt\n"
+    note1 = Notefile("file1.txt").read()
+    note2 = Notefile("file2.txt").read()
+    assert set(note1.data.tags) == {"tag", "tag11", "tag 1"}
+    assert set(note2.data.tags) == {"tag", "tag2"}
+
     os.chdir(TESTDIR)
-    
-def test_searchtags_opts():
-    """Minor test of --count and --all-tags"""
-    def load(out='out'):
-        with open(out) as f:
-            return dict(yaml.load(f))
-    
+
+
+def test_find_exclusions():
+    """
+    Test all of the find exclusions that play into search, grep, query, and tags
+    """
     os.chdir(TESTDIR)
-    dirpath = os.path.join(TESTDIR,'tagsearch')
+    dirpath = TESTDIR / "find"
     cleanmkdir(dirpath)
     os.chdir(dirpath)
 
-    with open('A.txt','wt') as f: f.write('A')
-    with open('B.txt','wt') as f: f.write('B')
-    with open('C.txt','wt') as f: f.write('C')
-    with open('D.txt','wt') as f: f.write('D')
-    
-    for f,t in itertools.combinations_with_replacement('ABCD',2):
-        call('tag -t {t} {f}.txt'.format(t=t,f=f))
+    files = {
+        "file1.txt",
+        "sub/file2.txt",
+        "sub/file3.exc",
+        "sub/exd/file4.txt",
+        "exd/file5.txt",
+        "dup/file1.txt",
+        "endxd",
+    }
 
-    # Search with default. only key should be 'd'
-    call('search-tags -o out d')
-    assert set(load()) == {'d'}
-    
-    # Now include all tags that also have d
-    call('search-tags -o out --all-tags d')
-    assert set(load()) == set('abcd')
+    for i, file in enumerate(files):
+        file = Path(file)
+        file.parent.mkdir(exist_ok=True, parents=True)
+        file.write_text(f"{file}")
+        note = Notefile(file).read()
+        note.add_note(f"this is a note for {file}")
+        note.modify_tags(add="tag1").modify_tags((f"tag_{i}", "tag2"))
+        note.write()
 
-    # Check count mode like the above
-    call('search-tags -o out --count d')
-    assert load() == {'d': 4}
-    
-    call('search-tags -o out --all-tags --count d')
-    assert load() == {'a': 1, 'b': 2, 'c': 3, 'd': 4}
-    
+    assert {n.filename for n in notefile.find()} == files
+
+    call("find -o tmp")
+    assert readout("tmp") == files
+
+    # Single exclusion
+    f = {
+        "dup/file1.txt",
+        "endxd",
+        "exd/file5.txt",
+        "file1.txt",
+        "sub/exd/file4.txt",
+        "sub/file2.txt",
+    }
+    assert {n.filename for n in notefile.find(excludes="*.exc")} == f
+
+    call('find --exclude "*.exc" -o tmp')
+    assert readout("tmp") == f
+
+    # Single exclusion with dir
+    call('find --exclude "*xd" -o tmp')
+    assert readout("tmp") == {
+        "sub/file3.exc",
+        "file1.txt",
+        "sub/file2.txt",
+        "dup/file1.txt",
+    }
+
+    call('find --exclude "*xd/" -o tmp')
+    assert readout("tmp") == {
+        "endxd",
+        "sub/file3.exc",
+        "file1.txt",
+        "sub/file2.txt",
+        "dup/file1.txt",
+    }
+
+    # Match case
+    call('find --exclude "*.TXT" -o tmp')
+    assert readout("tmp") == {"sub/file3.exc", "endxd"}
+
+    call('find --exclude "*.TXT" -o tmp --match-exclude-case ')
+    assert readout("tmp") == files
+
+    # Test path
+    call("find -p sub -o tmp")
+    assert readout("tmp") == {"sub/file3.exc", "sub/file2.txt", "sub/exd/file4.txt"}
+
+    # max-depth
+    call("find --max-depth 0 -o tmp")
+    assert readout("tmp") == {"endxd", "file1.txt"}
+
+    # test links. Add one now
+    os.symlink("dup/file1.txt", "link1.lnk")
+    Notefile("link1.lnk").read().write()  # Make the links
+
+    call('find --exclude "*.txt" -o tmp')
+    assert readout("tmp") == {"link1.lnk", "endxd", "sub/file3.exc"}
+
+    call('find --exclude "*.txt" -o tmp')
+    assert readout("tmp") == {"link1.lnk", "endxd", "sub/file3.exc"}
+
+    call('find --exclude "*.txt" --exclude-links -o tmp')
+    assert readout("tmp") == {"endxd", "sub/file3.exc"}
+
     os.chdir(TESTDIR)
 
 
-if __name__ == '__main__': 
-    test_main_note()
-    test_odd_filenames()
-    test_repairs('both')
-    test_repairs('orphaned')
-    test_repairs('metadata')
-    test_repairs_searchpath()
-    test_repair_dryrun()
-    test_links('both')
-    test_links('symlink')
-    test_links('source')
-    test_link_overwrite('both')
-    test_link_overwrite('symlink')
-    test_link_overwrite('source')
-    test_excludes_repair()
-    test_grep_and_listtags_and_export_and_find_and_change()
-    test_grep_w_multiple_expr()
-    test_queries()
-    test_nohash()
-    test_maxdepth()
-    test_hidden('both')
-    test_hidden('symlink')
-    test_hidden('source')
-    for hide_flag,hash_flag in [('-H', ''), ('-H', '--no-hash'), ('-V', ''), ('-V', '--no-hash')]:
-        test_copy_flags(hide_flag,hash_flag)
-    test_copy_with_links('both')
-    test_copy_with_links('symlink')
-    test_copy_with_links('source')
-    test_symlink_result()
-    test_hidden_note_exclusion()
-    test_alternative_fields()
-    test_empty_find()
-    test_searchtags_opts()
-    print('-'*80)
-    print('ALL TESTS PASS') # In case we do not get to this from a sys.exit()
+def test_outputs_export():
+    os.chdir(TESTDIR)
+    dirpath = TESTDIR / "outputs"
+    cleanmkdir(dirpath)
+    os.chdir(dirpath)
+
+    files = {"file1.txt", "sub/file1.txt", "sub2/file3.exc"}
+
+    for i, file in enumerate(sorted(files)):
+        file = Path(file)
+        file.parent.mkdir(exist_ok=True, parents=True)
+        file.write_text(f"{file}")
+        note = Notefile(file).read()
+        note.add_note(f"this is a note for {file}")
+        note.modify_tags(add=("tag1", f"tag_{i}"))
+        note.write()
+
+    ## Test outputs
+    call("find -0 -o tmp")
+    with open("tmp", "rb") as f:
+        dat = f.read()
+        assert b"\n" not in dat
+        assert b"\x00" in dat
+
+    call("find --tag-mode -o tmp")
+    assert set(readtags("tmp")) == {"tag_1", "tag1", "tag_0", "tag_2"}
+    # Other tag modes like --tag-counts and --tag-count-order are in test_search()
+
+    ## export
+    call("export -o tmp")
+    with open("tmp") as f:
+        export = notefile.nfyaml.load_yaml(f.read())
+    assert set(export.keys()) == {"notefile version", "notes", "description", "time"}
+    assert set(export["notes"]) == {"sub/file1.txt", "sub2/file3.exc", "file1.txt"}
+    tags = set()
+    for data in export["notes"].values():
+        tags.update(data["tags"])
+    assert tags == {"tag1", "tag_0", "tag_2", "tag_1"}
+
+    ## symlinks
+    call("find --symlink links")
+    links = {}
+    for link in os.listdir("links"):
+        links[link] = os.readlink(f"links/{link}")
+    assert links == {
+        "file1.txt": "../file1.txt",
+        "file1.1.txt": "../sub/file1.txt",
+        "file3.exc": "../sub2/file3.exc",
+    }
+
+    # Symlinks with tags
+    shutil.rmtree("links")
+    o, e = call("find --tag-mode --symlink links --debug", capture=True)
+    # There is a duplicate. Check it works right
+    assert e == "WARNING: links/tag1/file1.txt exists. Changing to links/tag1/file1.1.txt\n"
+
+    # Check them. Note that the ordering may not be deterministic of the repeat so handle
+    # that properly
+    links = {str(p): os.readlink(p) for p in Path("links").rglob("*") if p.is_file()}
+    file1 = links.pop("links/tag1/file1.txt")  # Will error if not in there
+    file1p1 = links.pop("links/tag1/file1.1.txt")
+    assert {file1, file1p1} == {
+        "../../sub/file1.txt",
+        "../../file1.txt",
+    }  # use set to ignore order
+
+    assert links == {
+        "links/tag1/file3.exc": "../../sub2/file3.exc",
+        "links/tag_0/file1.txt": "../../file1.txt",
+        "links/tag_1/file1.txt": "../../sub/file1.txt",
+        "links/tag_2/file3.exc": "../../sub2/file3.exc",
+    }
+
+    os.chdir(dirpath)
+
+
+def test_search():
+    """
+    Test the different queries and searches. No need to test exclusions, etc
+    as they are tested as part of find
+    """
+    os.chdir(TESTDIR)
+    dirpath = TESTDIR / "search"
+    cleanmkdir(dirpath)
+    os.chdir(dirpath)
+
+    writefile("file1.txt", "file1")
+    call('mod file1.txt -t xcommon -t file1 -n"match me or you"')
+
+    writefile("file2.txt", "file2")
+    call('mod file2.txt -t xcommon -t other -n"match you"')
+
+    writefile("file3.txt", "file2")
+    call('mod file3.txt -t xcommon -t third -t other -n"what about me"')
+
+    # Test a few greps and also query and search
+    call("grep match -o tmp")
+    assert readout("tmp") == {"file1.txt", "file2.txt"}
+    call("search --grep match -o tmp")
+    assert readout("tmp") == {"file1.txt", "file2.txt"}
+    call("query 'g(\"match\")' -o tmp")
+    assert readout("tmp") == {"file1.txt", "file2.txt"}
+    call("search --query 'g(\"match\")' -o tmp")
+    assert readout("tmp") == {"file1.txt", "file2.txt"}
+
+    # Regex
+    call('grep "wh.*t" -o tmp')
+    assert readout("tmp") == {"file3.txt"}
+
+    # Multiple
+    call("grep me you -o tmp")
+    assert readout("tmp") == {"file1.txt", "file2.txt", "file3.txt"}
+
+    call("grep me you --all -o tmp")
+    assert readout("tmp") == {"file1.txt"}
+
+    ## --full-note tests. Look for 'xcommon' since it'll just be in the tags
+    call("grep xcommon -o tmpnew")
+    assert not os.path.exists("tmpnew")  # Make sure it's not there
+    call("grep --full-note xcommon -o tmp")
+    assert readout("tmp") == {"file1.txt", "file2.txt", "file3.txt"}
+    call("""query --full-note "g('xcommon')" -o tmp""")
+    assert readout("tmp") == {"file1.txt", "file2.txt", "file3.txt"}
+    call("""query "'xcommon' in text" -o tmp""")
+    assert readout("tmp") == {"file1.txt", "file2.txt", "file3.txt"}
+
+    ## Test grep with regex
+    writefile("file4.txt", "wt", "FILE 4")
+    writefile("file5.txt", "wt", "FILE 5")
+    writefile("file6.txt", "wt", "FILE 6")
+    writefile("file7.txt", "wt", "FILE 7")
+
+    call('mod file4.txt -n "this is a te.*st"')
+    call('mod file5.txt -n "This is a teblablabast"')
+    call('mod file6.txt -n "These are their words"')
+    call('mod file7.txt -n "these are the words"')
+
+    call('grep -o tmp "te.*st"')
+    assert readout("tmp") == {"file4.txt", "file5.txt"}
+
+    call("""search -o tmp --query 'g("te.*st")'""")
+    assert readout("tmp") == {"file4.txt", "file5.txt"}
+
+    call('grep -o tmp --fixed-strings "te.*st"')
+    assert readout("tmp") == {"file4.txt"}
+
+    call("""query -o tmp --fixed-strings 'g("te.*st")' """)  # Make sure the flags work in query
+    assert readout("tmp") == {"file4.txt"}
+
+    # Or passing kwargs including override
+    call("""query -o tmp 'g("te.*st",fixed_strings=True)'""")
+    assert readout("tmp") == {"file4.txt"}
+
+    call("""query -o tmp --fixed-strings 'g("te.*st",fixed_strings=False)' """)
+    assert readout("tmp") == {"file4.txt", "file5.txt"}
+
+    call("grep -o tmp the")
+    assert readout("tmp") == {"file6.txt", "file7.txt"}
+
+    call("grep -o tmp --full-word the")
+    assert readout("tmp") == {"file7.txt"}
+
+    call("query -o tmp --full-word 'g(\"the\")' ")
+    assert readout("tmp") == {"file7.txt"}
+
+    ## Tags
+    call("tags -o tmp")
+    assert readtags("tmp") == {
+        "xcommon": {"file2.txt", "file1.txt", "file3.txt"},
+        "file1": {"file1.txt"},
+        "other": {"file2.txt", "file3.txt"},
+        "third": {"file3.txt"},
+    }
+
+    call("search --tag-mode -o tmp1")  # search tag mode calls
+    call("find --tag-mode -o tmp2")
+    assert readtags("tmp") == readtags("tmp1") == readtags("tmp2")
+
+    call("tags third other -o tmp")
+    call("""query "t('third') or t('other')" --tag-mode -o tmp2""")
+    call("""search --query "t('third')" --query "t('other')" --tag-mode -o tmp3""")
+    assert (
+        readtags("tmp")
+        == readtags("tmp2")
+        == readtags("tmp3")
+        == {
+            "xcommon": {"file2.txt", "file3.txt"},
+            "other": {"file2.txt", "file3.txt"},
+            "third": {"file3.txt"},
+        }
+    )
+
+    call("""query "t('third') or t('other')" -o tmp""")
+    assert readout("tmp") == {"file2.txt", "file3.txt"}
+
+    call("tags --tag-counts -o tmp")
+    readtags("tmp") == {"xcommon": 3, "file1": 1, "other": 2, "third": 1}
+
+    # Multiple (all) with some mix and match
+    call("tags --tag-all third other -o tmp")
+    call("""query "t('third') and t('other')" --tag-mode -o tmp2""")
+    call("""search --query "t('third')" --query "t('other')" --all --tag-mode -o tmp3""")
+    call("""search --tag other --query 't("third")' --all --tag-mode -o tmp4""")
+    assert (
+        readtags("tmp")
+        == readtags("tmp2")
+        == readtags("tmp3")
+        == {"xcommon": {"file3.txt"}, "other": {"file3.txt"}, "third": {"file3.txt"}}
+    )
+
+    # Ordering
+    call("tags -o tmp")
+    assert list(readtags("tmp")) == ["file1", "other", "third", "xcommon"]
+
+    call("tags --tag-count-order -o tmp")
+    call("tags --tag-count-order --tag-counts -o tmp2")
+    call("""search --query "t('third')" --query "t('other')" --all --tag-mode -o tmp3""")
+    assert set(readtags("tmp")) == set(readtags("tmp2")) == {"xcommon", "other", "file1", "third"}
+
+    ## Errors
+    try:
+        call('''query "asdf"''')
+        assert False
+    except SysExitError:
+        assert True
+
+    o, e = call('''query -e "asdf"''', capture=True)
+    assert "WARNING: Query Error" in e
+    assert not o
+
+    os.chdir(TESTDIR)
+
+
+def test_links():
+    """
+    Test the link modes, absolute and relative, and to different depth
+    """
+    os.chdir(TESTDIR)
+    dirpath = TESTDIR / "links"
+    cleanmkdir(dirpath)
+    os.chdir(dirpath)
+
+    ## Link to deeper with both mode
+    writefile("sub/dir/file1", "file 1")
+    os.symlink("sub/dir/file1", "link1r")
+
+    writefile("sub/dir/file2", "file 2")
+    os.symlink(dirpath / "sub/dir/file2", "link2a")
+    assert os.path.exists("link1r") and os.path.exists("link2a")
+
+    call("mod -t link1 -n file1 link1r --link both")
+    call("mod -t link2 -n file2 link2a --link both")
+
+    assert os.readlink("link1r.notes.yaml") == "sub/dir/file1.notes.yaml"
+    assert os.readlink("link2a.notes.yaml") == str(dirpath / "sub/dir/file2.notes.yaml")
+
+    note1f = Notefile("sub/dir/file1").read()
+    note1l = Notefile("link1r").read()
+    assert note1l.data == note1f.data
+
+    ## Link backwards relative only. both mode
+    writefile("file3", "file 3")
+    os.symlink("../../file3", "sub/dir/link3")
+    assert os.path.exists("sub/dir/link3")
+
+    call("mod -t link --link both sub/dir/link3")
+    assert os.path.exists("sub/dir/link3.notes.yaml")
+    assert os.readlink("sub/dir/link3.notes.yaml") == "../../file3.notes.yaml"
+
+    ## Different modes on new
+    writefile("file4", "file 4")
+    os.symlink("file4", "link4")
+    writefile("file5", "file 5")
+    os.symlink("file5", "link5")
+    writefile("file6", "file 6")
+    os.symlink("file6", "link6")
+
+    call("mod -t link link4 --link both")
+    call("mod -t link link5 --link source")
+    call("mod -t link link6 --link symlink")
+
+    assert os.path.exists("file4.notes.yaml") and os.path.exists("link4.notes.yaml")
+    assert os.path.exists("file5.notes.yaml") and not os.path.exists("link5.notes.yaml")
+    assert not os.path.exists("file6.notes.yaml") and os.path.exists("link6.notes.yaml")
+
+    ## Linking existing notes
+    writefile("file7", "file 7")
+    os.symlink("file7", "link7")
+    call("mod -t link file7")  # on file
+    assert os.path.exists("file7.notes.yaml") and not os.path.exists("link7.notes.yaml")
+    call("mod -t other link7")  # on link
+    assert os.path.exists("file7.notes.yaml") and os.path.exists("link7.notes.yaml")
+    assert set(Notefile("file7").read().data.tags) == {"link", "other"}
+
+    writefile("file8", "file 8")
+    os.symlink("file8", "link8")
+    call("mod -t link file8")  # on file
+    assert os.path.exists("file8.notes.yaml") and not os.path.exists("link8.notes.yaml")
+    call("mod -t other link8 --link source")  # on link
+    assert os.path.exists("file8.notes.yaml") and not os.path.exists("link8.notes.yaml")
+    assert set(Notefile("file8").read().data.tags) == {"link", "other"}
+
+    # Read it without 'source' mode
+    link8 = Notefile("link8").read()
+    assert not os.path.exists("link8.notes.yaml")  # Doesn't yet exit
+    link8.write()
+    assert os.path.exists("link8.notes.yaml")  # Now it does
+
+    writefile("file9", "file 9")
+    os.symlink("file9", "link9")
+    call("mod -t link file9")  # on file
+    assert os.path.exists("file9.notes.yaml") and not os.path.exists("link9.notes.yaml")
+    call("mod -t other link9 --link symlink")  # on link
+    assert os.path.exists("file9.notes.yaml") and os.path.exists("link9.notes.yaml")
+    assert set(Notefile("file9").read().data.tags) == {"link"}
+    assert set(Notefile("link9", link="symlink").read().data.tags) == {"other"}
+
+    # create a new note without setting the mode
+    _, e = call("mod -t new link9", capture=True)
+    assert e.startswith("WARNING: Linked file")
+
+    ## Create with a different mode from existing
+    writefile("file10", "file 10")
+    os.symlink("file10", "link10")
+    call("mod -t tag file10")
+    call("mod -t other link10 -H")
+    assert os.path.exists("file10.notes.yaml") and not os.path.exists(".file10.notes.yaml")
+    assert os.path.exists(".link10.notes.yaml") and not os.path.exists("link10.notes.yaml")
+
+    file10 = Notefile("file10").read()
+    link10 = Notefile("link10").read()
+    assert link10.ishidden and not file10.ishidden
+
+    ## Break by vis
+    call("vis hide file10")
+    assert os.path.exists(".file10.notes.yaml") and not os.path.exists("file10.notes.yaml")
+    assert not os.path.exists(".link10.notes.yaml") and not os.path.exists(
+        "link10.notes.yaml"
+    )  # exists fails for broken
+    Notefile("link10").read().write()  # reapir by writing
+    assert os.path.exists(".link10.notes.yaml") and not os.path.exists("link10.notes.yaml")  # Fixed
+
+    call("vis show file10")
+    assert os.path.exists("file10.notes.yaml") and not os.path.exists(".file10.notes.yaml")
+    assert not os.path.exists(".link10.notes.yaml") and not os.path.exists(
+        "link10.notes.yaml"
+    )  # exists fails for broken
+    call("repair link10")  # repair function
+    assert os.path.exists(".link10.notes.yaml") and not os.path.exists("link10.notes.yaml")  # Fixed
+
+    ## Broken Links
+    writefile("file11", "file 11")
+    os.symlink("broke11", "link11")
+    _, e = call("mod -t d link11", capture=True)
+    assert (
+        "WARNING: link11 is a broken link" in e
+        and "WARNING: File broke11 is orphaned or link is broken" in e
+    )
+    assert os.readlink("link11.notes.yaml") == "broke11.notes.yaml"  # stil link to it
+
+    os.chdir(TESTDIR)
+
+
+def test_unicode_spaces():
+    """
+    Test unicode, etc
+    """
+    os.chdir(TESTDIR)
+    dirpath = TESTDIR / "unicode"
+    cleanmkdir(dirpath)
+    os.chdir(dirpath)
+
+    writefile("file 1", "file 11")
+    call(r'mod -t "t°gs" file\ 1')
+
+    writefile("s°b dir/spüd.txt", "file2")
+    call("mod -n hi 's°b dir/spüd.txt' ")
+
+    os.symlink("s°b dir/spüd.txt", " leading.txt")
+    call('mod -t tttt " leading.txt"')
+
+    call('find -o "tmp"')
+    call("find -0o tmp0")
+    assert readout("tmp") == readout("tmp0") == {"s°b dir/spüd.txt", "file 1", " leading.txt"}
+
+    call("find --tag-mode -o tmp")
+    assert readtags("tmp") == {
+        "tttt": {" leading.txt", "s°b dir/spüd.txt"},
+        "t°gs": {"file 1"},
+    }
+
+    os.chdir(TESTDIR)
+
+
+def test_notepath():
+    """
+    Test unicode, etc
+    """
+    os.chdir(TESTDIR)
+    dirpath = TESTDIR / "notepath"
+    cleanmkdir(dirpath)
+    os.chdir(dirpath)
+
+    writefile("file1.txt")
+    writefile("sub/file2.txt")
+    writefile("file3.txt")
+
+    call("mod -t note file1.txt")
+    call("mod -t tag sub/file2.txt --hidden")
+
+    # These shouldn't be affected by vis or hide
+    o0, _ = call("note-path file1.txt sub/file2.txt", capture=True)
+    oH, _ = call("note-path file1.txt sub/file2.txt -H", capture=True)
+    oV, _ = call("note-path file1.txt sub/file2.txt -V", capture=True)
+    assert o0 == oH == oV == "file1.txt.notes.yaml\nsub/.file2.txt.notes.yaml\n"
+
+    # These *do* care. file3.txt exisst but no note.
+    oV, _ = call("note-path file3.txt ss/nofile.no -V", capture=True)
+    oH, _ = call("note-path file3.txt ss/nofile.no -H", capture=True)
+    assert oV == "file3.txt.notes.yaml\nss/nofile.no.notes.yaml\n"
+    assert oH == ".file3.txt.notes.yaml\nss/.nofile.no.notes.yaml\n"
+
+    os.chdir(TESTDIR)
+
+
+def test_metadata_repair():
+    """
+    Test unicode, etc
+    """
+    os.chdir(TESTDIR)
+    dirpath = TESTDIR / "metadata-repair"
+    cleanmkdir(dirpath)
+    os.chdir(dirpath)
+
+    meta = "mtime", "sha256", "filesize"
+
+    writefile("file1.txt", "a")
+    call("mod -t tag file1.txt")
+    note = Notefile("file1.txt").read()
+    data0 = note.data.copy()
+
+    # Add to it
+    writefile("file1.txt", "a", append=True)
+    assert data0 == Notefile("file1.txt").read().data
+    assert note.repair_metadata()
+    note.write()
+    assert data0 != note.read().data
+
+    data0 = Notefile("file1.txt").read().data
+    writefile("file1.txt", "a", append=True)
+    assert data0 == Notefile("file1.txt").read().data
+    call("repair-metadata file1.txt")
+    assert data0 != Notefile("file1.txt").read().data
+
+    data0 = Notefile("file1.txt").read().data
+    writefile("file1.txt", "a", append=True)
+    assert data0 == Notefile("file1.txt").read().data
+    o, _ = call("repair-metadata", capture=True)  # do not specify
+    assert data0 != Notefile("file1.txt").read().data
+    assert o == "repaired: file1.txt\n"
+
+    data0 = Notefile("file1.txt").read().data
+    writefile("file1.txt", "a", append=True)
+    assert data0 == Notefile("file1.txt").read().data
+    o, _ = call("repair-metadata --dry-run", capture=True)
+    assert data0 == Notefile("file1.txt").read().data
+    assert o == "repaired (DRY-RUN): file1.txt\n"
+
+    call("repair-metadata")  # to reset from above
+
+    ## No hash
+    writefile("file2.txt", "a")
+    call("mod -t tag file2.txt --no-hash")
+    note = Notefile("file2.txt").read()
+    data0 = note.data.copy()
+    assert not data0.get("sha256", None)
+
+    data0 = note.data.copy()
+    writefile("file2.txt", "a", append=True)
+    assert data0 == Notefile("file2.txt").read().data
+    o, _ = call("repair-metadata  --no-hash", capture=True)  # do not specify
+    data = Notefile("file2.txt").read().data
+    assert data0 != data
+    assert o == "repaired: file2.txt\n"
+    assert not data.get("sha256", None)
+
+    data0 = Notefile("file2.txt").read().data
+    writefile("file2.txt", "a", append=True)
+    assert data0 == Notefile("file2.txt").read().data
+    o, _ = call("repair-metadata", capture=True)  # do not specify
+    data = Notefile("file2.txt").read().data
+    assert data0 != data
+    assert o == "repaired: file2.txt\n"
+    assert data.get("sha256", None)
+
+    ## Force
+    writefile("file3.txt", "a")
+    call("mod -t tag file3.txt --no-hash")
+    assert not Notefile("file3.txt").read().data.get("sha256", None)
+
+    o, _ = call("repair-metadata --dry-run --force-refresh", capture=True)
+    assert o == (
+        "repaired (DRY-RUN): file1.txt\n"
+        "repaired (DRY-RUN): file2.txt\n"
+        "repaired (DRY-RUN): file3.txt\n"
+    )
+
+    o, _ = call("repair-metadata --no-hash --force-refresh", capture=True)
+    assert o == ("repaired: file1.txt\n" "repaired: file2.txt\n" "repaired: file3.txt\n")
+    assert not Notefile("file3.txt").read().data.get("sha256", None)
+
+    o, _ = call("repair-metadata --force-refresh", capture=True)
+    assert o == ("repaired: file1.txt\n" "repaired: file2.txt\n" "repaired: file3.txt\n")
+    assert Notefile("file3.txt").read().data.get("sha256", None)
+
+    os.chdir(TESTDIR)
+
+
+def test_orphan_repair():
+    """
+    Test unicode, etc
+    """
+    os.chdir(TESTDIR)
+    dirpath = TESTDIR / "orphan-repair"
+    cleanmkdir(dirpath)
+    os.chdir(dirpath)
+
+    # Repair with -V or -H unmatched?
+
+    writefile("file1.txt", "this is the first file")
+    call("mod -t tag file1.txt -H")
+
+    Path("sub").mkdir(parents=True, exist_ok=True)
+
+    # Make all kinds of copies....
+    shutil.copy2("file1.txt", "file ONE.txt")
+    shutil.copy2("file1.txt", "filewon.txt")
+    shutil.copy2("file1.txt", "sub/file1.txt")  # Same leaf name
+    writefile("filenot1.txt", "this is tHe first file")  # same mtime, size, wrong hash
+    writefile("filenot1again.txt", "this is tHe first file.")  # Same mtime and nothing else
+
+    stat = os.stat("file1.txt")
+    os.utime("filenot1.txt", (stat.st_atime, stat.st_mtime))
+    os.utime("filenot1again.txt", (stat.st_atime, stat.st_mtime))
+
+    os.unlink("file1.txt")
+
+    def warning_parse(txt):
+        lines = txt.split("\n")[1:]
+        lines = (line.strip() for line in lines)
+        lines = (line for line in lines if line)
+        lines = (line[2:] if line.startswith("./") else line for line in lines)
+        return set(lines)
+
+    # Default. too many
+    _, e = call("repair", capture=True)
+    assert warning_parse(e) == {"sub/file1.txt", "filewon.txt", "file ONE.txt"}
+
+    # Max depth\
+    _, e = call("repair --search-max-depth 0", capture=True)
+    assert warning_parse(e) == {"filewon.txt", "file ONE.txt"}
+
+    # Excludes
+    _, e = call("repair --search-exclude '*one*'", capture=True)
+    assert warning_parse(e) == {"filewon.txt", "sub/file1.txt"}
+
+    _, e = call(
+        "repair --search-exclude '*one*' --search-match-exclude-case --debug", capture=True,
+    )
+    assert warning_parse(e) == {"sub/file1.txt", "file ONE.txt", "filewon.txt"}
+
+    # Search path (this is just one so dry-run it
+    assert (
+        call("repair --dry-run --search-path sub", capture=True)[0]
+        == "(DRY RUN) .file1.txt.notes.yaml --> sub/.file1.txt.notes.yaml\n"
+    )
+
+    writefile("otherfile.txt", "another test")
+    call("mod -t test --no-hash otherfile.txt")
+    shutil.move("otherfile.txt", "other file.txt")
+    o, e = call("repair-orphaned otherfile.txt.notes.yaml", capture=True)
+    assert e == "WARNING: Cannot repair otherfile.txt based on hash since it's missing\n"
+
+    os.chdir(TESTDIR)
+
+
+def test_cat():
+    """
+    cat
+    """
+    os.chdir(TESTDIR)
+    dirpath = TESTDIR / "cat"
+    cleanmkdir(dirpath)
+    os.chdir(dirpath)
+
+    writefile("file1.txt", "file1")
+    call('mod file1.txt -t tag -n "note"')
+
+    o, _ = call("cat file1.txt", capture=True)
+    assert o == "note\n"
+
+    o, _ = call("cat file1.txt -f", capture=True)
+    data = notefile.nfyaml.load_yaml(o)
+    assert data["notes"] == "note"
+    assert data["tags"] == ["tag"]
+
+    os.chdir(TESTDIR)
+
+
+def test_notefield():
+    os.chdir(TESTDIR)
+    dirpath = TESTDIR / "notefield"
+    cleanmkdir(dirpath)
+    os.chdir(dirpath)
+
+    writefile("file1.txt", "file1")
+
+    call('mod file1.txt -t tag -n "this note" --note-field new')
+    note = Notefile("file1.txt").read()
+    assert note.data.new == "this note"
+    assert note.data.notes == ""
+
+    note = Notefile("file1.txt", note_field="new").read()
+    assert note.data.new == "this note"
+    assert "notes" not in note.data
+
+    Path("tmp").unlink(missing_ok=True)
+
+    call("grep this -o tmp")
+    assert not Path("tmp").exists()
+
+    call("grep this -o tmp --note-field new")  # same code as other searches
+    assert readout("tmp") == {"file1.txt"}
+
+    os.chdir(TESTDIR)
+
+
+def test_nonstr():
+    os.chdir(TESTDIR)
+    dirpath = TESTDIR / "nonstr"
+    cleanmkdir(dirpath)
+    os.chdir(dirpath)
+
+    writefile("file1.txt", "file1")
+    note = Notefile("file1.txt").read()
+    note.data.notes = {"this": ["is", "a"], "dict": {"note": None}}
+    note.write()
+
+    # Searching should be done via a text representation
+    call("grep agasdgasgd -o tmp")
+    assert not Path("tmp").exists()
+
+    call("grep dict -o tmp ")
+    assert readout("tmp") == {"file1.txt"}
+
+    try:
+        call("mod -n 'new data' file1.txt --debug")
+        assert False
+    except TypeError:
+        pass
+    call("mod -n 'new data' file1.txt -R")  # Should work to replace!
+
+    # note test_replace() already covers replace with non-text fields
+
+    os.chdir(TESTDIR)
+
+
+if __name__ == "__main__":
     pass
-    
-os.chdir(TESTDIR)
+    test_mod()
+    test_create_opts()
+    test_copy()
+    test_replace()
+    test_change_viz_and_format()
+    test_change_tag()
+    test_find_exclusions()
+    test_outputs_export()
+    test_search()
+    test_links()
+    test_unicode_spaces()
+    test_notepath()
+    test_metadata_repair()
+    test_orphan_repair()
+    test_cat()
+    test_notefield()
+    test_nonstr()
 
-"""
-# Manual Testing
-
-Not everything gets tested automatically but it should be easy enough to test
-manually. The following is a list of key items to test manually
-
-* Adding Notes via stdin: 
-    * `-r`
-    * Default
-Editing notes
-    * regular & --full
-    * Tags in edited notes
-    * link modes (this is a different pathway than `add` but the link-logic
-      goes through the same codes
-    * --no-hash does not set a hash!
-
-Export of stdin notes with and without -0
-In this, we exclude some from the stdin list so we can see it
-
-   $ cd testdirs/grep/
-   $ ../../notefile.py find --exclude "file*.txt" | ../../notefile.py export -
-   $ ../../notefile.py find --exclude "file*.txt" -0 | ../../notefile.py export -0 -
-
-and make sure it is just "file4.exc" and "link.txt"
-"""
-
-
-
-
-
-
-
-
-
+    print("-=" * 50)
+    print("SUCCESS")
