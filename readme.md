@@ -39,7 +39,9 @@ The extension will **always** be `.yaml` as YAML is a superset of JSON and any Y
 
 Install right from github:
 
-    $ python -m pip install git+https://github.com/Jwink3101/notefile.git
+    $ python -m pip install --no-use-pep517 git+https://github.com/Jwink3101/notefile.git
+
+This will throw a lot of warnings but they will be fixed when I get a chance!
 
 ### Requirements
 
