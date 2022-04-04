@@ -1,12 +1,12 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
-import os,sys
+import os, sys
 import subprocess
 
 os.chdir(os.path.dirname(__file__))
 
-commands =""" 
+commands = """ 
     edit            
     mod             
     copy            
@@ -26,27 +26,28 @@ commands ="""
     tags            
     note-path"""
 
-commands = [l.strip() for l in commands.split('\n') if l.strip()]
-commands.insert(0,None)
+commands = [l.strip() for l in commands.split("\n") if l.strip()]
+commands.insert(0, None)
 
-helpmd = ['# CLI Help']
+helpmd = ["# CLI Help"]
 
 for command in commands:
     name = command if command else "No Command"
-    helpmd.append(f'# {name}')
-    
-    cmd = [sys.executable,'notefile.py']
+    helpmd.append(f"# {name}")
+
+    cmd = [sys.executable, "notefile.py"]
     if command:
         cmd.append(command)
-    cmd.append('--help')
-    
-    help = subprocess.check_output(cmd).decode().replace('usage: notefile.py','usage: notefile')
-    
-    helpmd.append(f"""
+    cmd.append("--help")
+
+    help = subprocess.check_output(cmd).decode().replace("usage: notefile.py", "usage: notefile")
+
+    helpmd.append(
+        f"""
 ```text
 {help}
-```""")
+```"""
+    )
 
-with open('CLI_help.md','wt') as f:
-    f.write('\n\n'.join(helpmd))
-    
+with open("CLI_help.md", "wt") as f:
+    f.write("\n\n".join(helpmd))

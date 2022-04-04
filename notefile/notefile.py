@@ -5,7 +5,6 @@ from . import find
 
 from pathlib import Path
 import shlex
-from shlex import quote as shq
 import sys, os, io
 import json
 import copy
@@ -114,7 +113,7 @@ class Notefile:
         self.filename, self.vis_note, self.hid_note = get_filenames(filename)
 
         if os.path.basename(self.filename).startswith("."):
-            warn(f"hidden files may not always work: {shq(self.filename)}")
+            warn(f"hidden files may not always work: {repr(self.filename)}")
 
         # Store the original paths. Will be reset later if link
         self.destnote0, _ = hidden_chooser(self.vis_note, self.hid_note, hidden,)
@@ -135,7 +134,7 @@ class Notefile:
             # as such. Change to that
             if os.path.isfile(self.destnote0) and not os.path.islink(self.destnote0):
                 warn(
-                    f"Linked file ({shq(self.filename0)}) has conflicting notes. Changing to 'symlink' mode"
+                    f"Linked file ({repr(self.filename0)}) has conflicting notes. Changing to 'symlink' mode"
                 )
                 self.islink = False
                 self.link == "symlink"
@@ -144,7 +143,7 @@ class Notefile:
                 dest = os.path.join(os.path.dirname(self.filename), self.dest0,)
                 (self.filename, self.vis_note, self.hid_note,) = get_filenames(dest)
 
-                debug(f"Linked Note: {shq(self.filename)} --> {shq(self.dest0)}")
+                debug(f"Linked Note: {repr(self.filename)} --> {repr(self.dest0)}")
 
         # Get the actual notefile path (destnote) regardless of hidden settings
         # And whether it exists
@@ -189,7 +188,7 @@ class Notefile:
                 self.txt = self.writes()
             except Exception as E:
                 if os.path.islink(self.filename0):
-                    warn(f"{shq(self.filename0)} is a broken link to {shq(self.filename)}.")
+                    warn(f"{repr(self.filename0)} is a broken link to {repr(self.filename)}.")
                     self.data["filesize"] = -1
                     self.data["mtime"] = -1
                 else:
@@ -463,7 +462,7 @@ class Notefile:
             with open(tmpfile, "wt",) as file:
                 file.write(str(_TESTEDIT))
         elif manual:
-            input(f"Edit and save: {shq(tmpfile)}\nPress any key to continue ")
+            input(f"Edit and save: {repr(tmpfile)}\nPress any key to continue ")
         else:
             subprocess.check_call(shlex.split(editor) + [tmpfile])
 
@@ -559,7 +558,9 @@ class Notefile:
 
         # This will raise a warning no matter the current state by design
         if os.path.exists(vis_note) and os.path.exists(hid_note):
-            warn(f"Both hidden and visible notes exist for {shq(self.filename)}. Not changing mode")
+            warn(
+                f"Both hidden and visible notes exist for {repr(self.filename)}. Not changing mode"
+            )
             return False
 
         if mode == "hide":
@@ -640,7 +641,7 @@ class Notefile:
             raise ValueError("Cannot repair empty data. Use read() or set data attribute")
         # This is designed to be called before reading, etc for orphaned
         if not os.path.exists(self.filename):
-            warn(f"File {shq(self.filename)} is orphaned or link is broken")
+            warn(f"File {repr(self.filename)} is orphaned or link is broken")
             return
 
         stat = os.stat(self.filename)
@@ -928,7 +929,7 @@ class Notefile:
         return True
 
     def __str__(self,):
-        return f"Notefile({shq(self.filename0)})"
+        return f"Notefile({repr(self.filename0)})"
 
     __repr__ = __str__
 

@@ -1,9 +1,10 @@
-__version__ = "2.20220325.1"
+__version__ = "2.20220404.0"
 __author__ = "Justin Winokur"
 
 import sys, os
 
 if sys.version_info < (3, 8):
+    # Limited by argarse's extend action
     sys.stderr.write("ERROR: Must use Python >= 3.8\n")
     sys.exit(1)
 

@@ -191,12 +191,3 @@ def flattenlist(*args):
                 yield from flattenlist(*arg)
             except TypeError:  # Not iterable
                 yield arg
-
-
-# def fname_quote(name):
-#     """Like shlex.quote but ALWAYS starts it with quotes and verifies it didn't break"""
-#     import shlex
-#     quoted = quoted0 = shlex.quote(name)
-#     if quoted.startswith('"') or quoted.startswith("'"):
-#         return quoted
-#

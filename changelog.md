@@ -2,6 +2,11 @@
 
 (**_newest_** on *top*)
 
+## 2.20220404.0
+
+* Fixes bug with `pathlib.Path` objects in `notefile.find`
+* Minor fixed and improvements. Especially around the presentation of names
+
 ## 2.20220325.0
 
 **New Version**

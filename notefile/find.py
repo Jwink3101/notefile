@@ -67,10 +67,10 @@ def find(
     if kwargs:
         raise ValueError(f"Unrecognized arguments: {list(kwargs)}")
 
-    if not isinstance(path, str):
-        # Make a loop over paths
-        if not path:
-            path = ["."]
+    if not path:
+        path = ["."]
+
+    if isinstance(path, (list, tuple, set)):
         seen = set()
         for p in path:
             for r in find(
@@ -95,6 +95,8 @@ def find(
 
     if noteopts is None:
         noteopts = {}
+
+    path = str(path)  # Path objects
 
     if os.path.isfile(path):
         yield Notefile(path, **noteopts,) if not filemode else path

@@ -497,7 +497,9 @@ def test_change_viz_and_format():
 
     shutil.copy(".file1.txt.notes.yaml", "file1.txt.notes.yaml")
     _, err = call("vis --debug show file1.txt", capture=True)
-    assert err == "WARNING: Both hidden and visible notes exist for file1.txt. Not changing mode\n"
+    assert (
+        err == "WARNING: Both hidden and visible notes exist for 'file1.txt'. Not changing mode\n"
+    )
     os.unlink("file1.txt.notes.yaml")
 
     ## JSON vs YAML
@@ -626,6 +628,15 @@ def test_find_exclusions():
         "sub/file2.txt",
     }
     assert {n.filename for n in notefile.find(excludes="*.exc")} == f
+
+    assert {n.filename for n in notefile.find(path="sub", excludes="*.exc")} == {
+        "sub/exd/file4.txt",
+        "sub/file2.txt",
+    }
+    assert {n.filename for n in notefile.find(path=Path("sub"), excludes="*.exc")} == {
+        "sub/exd/file4.txt",
+        "sub/file2.txt",
+    }
 
     call('find --exclude "*.exc" -o tmp')
     assert readout("tmp") == f
@@ -1034,8 +1045,8 @@ def test_links():
     os.symlink("broke11", "link11")
     _, e = call("mod -t d link11", capture=True)
     assert (
-        "WARNING: link11 is a broken link" in e
-        and "WARNING: File broke11 is orphaned or link is broken" in e
+        "WARNING: 'link11' is a broken link to 'broke11'" in e
+        and "WARNING: File 'broke11' is orphaned or link is broken" in e
     )
     assert os.readlink("link11.notes.yaml") == "broke11.notes.yaml"  # stil link to it
 
