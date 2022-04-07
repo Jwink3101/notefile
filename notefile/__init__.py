@@ -1,4 +1,4 @@
-__version__ = "2.20220404.0"
+__version__ = "2.20220407.0"
 __author__ = "Justin Winokur"
 
 import sys, os
@@ -57,6 +57,10 @@ And it includes the following functions:
             can also be overridden with the respective keyword arguments
     
     g       Aliased to grep
+    
+    gall    Essentially grep with match_any = False
+    
+    gany    Essentially grep with match_any = True
     
     tany    Returns True if that tag is in tags: e.g
                 tany('tag1','tag2') <==> any(t in tags for t in ['tag1','tag2'])

@@ -2,6 +2,11 @@
 
 (**_newest_** on *top*)
 
+## 2.20220407.0
+
+* Fixes a bug with queries grep and multiple expressions.
+* Adds `gall` and `gany` to query.
+
 ## 2.20220404.0
 
 * Fixes bug with `pathlib.Path` objects in `notefile.find`

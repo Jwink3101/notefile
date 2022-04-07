@@ -756,21 +756,21 @@ class Notefile:
 
     def grep(
         self,
-        expr,
+        *expr,
         matchcase=False,
         full_note=False,
         full_word=False,
         fixed_strings=False,
         match_any=True,
-        *expr2,  # To allow multiple expressions
     ):
         """
         Search the content of notes for expr
     
         Inputs:
         -------
-        expr ['']
-            Expression to search. Can be regex. Also can pass a tuple or list
+        *expr ['']
+            Expression to search. Can be regex. Also can pass a tuple or list. All 
+            arguments are flattened (list of strings) and combined
     
         matchcase [False]
             Whether or not to consider case in the expression
@@ -795,7 +795,7 @@ class Notefile:
         if not matchcase:
             flags |= re.IGNORECASE
 
-        expr = list(flattenlist(expr, expr2))  # will make  a list of all strings
+        expr = list(flattenlist(expr))  # will make  a list of all strings
 
         if fixed_strings:
             expr = [re.escape(e) for e in expr]
@@ -832,14 +832,15 @@ class Notefile:
 
         return query(qtext)
 
-    def query(self, expr, allow_exception=False, match_any=True, **kwargs):
+    def query(self, *expr, allow_exception=False, match_any=True, **kwargs):
         """
         Perform python queries on notes:
     
         Inputs:
         -------
         expr ['']
-            Query expression(s). See query_help() for details.
+            Query expression(s). See query_help() for details. Also can pass a tuple 
+            or list. All arguments are flattened (list of strings) and combined
 
         allow_exception [False]
             If True, raises a warning instead of an exception
@@ -867,14 +868,16 @@ class Notefile:
             "ss": shlex.split,
             "note": self,
             "data": self.data,
-            "tags": self.data["tags"],
+            "tags": {t.lower() for t in self.data.get("tags",[])},
             "notes": self.data.get(self.note_field, "",),
             "text": getattr(self, "txt", "",),
         }
 
-        kwargs["match_any"] = match_any
-        ns["grep"] = functools.partial(self.grep, **kwargs)
+        ns["grep"] = functools.partial(self.grep, match_any=match_any,**kwargs)
         ns["g"] = ns["grep"]
+        ns["gall"] = functools.partial(self.grep, match_any=False,**kwargs)
+        ns["gany"] = functools.partial(self.grep,match_any=True, **kwargs)
+
         ns["tany"] = lambda *tags: any(t.lower() in self.data["tags"] for t in tags)
         ns["tall"] = lambda *tags: all(t.lower() in self.data["tags"] for t in tags)
         ns["t"] = ns["tany"]

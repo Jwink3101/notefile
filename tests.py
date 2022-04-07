@@ -855,6 +855,35 @@ def test_search():
     call("query -o tmp --full-word 'g(\"the\")' ")
     assert readout("tmp") == {"file7.txt"}
 
+    # Multiple in query
+    # any
+    call("""query "g('the','words')" -o tmp""")  # default
+    assert readout("tmp") == {"file6.txt", "file7.txt"}
+
+    call("""query "g('the','words')" --full-word -o tmp""")  # Baseline for below
+    assert readout("tmp") == {"file6.txt", "file7.txt"}
+
+    call("""query "g('the','words',match_any=True)" --full-word --all -o tmp""")  # kw overides CLI
+    assert readout("tmp") == {"file6.txt", "file7.txt"}
+
+    call("""query "gany('the','words')" --full-word --all -o tmp""")  # gany overides CLI
+    assert readout("tmp") == {"file6.txt", "file7.txt"}
+
+    # all
+    call("""query "g('the','words')" --all --full-word -o tmp""")  # cli --all
+    assert readout("tmp") == {"file7.txt"}
+
+    call("""query "g('the','words',match_any=False)" --full-word -o tmp""")  # kw all
+    assert readout("tmp") == {"file7.txt"}
+
+    call("""query "gall('the','words')" --full-word -o tmp""")  # implied with gall
+    assert readout("tmp") == {"file7.txt"}
+
+    call(
+        """query "gall('the','words',match_any=True)" --full-word -o tmp"""
+    )  # implied with gall but again overwritten with kw
+    assert readout("tmp") == {"file6.txt", "file7.txt"}
+
     ## Tags
     call("tags -o tmp")
     assert readtags("tmp") == {
