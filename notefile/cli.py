@@ -258,6 +258,56 @@ def cli(argv=None):
                 regardless of current format.""",
     )
 
+    editmod_parent = argparse.ArgumentParser(add_help=False)
+
+    editmod_parent_edit = editmod_parent.add_argument_group(
+        title="Interactive Edit",
+        description="Edit notes with a text editor. Other modifications come first",
+    )
+    editmod_parent_edit.add_argument(
+        "-e",
+        "--edit",
+        action="store_true",
+        help="Launch $EDITOR to interactivly edit the notes for a file",
+    )
+    editmod_parent_edit.add_argument(
+        "-f", "--full", action="store_true", help="edit the full YAML file",
+    )
+    editmod_parent_edit.add_argument(
+        "-m",
+        "--manual",
+        action="store_true",
+        help="Instead of $EDITOR, print the path and then wait for user-input to continue",
+    )
+
+    editmod_parent_mod = editmod_parent.add_argument_group(
+        title="Modify Notes", description="Add or replace notes. Add or remove tags"
+    )
+    editmod_parent_mod.add_argument(
+        "-r", "--remove", default=[], action="append", metavar="TAG", help="Specify tags to remove",
+    )
+    editmod_parent_mod.add_argument(
+        "-t", "--tag", "-a", "--add", default=[], action="append", help="Specify tags to add",
+    )
+    editmod_parent_mod.add_argument(
+        "-R", "--replace", action="store_true", help="Replace rather than append the new note",
+    )
+    editmod_parent_mod.add_argument(
+        "-n",
+        "--note",
+        action="append",
+        default=[],
+        help="""Notes to add (or replace). Each argument is its own line. Specify 
+                `--note ""` to add empty line. Notes will come _after_ stdin if 
+                applicable""",
+    )
+    editmod_parent_mod.add_argument(
+        "-s",
+        "--stdin",
+        action="store_true",
+        help="Read note from stdin. Prepended to any --note arguments",
+    )
+
     repair_parent = argparse.ArgumentParser(add_help=False)
     repair_parent.add_argument(
         "path", nargs="*", action="extend", help="Additional --path arguments",
@@ -339,56 +389,22 @@ def cli(argv=None):
         description="Run `%(prog)s <command> -h` for help",
     )
 
-    ## New or modify
-    subparsers["edit"] = subpar.add_parser(
-        "edit",
-        help="Launch $EDITOR to interactivly edit the notes for a file",
-        parents=[new_parent, global_parent,],
-    )
-    subparsers["edit"].add_argument(
-        "file", help="Specify file(s)", nargs="+",
-    )
-    subparsers["edit"].add_argument(
-        "-f", "--full", action="store_true", help="edit the full YAML file",
-    )
-    subparsers["edit"].add_argument(
-        "-m",
-        "--manual",
-        action="store_true",
-        help="Instead of $EDITOR, print the path and then wait for user-input to continue",
-    )
-
     subparsers["mod"] = subpar.add_parser(
         "mod",
-        help="Modify notes. Add or replace notes. Add or remove tags",
-        parents=[new_parent, global_parent,],
+        parents=[editmod_parent, new_parent, global_parent],
+        help="Modify notes. Edit interactivly, add or replace notes, add or remove tags",
     )
     subparsers["mod"].add_argument(
         "file", help="Specify file(s)", nargs="+",
     )
-    subparsers["mod"].add_argument(
-        "-r", "--remove", default=[], action="append", metavar="TAG", help="Specify tags to remove",
+
+    subparsers["edit"] = subpar.add_parser(
+        "edit",
+        parents=[editmod_parent, new_parent, global_parent],
+        help="Shortcut for '%(prog)s mod --edit'",
     )
-    subparsers["mod"].add_argument(
-        "-t", "--tag", "-a", "--add", default=[], action="append", help="Specify tags to add",
-    )
-    subparsers["mod"].add_argument(
-        "-R", "--replace", action="store_true", help="Replace rather than append the new note",
-    )
-    subparsers["mod"].add_argument(
-        "-n",
-        "--note",
-        action="append",
-        default=[],
-        help="""Notes to add (or replace). Each argument is its own line. Specify 
-                `--note ""` to add empty line. Notes will come _after_ stdin if 
-                applicable""",
-    )
-    subparsers["mod"].add_argument(
-        "-s",
-        "--stdin",
-        action="store_true",
-        help="Read note from stdin. Prepended to any --note arguments",
+    subparsers["edit"].add_argument(
+        "file", help="Specify file(s)", nargs="+",
     )
 
     subparsers["copy"] = subpar.add_parser(
@@ -856,24 +872,27 @@ class SingleMod(BaseCLI):
     def __init__(self, args):
         self.args = args
 
-        if self.args.command in {"edit"}:
-            self.editmod()
-        elif self.args.command in {"mod"}:
-            if not (args.tag or args.remove or args.note or args.stdin):
-                raise ValueError("Must specify tags or notes to add (or remove)")
-            addnote = [sys.stdin.read().strip()] if args.stdin else []
-            args.addnote = "\n".join(addnote + args.note)
-            self.editmod()
+        if self.args.command == "edit":
+            self.args.edit = True
+
+        if not (args.edit or args.tag or args.remove or args.note or args.stdin):
+            raise ValueError(
+                "Must specify at least one of --edit, --tag, --remove, --note, --stdin"
+            )
+        addnote = [sys.stdin.read().strip()] if args.stdin else []
+        args.addnote = "\n".join(addnote + args.note)
+        self.editmod()
 
     def editmod(self):
         args = self.args
         for file in args.file:
             note = Notefile(file, **self.noteopts,).read()
-            if args.command == "edit":
+
+            note.modify_tags(add=args.tag, remove=args.remove)
+            note.add_note(args.addnote, replace=args.replace)  # also does strip()
+            if args.edit:
                 note.interactive_edit(full=args.full, manual=args.manual)
-            else:
-                note.modify_tags(add=args.tag, remove=args.remove)
-                note.add_note(args.addnote, replace=args.replace)  # also does strip()
+
             if args.refresh:
                 note.repair_metadata(force=False)
 

@@ -2,6 +2,10 @@
 
 (**_newest_** on *top*)
 
+## 2.20220409.0
+
+- Combines `edit` and `mod` to one command with `edit` being a shortcut for `mod --edit`. This does *not change any interface*!
+
 ## 2.20220407.0
 
 * Fixes a bug with queries grep and multiple expressions.

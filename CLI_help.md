@@ -21,8 +21,9 @@ Commands:
   Run `notefile.py <command> -h` for help
 
   command
-    edit              Launch $EDITOR to interactivly edit the notes for a file
-    mod               Modify notes. Add or replace notes. Add or remove tags
+    mod               Modify notes. Edit interactivly, add or replace notes,
+                      add or remove tags
+    edit              Shortcut for 'notefile.py mod --edit'
     copy              Copy the notes from SRC to DST(s). DST must not have any
                       notes
     replace           Replace/Update some or all of the content in SRC to
@@ -53,10 +54,11 @@ Commands:
 
 
 ```text
-usage: notefile edit [-h] [--link {source,symlink,both}] [-H] [-V]
+usage: notefile edit [-h] [-e] [-f] [-m] [-r TAG] [-t TAG] [-R] [-n NOTE]
+                        [-s] [--link {source,symlink,both}] [-H] [-V]
                         [--no-hash] [--no-refresh] [--format {json,yaml}]
                         [--rewrite-format] [--debug] [--note-field field]
-                        [--version] [-f] [-m]
+                        [--version]
                         file [file ...]
 
 positional arguments:
@@ -64,9 +66,28 @@ positional arguments:
 
 optional arguments:
   -h, --help            show this help message and exit
+
+Interactive Edit:
+  Edit notes with a text editor. Other modifications come first
+
+  -e, --edit            Launch $EDITOR to interactivly edit the notes for a
+                        file
   -f, --full            edit the full YAML file
   -m, --manual          Instead of $EDITOR, print the path and then wait for
                         user-input to continue
+
+Modify Notes:
+  Add or replace notes. Add or remove tags
+
+  -r TAG, --remove TAG  Specify tags to remove
+  -t TAG, --tag TAG, -a TAG, --add TAG
+                        Specify tags to add
+  -R, --replace         Replace rather than append the new note
+  -n NOTE, --note NOTE  Notes to add (or replace). Each argument is its own
+                        line. Specify `--note ""` to add empty line. Notes
+                        will come _after_ stdin if applicable
+  -s, --stdin           Read note from stdin. Prepended to any --note
+                        arguments
 
 Create/Modify Options:
   Flags for creating and saving notes. Not all flags are always applicable!
@@ -106,10 +127,11 @@ Global Options:
 
 
 ```text
-usage: notefile mod [-h] [--link {source,symlink,both}] [-H] [-V]
+usage: notefile mod [-h] [-e] [-f] [-m] [-r TAG] [-t TAG] [-R] [-n NOTE]
+                       [-s] [--link {source,symlink,both}] [-H] [-V]
                        [--no-hash] [--no-refresh] [--format {json,yaml}]
                        [--rewrite-format] [--debug] [--note-field field]
-                       [--version] [-r TAG] [-t TAG] [-R] [-n NOTE] [-s]
+                       [--version]
                        file [file ...]
 
 positional arguments:
@@ -117,6 +139,19 @@ positional arguments:
 
 optional arguments:
   -h, --help            show this help message and exit
+
+Interactive Edit:
+  Edit notes with a text editor. Other modifications come first
+
+  -e, --edit            Launch $EDITOR to interactivly edit the notes for a
+                        file
+  -f, --full            edit the full YAML file
+  -m, --manual          Instead of $EDITOR, print the path and then wait for
+                        user-input to continue
+
+Modify Notes:
+  Add or replace notes. Add or remove tags
+
   -r TAG, --remove TAG  Specify tags to remove
   -t TAG, --tag TAG, -a TAG, --add TAG
                         Specify tags to add
@@ -1231,6 +1266,10 @@ And it includes the following functions:
             can also be overridden with the respective keyword arguments
     
     g       Aliased to grep
+    
+    gall    Essentially grep with match_any = False
+    
+    gany    Essentially grep with match_any = True
     
     tany    Returns True if that tag is in tags: e.g
                 tany('tag1','tag2') <==> any(t in tags for t in ['tag1','tag2'])

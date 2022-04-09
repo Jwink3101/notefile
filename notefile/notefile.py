@@ -868,15 +868,15 @@ class Notefile:
             "ss": shlex.split,
             "note": self,
             "data": self.data,
-            "tags": {t.lower() for t in self.data.get("tags",[])},
+            "tags": {t.lower() for t in self.data.get("tags", [])},
             "notes": self.data.get(self.note_field, "",),
             "text": getattr(self, "txt", "",),
         }
 
-        ns["grep"] = functools.partial(self.grep, match_any=match_any,**kwargs)
+        ns["grep"] = functools.partial(self.grep, match_any=match_any, **kwargs)
         ns["g"] = ns["grep"]
-        ns["gall"] = functools.partial(self.grep, match_any=False,**kwargs)
-        ns["gany"] = functools.partial(self.grep,match_any=True, **kwargs)
+        ns["gall"] = functools.partial(self.grep, match_any=False, **kwargs)
+        ns["gany"] = functools.partial(self.grep, match_any=True, **kwargs)
 
         ns["tany"] = lambda *tags: any(t.lower() in self.data["tags"] for t in tags)
         ns["tall"] = lambda *tags: all(t.lower() in self.data["tags"] for t in tags)
