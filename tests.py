@@ -447,10 +447,12 @@ def test_replace():
     os.chdir(TESTDIR)
 
 
-def test_change_viz_and_format():
+@pytest.mark.parametrize("vis", (True, False))
+def test_change_viz_and_format(vis):
     """
-    Test changing viz and also formats
+    Test changing viz and also formats. If vis will keep the legacy "vis" commands
     """
+    vis = "vis" if vis else ""
     os.chdir(TESTDIR)
     dirpath = TESTDIR / "formats"
     cleanmkdir(dirpath)
@@ -472,25 +474,25 @@ def test_change_viz_and_format():
     assert os.path.exists(".file2.txt.notes.yaml") and not os.path.exists("file2.txt.notes.yaml")
 
     # Make sure they do not change
-    call("vis show file1.txt")
-    call("vis hide file2.txt")
+    call(f"{vis} show file1.txt")
+    call(f"{vis} hide file2.txt")
     note1 = Notefile("file1.txt").read()
     note2 = Notefile("file2.txt").read()
     assert not note1.ishidden and note2.ishidden
 
     # Change one
-    call("vis show file2.txt")
+    call(f"{vis} show file2.txt")
     note1 = Notefile("file1.txt").read()
     note2 = Notefile("file2.txt").read()
     assert not note1.ishidden and not note2.ishidden
 
     # Change both
-    call("vis hide")
+    call(f"{vis} hide")
     note1 = Notefile("file1.txt").read()
     note2 = Notefile("file2.txt").read()
     assert note1.ishidden and note2.ishidden
 
-    call("vis show --dry-run")
+    call(f"{vis} show --dry-run")
     note1 = Notefile("file1.txt").read()
     note2 = Notefile("file2.txt").read()
     assert note1.ishidden and note2.ishidden
@@ -1273,6 +1275,8 @@ def test_orphan_repair():
         lines = (line[2:] if line.startswith("./") else line for line in lines)
         return set(lines)
 
+    call('find --orphaned --debug')
+
     # Default. too many
     _, e = call("repair", capture=True)
     assert warning_parse(e) == {"sub/file1.txt", "filewon.txt", "file ONE.txt"}
@@ -1388,23 +1392,24 @@ def test_nonstr():
 
 if __name__ == "__main__":
     pass
-    test_mod()
-    test_create_opts()
-    test_copy()
-    test_replace()
-    test_change_viz_and_format()
-    test_change_tag()
-    test_find_exclusions()
-    test_outputs_export()
-    test_search()
-    test_links()
-    test_unicode_spaces()
-    test_notepath()
-    test_metadata_repair()
+#     test_mod()
+#     test_create_opts()
+#     test_copy()
+#     test_replace()
+#     test_change_viz_and_format(True)
+#     test_change_viz_and_format(False)
+#     test_change_tag()
+#     test_find_exclusions()
+#     test_outputs_export()
+#     test_search()
+#     test_links()
+#     test_unicode_spaces()
+#     test_notepath()
+#     test_metadata_repair()
     test_orphan_repair()
-    test_cat()
-    test_notefield()
-    test_nonstr()
+#     test_cat()
+#     test_notefield()
+#     test_nonstr()
 
     print("-=" * 50)
     print("SUCCESS")

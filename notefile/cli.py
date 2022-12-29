@@ -474,17 +474,27 @@ def cli(argv=None):
     subparsers["vis"] = subpar.add_parser(
         "vis",
         help="Change the visibility of file(s)/dir(s)",
-        parents=[global_parent, find_parent, disp_parent,],
+        parents=[global_parent, find_parent, disp_parent],
     )
+    for mode in ["show", "hide"]:
+        subparsers[mode] = subpar.add_parser(
+            mode,
+            help=f"Shortcut for '%(prog)s vis {mode}'",
+            parents=[global_parent, find_parent, disp_parent],
+        )
+
     subparsers["vis"].add_argument(
         "mode", choices=["hide", "show",], help="Visibility mode for file(s)/dir(s) ",
     )
-    subparsers["vis"].add_argument(
-        "path", nargs="*", action="extend", help="Additional --path arguments",
-    )
-    subparsers["vis"].add_argument(
-        "-n", "--dry-run", action="store_true", help="""Do not make changes""",
-    )
+    # Do these as a loop rather than a parent since I need to inject an argument
+    # as opposed to options
+    for mode in ["show", "hide", "vis"]:
+        subparsers[mode].add_argument(
+            "path", nargs="*", action="extend", help="Additional --path arguments",
+        )
+        subparsers[mode].add_argument(
+            "-n", "--dry-run", action="store_true", help="""Do not make changes""",
+        )
 
     subparsers["format"] = subpar.add_parser(
         "format",
@@ -543,10 +553,14 @@ def cli(argv=None):
     subparsers["find"] = subpar.add_parser(
         "find", help="Find and list all notes", parents=[global_parent, find_parent, disp_parent,],
     )
+    subparsers["find"].add_argument('--orphaned',action='store_true',
+        help=("Find orphaned notes only. Does not repair. See repair-orphaned to repair"))
 
     subparsers["export"] = subpar.add_parser(
         "export",
-        help="Shortcut for '%(prog)s find --export'",
+        help=("Shortcut for '%(prog)s find --export'. "
+              "Note, can use '%(prog)s search --export <search flags>' if needed "
+              "with search queries."),
         parents=[global_parent, find_parent, disp_parent,],
     )
     subparsers["export"].add_argument(
@@ -627,7 +641,9 @@ def cli(argv=None):
             ChangeTag(args)
         elif args.command == "format":
             FormatChangeCLI(args)
-        elif args.command == "vis":
+        elif args.command in {"vis", "show", "hide"}:
+            if args.command != "vis":
+                args.mode = args.command
             VisChangeCLI(args)
         elif args.command == "cat":  # no need to call an object
             note = Notefile(args.file, note_field=args.note_field,).read()
@@ -735,7 +751,11 @@ class DisplayMIXIN:
         """Display for non-tag modes. This will display as returned"""
         sep = b"\x00" if self.args.print0 else b"\n"
         for note in notes:
-            self.outbuffer.write(note.filename0.encode() + sep)
+            try:
+                self.outbuffer.write(note.filename0.encode() + sep)
+            except:
+                print(f'{note.filename0 = }')
+                raise
             self.outbuffer.flush()
 
             if self.args.symlink:
@@ -807,9 +827,14 @@ class DisplayMIXIN:
 class SearchCLI(DisplayMIXIN, BaseCLI):
     def __init__(self, args):
         self.args = args
-
+        
+        orphaned = getattr(self.args,'orphaned',False)
+        
         # Build the pipeline. Do not read for find. Do not query for export.
-        notes = self.find()
+        notes = self.find(include_orphaned=orphaned)
+        if orphaned:
+            notes = (note for note in notes if note.orphaned)
+            
         if args.command != "find":  # no need to read if not testing or exporting
             notes = noteread(notes)  # May be parallel in the future
             if args.command != "export":
@@ -944,7 +969,6 @@ class ChangeTag(DisplayMIXIN, BaseCLI):
 class VisChangeCLI(DisplayMIXIN, BaseCLI):
     def __init__(self, args):
         self.args = args
-
         if args.dry_run:
             self.outbuffer.write(b"# DRY RUN\n")
             self.outbuffer.flush()

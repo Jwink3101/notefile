@@ -2,6 +2,12 @@
 
 (**_newest_** on *top*)
 
+## 2.20221228.0
+
+- Added `show` and `hide` as their own shortcut commands.
+- Added `--orphaned` flag to `find`
+- Repo Cleanup
+
 ## 2.20220409.0
 
 - Combines `edit` and `mod` to one command with `edit` being a shortcut for `mod --edit`. This does *not change any interface*!

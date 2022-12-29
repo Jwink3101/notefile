@@ -147,7 +147,7 @@ Alternatively, the `export` command can be used.
 
 These will likely be addressed (roughly in order of priority)
 
-* Behavior with hidden files themselves is not consistent. A warning will be thrown
+- Behavior with hidden files themselves is not consistent. A warning will be thrown
 
 ## Additional Workflows
 

@@ -165,8 +165,10 @@ class Notefile:
         """
         if self.exists:
             debug("loading {}".format(self.destnote))
-            with open(self.destnote, "rt",) as file:
-                self.txt = file.read()
+            try:
+                self.txt = Path(self.destnote).read_text()
+            except FileNotFoundError:
+                self.txt = self._read_from_broken_link_from_hide()
             try:
                 self.data = json.loads(self.txt)
                 self.format = "json"
@@ -583,7 +585,11 @@ class Notefile:
             shutil.move(src_note, dst_note)
         except (OSError, IOError,) as E:
             warn(f"Error on move '{src_note}' to '{dst_note}'. Error: {E}")
+
+        # Change attributes for this now
         self.ishidden = mode == "hide"
+        self.destnote = dst_note  # Using the 0 above
+
         return True
 
     def cat(self, tags=False, full=False):
@@ -930,6 +936,25 @@ class Notefile:
             return False  # Still broken but not repairable
 
         return True
+
+    def _read_from_broken_link_from_hide(self):
+        """
+        Tries to read from a broken link due to hidden but does NOT repair!
+        (reading shouldn't modify content)
+        """
+        for destnote in get_filenames(self.destnote)[1:]:
+            if exists_or_link(destnote):
+                break
+        else:
+            raise FileNotFoundError(f"Cannot find {repr(self.destnote)}")
+        for linkdest in get_filenames(os.readlink(destnote))[1:]:
+            if exists_or_link(linkdest):
+                break
+        else:
+            raise FileNotFoundError(f"Cannot find link for {repr(self.destnote)}")
+
+        with open(linkdest) as fobj:
+            return fobj.read()
 
     def __str__(self,):
         return f"Notefile({repr(self.filename0)})"
