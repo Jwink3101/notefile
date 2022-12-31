@@ -271,13 +271,21 @@ def cli(argv=None):
         help="Launch $EDITOR to interactivly edit the notes for a file",
     )
     editmod_parent_edit.add_argument(
-        "-f", "--full", action="store_true", help="edit the full YAML file",
+        "-f",
+        "--full",
+        action="store_true",
+        help="""Edit the full YAML file. Will always edit in YAML mode even 
+                if notes are stored in JSON""",
     )
     editmod_parent_edit.add_argument(
         "-m",
         "--manual",
         action="store_true",
         help="Instead of $EDITOR, print the path and then wait for user-input to continue",
+    )
+
+    editmod_parent_edit.add_argument(
+        "--tags-only", action="store_true", help="Just edit tags, not both"
     )
 
     editmod_parent_mod = editmod_parent.add_argument_group(
@@ -553,14 +561,19 @@ def cli(argv=None):
     subparsers["find"] = subpar.add_parser(
         "find", help="Find and list all notes", parents=[global_parent, find_parent, disp_parent,],
     )
-    subparsers["find"].add_argument('--orphaned',action='store_true',
-        help=("Find orphaned notes only. Does not repair. See repair-orphaned to repair"))
+    subparsers["find"].add_argument(
+        "--orphaned",
+        action="store_true",
+        help=("Find orphaned notes only. Does not repair. See repair-orphaned to repair"),
+    )
 
     subparsers["export"] = subpar.add_parser(
         "export",
-        help=("Shortcut for '%(prog)s find --export'. "
-              "Note, can use '%(prog)s search --export <search flags>' if needed "
-              "with search queries."),
+        help=(
+            "Shortcut for '%(prog)s find --export'. "
+            "Note, can use '%(prog)s search --export <search flags>' if needed "
+            "with search queries."
+        ),
         parents=[global_parent, find_parent, disp_parent,],
     )
     subparsers["export"].add_argument(
@@ -754,7 +767,7 @@ class DisplayMIXIN:
             try:
                 self.outbuffer.write(note.filename0.encode() + sep)
             except:
-                print(f'{note.filename0 = }')
+                print(f"{note.filename0 = }")
                 raise
             self.outbuffer.flush()
 
@@ -827,14 +840,14 @@ class DisplayMIXIN:
 class SearchCLI(DisplayMIXIN, BaseCLI):
     def __init__(self, args):
         self.args = args
-        
-        orphaned = getattr(self.args,'orphaned',False)
-        
+
+        orphaned = getattr(self.args, "orphaned", False)
+
         # Build the pipeline. Do not read for find. Do not query for export.
         notes = self.find(include_orphaned=orphaned)
         if orphaned:
             notes = (note for note in notes if note.orphaned)
-            
+
         if args.command != "find":  # no need to read if not testing or exporting
             notes = noteread(notes)  # May be parallel in the future
             if args.command != "export":
@@ -916,7 +929,7 @@ class SingleMod(BaseCLI):
             note.modify_tags(add=args.tag, remove=args.remove)
             note.add_note(args.addnote, replace=args.replace)  # also does strip()
             if args.edit:
-                note.interactive_edit(full=args.full, manual=args.manual)
+                note.interactive_edit(full=args.full, manual=args.manual, tags_only=args.tags_only)
 
             if args.refresh:
                 note.repair_metadata(force=False)

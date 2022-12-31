@@ -2,6 +2,10 @@
 
 (**_newest_** on *top*)
 
+## 2.20221231.0
+
+- For interactive edit, adds `--tags-only` flag and all `--full` edits are in YAML regardless of format
+
 ## 2.20221228.0
 
 - Added `show` and `hide` as their own shortcut commands.

@@ -221,9 +221,11 @@ class Notefile:
 
         return self  # for convenience
 
-    def writes(self):
+    def writes(self, format=None):
         """
-        Return a YAML string
+        Return a string of the notes.
+        
+        If format is None, will use default. Otherwise, it can be set with a format
         """
         if self.data is None:
             raise ValueError("Cannot write empty data. Use read() or set data attribute")
@@ -239,7 +241,8 @@ class Notefile:
         data["last-updated"] = now_string()
         data["notefile version"] = __version__
 
-        format = self.format0 if self.rewrite_format else self.format
+        if not format:
+            format = self.format0 if self.rewrite_format else self.format
 
         if format.lower() not in {"json", "yaml"}:
             warn(f"Unsupported format '{self.format}'. Using 'yaml'")
@@ -421,7 +424,7 @@ class Notefile:
 
             os.symlink(linkpath, linknote)
 
-    def interactive_edit(self, full=False, manual=False):
+    def interactive_edit(self, full=False, manual=False, tags_only=False):
         """Launch the editor. Does *NOT* write()"""
         import subprocess, shlex
 
@@ -444,17 +447,22 @@ class Notefile:
         tagtxt = "<< Comma-seperated tags. DO NOT MODIFY THIS LINE >>"
         info = "# filename: {}\n# notedest: {}".format(self.filename, self.destnote,)
 
+        tags = self.data.get("tags", [],)
+        tags = sorted(t for t in set(tt.strip().lower() for tt in tags) if t)
+        tags = ", ".join(tags)
+
         if full:
-            txt = self.writes()
+            txt = self.writes(format="yaml")
             content = txt + "\n" + info
+        elif tags_only:
+            content = tags + "\n\n# Comma-seperated tags\n" + info
         else:
             content = self.data.get(self.note_field, "",)  # in case it's a dict
             if not isinstance(content, str,):
                 raise TypeError("Cannot edit non-string notes. Edit the full YAML instead")
             content += "\n\n" + tagtxt + "\n"
-            tags = self.data.get("tags", [],)
-            tags = sorted(t for t in set(tt.strip().lower() for tt in tags) if t)
-            content += ", ".join(tags) + "\n" + "\n" + info + "\n"
+
+            content += tags + "\n" + "\n" + info + "\n"
 
         tmpfile = tmpfileinpath(self.destnote) + (".yaml" if full else ".txt")
         with open(tmpfile, "wt",) as file:
@@ -470,7 +478,7 @@ class Notefile:
 
         with open(tmpfile, "rt",) as f:
             newtxt = f.read()
-        os.remove(tmpfile)
+        os.unlink(tmpfile)
 
         if full:
             self.data = Bunch(**load_yaml(newtxt))
@@ -479,16 +487,18 @@ class Notefile:
             note = []
             tags = []
 
-            for line in lines:  # Get notes
-                if line.strip() == tagtxt:
-                    break
-                note.append(line)
+            if not tags_only:  # Read notes first
+                for line in lines:  # Get notes
+                    if line.strip() == tagtxt:
+                        break
+                    note.append(line)
+                self.data[self.note_field] = "\n".join(note)  # Only if modifying notes
+
             for line in lines:  # Get tags with the remaining lines
-                if line.startswith("# filename: "):
+                if line.startswith("# filename: ") or line.startswith("# Comma-"):
                     break
                 tags.extend(line.split(","))
 
-            self.data[self.note_field] = "\n".join(note)
             tags = sorted(t for t in set(tt.strip().lower() for tt in tags) if t)
             self.data["tags"] = tags
 
