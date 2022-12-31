@@ -58,9 +58,9 @@ Commands:
 
 
 ```text
-usage: notefile mod [-h] [-e] [-f] [-m] [-r TAG] [-t TAG] [-R] [-n NOTE]
-                       [-s] [--link {source,symlink,both}] [-H] [-V]
-                       [--no-hash] [--no-refresh] [--format {json,yaml}]
+usage: notefile mod [-h] [-e] [-f] [-m] [--tags-only] [-r TAG] [-t TAG]
+                       [-R] [-n NOTE] [-s] [--link {source,symlink,both}] [-H]
+                       [-V] [--no-hash] [--no-refresh] [--format {json,yaml}]
                        [--rewrite-format] [--debug] [--note-field field]
                        [--version]
                        file [file ...]
@@ -76,9 +76,11 @@ Interactive Edit:
 
   -e, --edit            Launch $EDITOR to interactivly edit the notes for a
                         file
-  -f, --full            edit the full YAML file
+  -f, --full            Edit the full YAML file. Will always edit in YAML mode
+                        even if notes are stored in JSON
   -m, --manual          Instead of $EDITOR, print the path and then wait for
                         user-input to continue
+  --tags-only           Just edit tags, not both
 
 Modify Notes:
   Add or replace notes. Add or remove tags
@@ -131,11 +133,11 @@ Global Options:
 
 
 ```text
-usage: notefile edit [-h] [-e] [-f] [-m] [-r TAG] [-t TAG] [-R] [-n NOTE]
-                        [-s] [--link {source,symlink,both}] [-H] [-V]
-                        [--no-hash] [--no-refresh] [--format {json,yaml}]
-                        [--rewrite-format] [--debug] [--note-field field]
-                        [--version]
+usage: notefile edit [-h] [-e] [-f] [-m] [--tags-only] [-r TAG] [-t TAG]
+                        [-R] [-n NOTE] [-s] [--link {source,symlink,both}]
+                        [-H] [-V] [--no-hash] [--no-refresh]
+                        [--format {json,yaml}] [--rewrite-format] [--debug]
+                        [--note-field field] [--version]
                         file [file ...]
 
 positional arguments:
@@ -149,9 +151,11 @@ Interactive Edit:
 
   -e, --edit            Launch $EDITOR to interactivly edit the notes for a
                         file
-  -f, --full            edit the full YAML file
+  -f, --full            Edit the full YAML file. Will always edit in YAML mode
+                        even if notes are stored in JSON
   -m, --manual          Instead of $EDITOR, print the path and then wait for
                         user-input to continue
+  --tags-only           Just edit tags, not both
 
 Modify Notes:
   Add or replace notes. Add or remove tags
