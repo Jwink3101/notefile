@@ -254,7 +254,7 @@ def cli(argv=None):
     new_parent_group.add_argument(
         "--rewrite-format",
         action="store_true",
-        help="""Change to the specified format (see '--note-format')
+        help="""Change to the specified format (see '--format')
                 regardless of current format.""",
     )
 
@@ -620,7 +620,7 @@ def cli(argv=None):
     subparsers["note-path"] = subpar.add_parser(
         "note-path",
         help="""Return the path to the notefile (or potential file if the note doesn't
-                yet exist""",
+                yet exist)""",
         parents=[global_parent, new_parent_group,],
     )
     subparsers["note-path"].add_argument(
@@ -630,7 +630,8 @@ def cli(argv=None):
     subparsers["v1"] = subpar.add_parser(
         "v1",
         help="""Call the older notefile tool with all args passed to it. 
-                Example: `notefile v1 search-tags`""",
+                Example: 'notefile v1 search-tags'. v1 will *read* JSON 
+                but cannot *write* it. Will be DEPREACTED soon.""",
     )
 
     args = parser.parse_args(argv)
