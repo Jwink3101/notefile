@@ -158,8 +158,7 @@ For example, to search for all notes and perform a test do
 ```python
 import notefile
 for note in notefile.find(return_note=True):
-    note.read() # Access to data attribute
-    # test on note.data
+    # test on note.data (which is read automatically)
 ```
 
 Additional fields can be added (or removed) from `data` and will be saved when `write` is called.

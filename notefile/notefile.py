@@ -63,15 +63,14 @@ class Notefile:
         if the note already existed
     
     data:
-        Note data including 'notes' and 'tags'. Note that you *must* call read()
-        first
+        Note data including 'notes' and 'tags'. If called, will automatically read()
+        the note.
     
     Notable Methods:
     ---------------
     read()
-        Read the contents of the note. Cannot use data without having called
-        read()
-    
+        Read the contents of the note. Done automatically when accessing self.data
+        
     writes()
         Return a YAML string
         
@@ -156,7 +155,7 @@ class Notefile:
         self.orphaned = not exists_or_link(self.filename0)
 
         self.txt = None
-        self.data = None
+        self._data = None
         self._write_count = 0
 
     def read(self, _sha256=None):
@@ -170,56 +169,68 @@ class Notefile:
             except FileNotFoundError:
                 self.txt = self._read_from_broken_link_from_hide()
             try:
-                self.data = json.loads(self.txt)
+                self._data = json.loads(self.txt)
                 self.format = "json"
             except json.JSONDecodeError:
-                self.data = load_yaml(self.txt)
+                self._data = load_yaml(self.txt)
                 self.format = "yaml"
 
-            self.data.pop("__comment", None)
+            self._data.pop("__comment", None)
         else:
             debug("New notefile")
-            self.data = {}
+            self._data = {}
             try:
                 stat = os.stat(self.filename)
 
-                self.data["filesize"] = stat.st_size
-                self.data["mtime"] = stat.st_mtime
+                self._data["filesize"] = stat.st_size
+                self._data["mtime"] = stat.st_mtime
                 if self.hashfile:
-                    self.data["sha256"] = sha256(self.filename)
+                    self._data["sha256"] = sha256(self.filename)
                 self.txt = self.writes()
             except Exception as E:
                 if os.path.islink(self.filename0):
                     warn(f"{repr(self.filename0)} is a broken link to {repr(self.filename)}.")
-                    self.data["filesize"] = -1
-                    self.data["mtime"] = -1
+                    self._data["filesize"] = -1
+                    self._data["mtime"] = -1
                 else:
                     raise  # Not sure what causes this
 
-        if "tags" not in self.data:
-            self.data["tags"] = []
+        if "tags" not in self._data:
+            self._data["tags"] = []
 
         # Because we write with ruamel_yaml using YAML 1.2 and read (if possible)
         # with PyYAML (1.1), tags "yes" and "no" get converted to True and False.
         # Fix this edge case for now
         t = []
-        for tag in self.data["tags"]:
+        for tag in self._data["tags"]:
             if tag is True:
                 tag = "yes"
             if tag is False:
                 tag = "no"
             t.append(tag)
-        self.data["tags"][:] = t
+        self._data["tags"][:] = t
 
-        if self.note_field not in self.data:
-            self.data[self.note_field] = ""
-        self.data = Bunch(**self.data)
+        if self.note_field not in self._data:
+            self._data[self.note_field] = ""
+        self._data = Bunch(**self._data)
 
         # Make a copy for compare later. Use deep copy in case mutable
         # objects are modified
-        self.data0 = copy.deepcopy(self.data)
+        self._data0 = copy.deepcopy(self._data)
 
         return self  # for convenience
+
+    @property
+    def data(self):
+        if not self._data:
+            debug('Automatic read()')
+            self.read()
+        return self._data
+    
+    @data.setter
+    def data(self,data):
+        debug('data setter')
+        self._data = data
 
     def writes(self, format=None):
         """
@@ -227,9 +238,6 @@ class Notefile:
         
         If format is None, will use default. Otherwise, it can be set with a format
         """
-        if self.data is None:
-            raise ValueError("Cannot write empty data. Use read() or set data attribute")
-
         if self.note_field in self.data and isinstance(self.data[self.note_field], str,):
             self.data[self.note_field] = self.data[self.note_field].strip()
 
@@ -328,9 +336,6 @@ class Notefile:
             or the dest must not have anything in the field
         
         """
-        if not self.data:
-            self.read()
-
         if noteopts is None:
             noteopts = {}
 
@@ -428,9 +433,6 @@ class Notefile:
         """Launch the editor. Does *NOT* write()"""
         import subprocess, shlex
 
-        if self.data is None:
-            raise ValueError("Cannot edit empty data. Use read() or set data attribute")
-
         editor_names = ["EDITOR", "GIT_EDITOR", "SVN_EDITOR", "LOCAL_EDITOR"]
         for editor_name in editor_names:
             try:
@@ -481,7 +483,7 @@ class Notefile:
         os.unlink(tmpfile)
 
         if full:
-            self.data = Bunch(**load_yaml(newtxt))
+            self._data = Bunch(**load_yaml(newtxt))
         else:
             lines = iter(newtxt.strip().split("\n"))
             note = []
@@ -506,9 +508,6 @@ class Notefile:
 
     def add_note(self, note, replace=False):
         """Add (or replace) a note. Does *NOT* write()"""
-        if self.data is None:
-            raise ValueError("Cannot edit empty data. Use read() or set data attribute")
-
         if note is None:
             note = ""
 
@@ -604,9 +603,6 @@ class Notefile:
 
     def cat(self, tags=False, full=False):
         """cat the notes to a string"""
-        if self.data is None:
-            raise ValueError("Cannot cat empty data. Use read() or set data attribute")
-
         if full:
             return self.writes()
 
@@ -632,9 +628,6 @@ class Notefile:
     #         return yamltxt(self.data)
 
     def isempty(self,):
-        if self.data is None:
-            raise ValueError("Cannot determine empty with out read() or set data attribute")
-
         for key in set(self.data) - METADATA:
             if self.data[key]:
                 return False
@@ -653,8 +646,6 @@ class Notefile:
         
         does *NOT* write!
         """
-        if self.data is None:
-            raise ValueError("Cannot repair empty data. Use read() or set data attribute")
         # This is designed to be called before reading, etc for orphaned
         if not os.path.exists(self.filename):
             warn(f"File {repr(self.filename)} is orphaned or link is broken")
@@ -705,10 +696,6 @@ class Notefile:
         
         return the new dest or None
         """
-
-        if self.data is None:
-            raise ValueError("Cannot repair empty data. Use read() or set data attribute")
-
         from .find import find
 
         if filehash and len(self.data.get("sha256", "",)) != 64:  # not a computed hash
@@ -827,7 +814,7 @@ class Notefile:
             requeries = [re.compile(e, flags=flags,) for e in expr]
             query = lambda qtext: all(r.search(qtext) for r in requeries)
 
-        if not self.data:
+        if not self._data:
             # To speed this up grep the raw text first before even trying to parse the
             # note. This is a double search but is almost certainly faster than always
             # parsing and only done if we didn't read already
@@ -875,9 +862,6 @@ class Notefile:
         import re
 
         expr = list(flattenlist(expr))  # will make  a list of all strings
-
-        if not self.data:
-            self.read()
 
         ns = {
             "re": re,

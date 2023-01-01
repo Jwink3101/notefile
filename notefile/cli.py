@@ -660,7 +660,7 @@ def cli(argv=None):
                 args.mode = args.command
             VisChangeCLI(args)
         elif args.command == "cat":  # no need to call an object
-            note = Notefile(args.file, note_field=args.note_field,).read()
+            note = Notefile(args.file, note_field=args.note_field,)
             print(note.cat(tags=args.tags, full=args.full,))
         elif args.command in {"find", "export", "search", "grep", "query", "tags"}:
             args.tag = set(getattr(args, "tag", [],))
@@ -785,9 +785,6 @@ class DisplayMIXIN:
         tags = defaultdict(list)
 
         for note in notes:
-            if not note.data:
-                note.read()
-
             for tag in note.data.tags:
                 tags[tag].append(note.filename0)
 
@@ -826,8 +823,6 @@ class DisplayMIXIN:
         res["notefile version"] = __version__
         res["notes"] = {}
         for note in notes:
-            if not note.data:
-                note.read()
             res["notes"][note.filename0] = note.data
 
         # All exports are YAML regardless of mode.
@@ -925,7 +920,7 @@ class SingleMod(BaseCLI):
     def editmod(self):
         args = self.args
         for file in args.file:
-            note = Notefile(file, **self.noteopts,).read()
+            note = Notefile(file, **self.noteopts)
 
             note.modify_tags(add=args.tag, remove=args.remove)
             note.add_note(args.addnote, replace=args.replace)  # also does strip()

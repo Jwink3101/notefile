@@ -145,7 +145,7 @@ def find(
                 continue
 
             if empty is not None:  # True or False
-                isempty = nf.read().isempty()
+                isempty = nf.isempty()
                 if empty and not isempty:
                     continue
                 if not empty and isempty:

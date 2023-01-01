@@ -2,6 +2,11 @@
 
 (**_newest_** on *top*)
 
+## 2.20230101.0
+
+- Made the `Notefile` object call `.read()` automatically when needed. Added tests around this and cleaned up code that used to call `.read()`
+- Updated documentation including in CLI
+
 ## 2.20221231.0
 
 - For interactive edit, adds `--tags-only` flag and all `--full` edits are in YAML regardless of format
