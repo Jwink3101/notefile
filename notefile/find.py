@@ -21,47 +21,47 @@ def find(
 ):
     """
     find notes recurisvly starting in `path`
-    
+
     Options:
     --------
     path ['.']
         Where to look. Can be a list/tuple too and will uniquely join them.
         Directories will recurse and follow exclusions. Files will ALWAYS return
-        
+
     excludes []
         Specify excludes in glob-style. Will be checked against
         both filenames and directories. Will also be checked against
         directorys with "/" appended
-    
+
     matchcase [False]
         Whether or not to match the case of the exclude file
-    
+
     maxdepth [None]
         Specify a maximum depth. The current directory is 0
-    
+
     one_file_system [False]
         If True, do not cross filesystem boundaries.
-    
-    exclude_links [ False ] 
+
+    exclude_links [ False ]
         If True, will *not* return symlinked notes
-    
+
     include_orphaned [ False ]
-        If True, will ALSO return orphaned notes. 
-        Otherwise, they are excluded   
-    
+        If True, will ALSO return orphaned notes.
+        Otherwise, they are excluded
+
     empty [None]
         None: Return all (also optimized)
         True: Only return empty notes
         False: Only return non-empty notes
-        
+
     noteopts [{}]
         Options for the notefile created and returned
-    
+
     Yields:
     -------
     note
         Notefile object
-    
+
     """
     filemode = kwargs.pop("filemode", False)
     if kwargs:
@@ -99,7 +99,10 @@ def find(
     path = str(path)  # Path objects
 
     if os.path.isfile(path):
-        yield Notefile(path, **noteopts,) if not filemode else path
+        yield Notefile(
+            path,
+            **noteopts,
+        ) if not filemode else path
         return
 
     dev0 = os.stat(path).st_dev
@@ -115,9 +118,22 @@ def find(
         exclude_in_place(dirs, excludes, matchcase=matchcase, isdir=True)
 
         if one_file_system:
-            dirs[:] = [d for d in dirs if os.stat(os.path.join(root, d,)).st_dev == dev0]
+            dirs[:] = [
+                d
+                for d in dirs
+                if os.stat(
+                    os.path.join(
+                        root,
+                        d,
+                    )
+                ).st_dev
+                == dev0
+            ]
 
-        rel = os.path.relpath(root, path,)
+        rel = os.path.relpath(
+            root,
+            path,
+        )
         depth = rel.count("/") + 1 if rel != "." else 0
         if maxdepth is not None and depth > maxdepth:
             del dirs[:]  # Do not go deeper
@@ -126,7 +142,10 @@ def find(
         files.sort(key=_dot_sort)
         dirs.sort(key=lambda s: s.lower())
         for file in files:
-            ffile = os.path.join(root, file,)
+            ffile = os.path.join(
+                root,
+                file,
+            )
             isnote = file.lower().endswith(NOTESEXT)
             if filemode:
                 if isnote or (exclude_links and os.path.islink(ffile)):
@@ -137,7 +156,10 @@ def find(
             if not isnote:
                 continue
 
-            nf = Notefile(ffile, **noteopts,)
+            nf = Notefile(
+                ffile,
+                **noteopts,
+            )
             if exclude_links and nf.islink:
                 continue
 

@@ -22,7 +22,9 @@ setup(
     packages=["notefile"],
     install_requires=["ruamel.yaml"],
     long_description=open("readme.md").read(),
-    entry_points={"console_scripts": ["notefile=notefile.cli:cli"],},
+    entry_points={
+        "console_scripts": ["notefile=notefile.cli:cli"],
+    },
     version=__version__,
     description="Create associated notefiles (sidecar files)",
     url="https://github.com/Jwink3101/notefile",

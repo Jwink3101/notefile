@@ -39,12 +39,15 @@ def cli(argv=None):
                 or $NOTEFILE_NOTEFIELD environment variable""",
     )
     global_parent_group.add_argument(
-        "--version", action="version", version="%(prog)s-" + __version__,
+        "--version",
+        action="version",
+        version="%(prog)s-" + __version__,
     )
 
     find_parent = argparse.ArgumentParser(add_help=False)
     find_parent_group = find_parent.add_argument_group(
-        title="find Options", description="Flags for finding notes",
+        title="find Options",
+        description="Flags for finding notes",
     )
     find_parent_group.add_argument(
         "-p",
@@ -64,10 +67,14 @@ def cli(argv=None):
                 are also matched with a trailing '/'. Can specify multiple times.""",
     )
     find_parent_group.add_argument(
-        "--exclude-links", action="store_true", help="Do not include symlinked notefiles",
+        "--exclude-links",
+        action="store_true",
+        help="Do not include symlinked notefiles",
     )
     find_parent_group.add_argument(
-        "--match-exclude-case", action="store_true", help="Match case on exclude patterns",
+        "--match-exclude-case",
+        action="store_true",
+        help="Match case on exclude patterns",
     )
     find_parent_group.add_argument(
         "--max-depth",
@@ -79,7 +86,10 @@ def cli(argv=None):
                 The current directory is 0""",
     )
     find_parent_group.add_argument(
-        "-x", "--one-file-system", action="store_true", help="Do not cross filesystem boundaries",
+        "-x",
+        "--one-file-system",
+        action="store_true",
+        help="Do not cross filesystem boundaries",
     )
 
     disp_parent = argparse.ArgumentParser(add_help=False)
@@ -95,7 +105,9 @@ def cli(argv=None):
                 filenames have space""",
     )
     disp_parent_group.add_argument(
-        "--export", action="store_true", help="Export notes rather than printing names or tags",
+        "--export",
+        action="store_true",
+        help="Export notes rather than printing names or tags",
     )
     disp_parent_group.add_argument(
         "--tag-mode",
@@ -114,7 +126,10 @@ def cli(argv=None):
         help="""Orders the results by number of tags. Implies --tag-mode""",
     )
     disp_parent_group.add_argument(
-        "-o", "--output", metavar="FILE", help="""Write results to FILE instead of stdout""",
+        "-o",
+        "--output",
+        metavar="FILE",
+        help="""Write results to FILE instead of stdout""",
     )
     disp_parent_group.add_argument(
         "--symlink",
@@ -128,12 +143,15 @@ def cli(argv=None):
 
     search_parent = argparse.ArgumentParser(add_help=False)
     search_parent.add_argument(
-        "--all", action="store_true", help="Match for all. Default is ANY",
+        "--all",
+        action="store_true",
+        help="Match for all. Default is ANY",
     )
     # search_parent.add_argument('--any',action='store_true',help='Match for any (default)')
 
     search_parent_grep = search_parent.add_argument_group(
-        title="grep options", description="Search for string matches",
+        title="grep options",
+        description="Search for string matches",
     )
     search_parent_grep.add_argument(
         "--grep",
@@ -150,7 +168,9 @@ def cli(argv=None):
         help="Match the string literally without regex patterns for grep expression",
     )
     search_parent_grep.add_argument(
-        "--full-note", action="store_true", help="grep the full note, not just the notes",
+        "--full-note",
+        action="store_true",
+        help="grep the full note, not just the notes",
     )
     search_parent_grep.add_argument(
         "--full-word",
@@ -158,7 +178,9 @@ def cli(argv=None):
         help=r"Matches the full word(s) of the grep expression. (adds \b)",
     )
     search_parent_grep.add_argument(
-        "--match-expr-case", action="store_true", help="Match case on grep expression",
+        "--match-expr-case",
+        action="store_true",
+        help="Match case on grep expression",
     )
 
     search_parent_query = search_parent.add_argument_group(
@@ -184,10 +206,16 @@ def cli(argv=None):
 
     search_parent_tags = search_parent.add_argument_group(title="tag search options")
     search_parent_tags.add_argument(
-        "-t", "--tag", action="append", default=[], help="""Specify tag to find""",
+        "-t",
+        "--tag",
+        action="append",
+        default=[],
+        help="""Specify tag to find""",
     )
     search_parent_tags.add_argument(
-        "--tag-all", action="store_true", help="""Match all specified tags""",
+        "--tag-all",
+        action="store_true",
+        help="""Match all specified tags""",
     )
 
     new_parent = argparse.ArgumentParser(add_help=False)
@@ -200,7 +228,11 @@ def cli(argv=None):
     )
     new_parent_group.add_argument(
         "--link",
-        choices=["source", "symlink", "both",],
+        choices=[
+            "source",
+            "symlink",
+            "both",
+        ],
         default="both",
         help="""['%(default)s'] Specify how to handle symlinks. If 'source', will add 
                 the notefile to the source only (non-recursively). If 'symlink', will 
@@ -239,7 +271,10 @@ def cli(argv=None):
     )
     new_parent_group.add_argument(
         "--format",
-        choices=["json", "yaml",],
+        choices=[
+            "json",
+            "yaml",
+        ],
         default=FORMAT,
         help="""Note format for writing NEW notes. Will not change the format
                 for existing notes unless --rewrite-format is set.
@@ -292,13 +327,27 @@ def cli(argv=None):
         title="Modify Notes", description="Add or replace notes. Add or remove tags"
     )
     editmod_parent_mod.add_argument(
-        "-r", "--remove", default=[], action="append", metavar="TAG", help="Specify tags to remove",
+        "-r",
+        "--remove",
+        default=[],
+        action="append",
+        metavar="TAG",
+        help="Specify tags to remove",
     )
     editmod_parent_mod.add_argument(
-        "-t", "--tag", "-a", "--add", default=[], action="append", help="Specify tags to add",
+        "-t",
+        "--tag",
+        "-a",
+        "--add",
+        default=[],
+        action="append",
+        help="Specify tags to add",
     )
     editmod_parent_mod.add_argument(
-        "-R", "--replace", action="store_true", help="Replace rather than append the new note",
+        "-R",
+        "--replace",
+        action="store_true",
+        help="Replace rather than append the new note",
     )
     editmod_parent_mod.add_argument(
         "-n",
@@ -318,11 +367,16 @@ def cli(argv=None):
 
     repair_parent = argparse.ArgumentParser(add_help=False)
     repair_parent.add_argument(
-        "path", nargs="*", action="extend", help="Additional --path arguments",
+        "path",
+        nargs="*",
+        action="extend",
+        help="Additional --path arguments",
     )
     repair_parent_group = repair_parent.add_argument_group(title="Repair Options")
     repair_parent_group.add_argument(
-        "--dry-run", action="store_true", help="Do not make any changes",
+        "--dry-run",
+        action="store_true",
+        help="Do not make any changes",
     )
 
     repair_meta_parent = argparse.ArgumentParser(add_help=False)
@@ -335,13 +389,19 @@ def cli(argv=None):
 
     repair_orphaned_parent = argparse.ArgumentParser(add_help=False)
     repair_orphaned_parent_group = repair_orphaned_parent.add_argument_group(
-        title="Repair orphaned options", description=None,
+        title="Repair orphaned options",
+        description=None,
     )
     repair_orphaned_parent_group.add_argument(
         "--match",
         default=None,
         action="append",
-        choices=["size", "mtime", "hash", "name",],
+        choices=[
+            "size",
+            "mtime",
+            "hash",
+            "name",
+        ],
         help="""Specify how to search for matches. Specify multiple as needed. 'size'
                 is ALWAYS implied but is the only attribute if '--match size' is the sole
                 flag. Default is '--match mtime --match hash' (with '--match size' 
@@ -368,10 +428,14 @@ def cli(argv=None):
                 are also matched with a trailing '/'. Can specify multiple times.""",
     )
     repair_orphaned_parent_group.add_argument(
-        "--search-exclude-links", action="store_true", help="Do not include symlinked files",
+        "--search-exclude-links",
+        action="store_true",
+        help="Do not include symlinked files",
     )
     repair_orphaned_parent_group.add_argument(
-        "--search-match-exclude-case", action="store_true", help="Match case on exclude patterns",
+        "--search-match-exclude-case",
+        action="store_true",
+        help="Match case on exclude patterns",
     )
     repair_orphaned_parent_group.add_argument(
         "--search-max-depth",
@@ -388,7 +452,10 @@ def cli(argv=None):
         help="Do not cross filesystem boundaries when searching for a file",
     )
 
-    parser = argparse.ArgumentParser(description="MAIN", parents=[global_parent],)
+    parser = argparse.ArgumentParser(
+        description="MAIN",
+        parents=[global_parent],
+    )
     subpar = parser.add_subparsers(
         dest="command",
         title="Commands",
@@ -403,7 +470,9 @@ def cli(argv=None):
         help="Modify notes. Edit interactivly, add or replace notes, add or remove tags",
     )
     subparsers["mod"].add_argument(
-        "file", help="Specify file(s)", nargs="+",
+        "file",
+        help="Specify file(s)",
+        nargs="+",
     )
 
     subparsers["edit"] = subpar.add_parser(
@@ -412,31 +481,45 @@ def cli(argv=None):
         help="Shortcut for '%(prog)s mod --edit'",
     )
     subparsers["edit"].add_argument(
-        "file", help="Specify file(s)", nargs="+",
+        "file",
+        help="Specify file(s)",
+        nargs="+",
     )
 
     subparsers["copy"] = subpar.add_parser(
         "copy",
         help="Copy the notes from SRC to DST(s). DST must not have any notes",
-        parents=[new_parent, global_parent,],
+        parents=[
+            new_parent,
+            global_parent,
+        ],
     )
     subparsers["copy"].add_argument(
-        "SRC", help="Source note",
+        "SRC",
+        help="Source note",
     )
     subparsers["copy"].add_argument(
-        "DST", nargs="+", help="Destination file. Must not have ANY notes",
+        "DST",
+        nargs="+",
+        help="Destination file. Must not have ANY notes",
     )
 
     subparsers["replace"] = subpar.add_parser(
         "replace",
         help="Replace/Update some or all of the content in SRC to notes in DST",
-        parents=[new_parent, global_parent,],
+        parents=[
+            new_parent,
+            global_parent,
+        ],
     )
     subparsers["replace"].add_argument(
-        "SRC", help="Source note",
+        "SRC",
+        help="Source note",
     )
     subparsers["replace"].add_argument(
-        "DST", nargs="+", help="Destination file",
+        "DST",
+        nargs="+",
+        help="Destination file",
     )
     subparsers["replace"].add_argument(
         "--field",
@@ -465,18 +548,29 @@ def cli(argv=None):
     subparsers["change-tag"] = subpar.add_parser(
         "change-tag",
         help="Change one tag to another (or multiple) and display the results",
-        parents=[global_parent, find_parent, disp_parent, new_parent,],
+        parents=[
+            global_parent,
+            find_parent,
+            disp_parent,
+            new_parent,
+        ],
     )
     # ^^ Doesn't really need new_parent since will always already exist but wanted to
     #    include changing the format
     subparsers["change-tag"].add_argument(
-        "old", help="old tag to change",
+        "old",
+        help="old tag to change",
     )
     subparsers["change-tag"].add_argument(
-        "new", help="new tag(s)", nargs="+",
+        "new",
+        help="new tag(s)",
+        nargs="+",
     )
     subparsers["change-tag"].add_argument(
-        "-n", "--dry-run", action="store_true", help="""Do not make changes""",
+        "-n",
+        "--dry-run",
+        action="store_true",
+        help="""Do not make changes""",
     )
 
     subparsers["vis"] = subpar.add_parser(
@@ -492,31 +586,57 @@ def cli(argv=None):
         )
 
     subparsers["vis"].add_argument(
-        "mode", choices=["hide", "show",], help="Visibility mode for file(s)/dir(s) ",
+        "mode",
+        choices=[
+            "hide",
+            "show",
+        ],
+        help="Visibility mode for file(s)/dir(s) ",
     )
     # Do these as a loop rather than a parent since I need to inject an argument
     # as opposed to options
     for mode in ["show", "hide", "vis"]:
         subparsers[mode].add_argument(
-            "path", nargs="*", action="extend", help="Additional --path arguments",
+            "path",
+            nargs="*",
+            action="extend",
+            help="Additional --path arguments",
         )
         subparsers[mode].add_argument(
-            "-n", "--dry-run", action="store_true", help="""Do not make changes""",
+            "-n",
+            "--dry-run",
+            action="store_true",
+            help="""Do not make changes""",
         )
 
     subparsers["format"] = subpar.add_parser(
         "format",
         help="Change the format of file(s)/dir(s)",
-        parents=[global_parent, find_parent, disp_parent,],
+        parents=[
+            global_parent,
+            find_parent,
+            disp_parent,
+        ],
     )
     subparsers["format"].add_argument(
-        "format", choices=["yaml", "json",], help="Change the note format for file(s)/dir(s)",
+        "format",
+        choices=[
+            "yaml",
+            "json",
+        ],
+        help="Change the note format for file(s)/dir(s)",
     )
     subparsers["format"].add_argument(
-        "path", nargs="*", action="extend", help="Additional --path arguments",
+        "path",
+        nargs="*",
+        action="extend",
+        help="Additional --path arguments",
     )
     subparsers["format"].add_argument(
-        "-n", "--dry-run", action="store_true", help="""Do not make changes""",
+        "-n",
+        "--dry-run",
+        action="store_true",
+        help="""Do not make changes""",
     )
 
     subparsers["repair"] = subpar.add_parser(
@@ -534,18 +654,35 @@ def cli(argv=None):
     subparsers["repair", "m",] = subpar.add_parser(
         "repair-metadata",
         help="Repair notefile(s): metadata",
-        parents=[global_parent, find_parent, new_parent, repair_parent, repair_meta_parent,],
+        parents=[
+            global_parent,
+            find_parent,
+            new_parent,
+            repair_parent,
+            repair_meta_parent,
+        ],
     )
     subparsers["repair", "o",] = subpar.add_parser(
         "repair-orphaned",
         help="Repair notefile(s): orphaned",
-        parents=[global_parent, find_parent, new_parent, repair_parent, repair_orphaned_parent,],
+        parents=[
+            global_parent,
+            find_parent,
+            new_parent,
+            repair_parent,
+            repair_orphaned_parent,
+        ],
     )
 
     ## Single item see
-    subparsers["cat"] = subpar.add_parser("cat", help="Print the note", parents=[global_parent],)
+    subparsers["cat"] = subpar.add_parser(
+        "cat",
+        help="Print the note",
+        parents=[global_parent],
+    )
     subparsers["cat"].add_argument(
-        "file", help="Specify file to cat",
+        "file",
+        help="Specify file to cat",
     )
     subparsers["cat"].add_argument(
         "-f",
@@ -554,12 +691,21 @@ def cli(argv=None):
         help="Display the full YAML note rather than just the note text",
     )
     subparsers["cat"].add_argument(
-        "-t", "--tags", action="store_true", help="Display the tags",
+        "-t",
+        "--tags",
+        action="store_true",
+        help="Display the tags",
     )
 
     ## Multi-item search and/or see
     subparsers["find"] = subpar.add_parser(
-        "find", help="Find and list all notes", parents=[global_parent, find_parent, disp_parent,],
+        "find",
+        help="Find and list all notes",
+        parents=[
+            global_parent,
+            find_parent,
+            disp_parent,
+        ],
     )
     subparsers["find"].add_argument(
         "--orphaned",
@@ -574,25 +720,45 @@ def cli(argv=None):
             "Note, can use '%(prog)s search --export <search flags>' if needed "
             "with search queries."
         ),
-        parents=[global_parent, find_parent, disp_parent,],
+        parents=[
+            global_parent,
+            find_parent,
+            disp_parent,
+        ],
     )
     subparsers["export"].add_argument(
-        "path", nargs="*", action="extend", help="Additional --path arguments",
+        "path",
+        nargs="*",
+        action="extend",
+        help="Additional --path arguments",
     )
 
     subparsers["search"] = subpar.add_parser(
         "search",
         help="Find and list all notes with criteria",
-        parents=[global_parent, find_parent, search_parent, disp_parent,],
+        parents=[
+            global_parent,
+            find_parent,
+            search_parent,
+            disp_parent,
+        ],
     )
 
     subparsers["grep"] = subpar.add_parser(
         "grep",
         help="Shortcut for '%(prog)s search --grep'",
-        parents=[global_parent, find_parent, search_parent, disp_parent,],
+        parents=[
+            global_parent,
+            find_parent,
+            search_parent,
+            disp_parent,
+        ],
     )
     subparsers["grep"].add_argument(
-        "grep", nargs="*", action="extend", help="Additional --grep expressions",
+        "grep",
+        nargs="*",
+        action="extend",
+        help="Additional --grep expressions",
     )
 
     subparsers["query"] = subpar.add_parser(
@@ -601,19 +767,34 @@ def cli(argv=None):
                 on queries""",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog=query_help(print_help=False),
-        parents=[global_parent, find_parent, search_parent, disp_parent,],
+        parents=[
+            global_parent,
+            find_parent,
+            search_parent,
+            disp_parent,
+        ],
     )
     subparsers["query"].add_argument(
-        "query", nargs="*", action="extend", help="""Additional queries added to any --query.""",
+        "query",
+        nargs="*",
+        action="extend",
+        help="""Additional queries added to any --query.""",
     )
 
     subparsers["tags"] = subpar.add_parser(
         "tags",
         help="Shortcut for '%(prog)s search --tag-mode --tag'",
-        parents=[global_parent, find_parent, search_parent, disp_parent,],
+        parents=[
+            global_parent,
+            find_parent,
+            search_parent,
+            disp_parent,
+        ],
     )
     subparsers["tags"].add_argument(
-        "tag", nargs="*", action="extend",
+        "tag",
+        nargs="*",
+        action="extend",
     )
 
     # Path
@@ -621,10 +802,15 @@ def cli(argv=None):
         "note-path",
         help="""Return the path to the notefile (or potential file if the note doesn't
                 yet exist)""",
-        parents=[global_parent, new_parent_group,],
+        parents=[
+            global_parent,
+            new_parent_group,
+        ],
     )
     subparsers["note-path"].add_argument(
-        "path", nargs="+", help="Specify path(s). Will print in order",
+        "path",
+        nargs="+",
+        help="Specify path(s). Will print in order",
     )
 
     subparsers["v1"] = subpar.add_parser(
@@ -660,17 +846,38 @@ def cli(argv=None):
                 args.mode = args.command
             VisChangeCLI(args)
         elif args.command == "cat":  # no need to call an object
-            note = Notefile(args.file, note_field=args.note_field,)
-            print(note.cat(tags=args.tags, full=args.full,))
+            note = Notefile(
+                args.file,
+                note_field=args.note_field,
+            )
+            print(
+                note.cat(
+                    tags=args.tags,
+                    full=args.full,
+                )
+            )
         elif args.command in {"find", "export", "search", "grep", "query", "tags"}:
-            args.tag = set(getattr(args, "tag", [],))
+            args.tag = set(
+                getattr(
+                    args,
+                    "tag",
+                    [],
+                )
+            )
             if args.command == "tags":
                 args.tag_mode = True
             if args.command == "export":
                 args.export = True
 
             tagkeys = ["tag_mode", "tag_counts", "tag_count_order"]
-            args.tag_mode = any(getattr(args, k, False,) for k in tagkeys)
+            args.tag_mode = any(
+                getattr(
+                    args,
+                    k,
+                    False,
+                )
+                for k in tagkeys
+            )
 
             SearchCLI(args)
         elif args.command in {"repair", "repair-metadata", "repair-orphaned"}:
@@ -685,7 +892,10 @@ def cli(argv=None):
 
 
 ################## Currently undocumented...
-nproc = os.environ.get("NOTEFILE_PAR", "1",)
+nproc = os.environ.get(
+    "NOTEFILE_PAR",
+    "1",
+)
 if nproc.strip().lower() == "all":
     nproc = os.cpu_count()
 if int(nproc) > 1:
@@ -698,10 +908,11 @@ if int(nproc) > 1:
         with mp.Pool() as pool:
             yield from pool.imap_unordered(_r, notes, chunksize=100)
 
-
 else:
 
-    def noteread(notes,):
+    def noteread(
+        notes,
+    ):
         """Just call read. But may get parallel in the future"""
         for note in notes:
             yield note.read()
@@ -715,7 +926,10 @@ class BaseCLI:
         args = self.args
         from . import find
 
-        noteopts = kwargs.pop("noteopts", {},)
+        noteopts = kwargs.pop(
+            "noteopts",
+            {},
+        )
         noteopts["note_field"] = args.note_field
         yield from find(
             path=args.path,
@@ -742,7 +956,10 @@ class BaseCLI:
 
     @property
     def outbuffer(self):
-        if not hasattr(self, "_outbuffer",):
+        if not hasattr(
+            self,
+            "_outbuffer",
+        ):
             if self.args.output:
                 self._outbuffer = open(self.args.output, "wb")
             else:
@@ -777,7 +994,7 @@ class DisplayMIXIN:
 
     def display_tags(self, notes):
         """
-        Display for tag modes. 
+        Display for tag modes.
         This will have to wait for the notes iterator to finish
         """
         from collections import defaultdict
@@ -793,7 +1010,14 @@ class DisplayMIXIN:
 
         counts = {tag: len(notes) for tag, notes in tags.items()}
         if self.args.tag_count_order:
-            tagorder = sorted(tags, key=lambda tag: (counts[tag], tag,), reverse=True,)
+            tagorder = sorted(
+                tags,
+                key=lambda tag: (
+                    counts[tag],
+                    tag,
+                ),
+                reverse=True,
+            )
         else:
             tagorder = sorted(tags)
 
@@ -803,16 +1027,26 @@ class DisplayMIXIN:
             if self.args.tag_counts:
                 resdict[tag] = counts[tag]
             else:
-                resdict[tag] = sorted(tags[tag], key=str.lower,)
+                resdict[tag] = sorted(
+                    tags[tag],
+                    key=str.lower,
+                )
 
         yaml.dump(
-            resdict, self.outbuffer,
+            resdict,
+            self.outbuffer,
         )
         self.outbuffer.flush()
 
         if self.args.symlink:
-            for (tag, notes,) in tags.items():
-                dirdest = os.path.join(self.args.symlink, tag,)
+            for (
+                tag,
+                notes,
+            ) in tags.items():
+                dirdest = os.path.join(
+                    self.args.symlink,
+                    tag,
+                )
                 for note in notes:
                     utils.symlink_file(note, dirdest)
 
@@ -849,7 +1083,12 @@ class SearchCLI(DisplayMIXIN, BaseCLI):
             if args.command != "export":
                 # Read stdin on query if -
                 args.query = [
-                    q if q != "-" else sys.stdin.read().strip() for q in getattr(args, "query", [],)
+                    q if q != "-" else sys.stdin.read().strip()
+                    for q in getattr(
+                        args,
+                        "query",
+                        [],
+                    )
                 ]
                 # Process. Do the query
                 notes = (note for note in notes if self.test(note))
@@ -872,14 +1111,21 @@ class SearchCLI(DisplayMIXIN, BaseCLI):
 
         m = False  # whether we did anything
         if args.grep:
-            t = note.grep(args.grep, **grepopts,)
+            t = note.grep(
+                args.grep,
+                **grepopts,
+            )
             if args.all and not t:
                 return False  # short circuit
             elif not args.all and t:
                 return True
             m = True
         if args.query:
-            t = note.query(args.query, allow_exception=args.allow_exception, **grepopts,)
+            t = note.query(
+                args.query,
+                allow_exception=args.allow_exception,
+                **grepopts,
+            )
             if args.all and not t:
                 return False  # short circuit
             elif not args.all and t:
@@ -936,13 +1182,23 @@ class SingleMod(BaseCLI):
 class CopyReplace(BaseCLI):
     def __init__(self, args):
         self.args = args
-        src = Notefile(args.SRC, **self.noteopts,)
+        src = Notefile(
+            args.SRC,
+            **self.noteopts,
+        )
 
         if args.command == "copy":
-            opts = dict(allfields=True, newonly=True, append=False,)
+            opts = dict(
+                allfields=True,
+                newonly=True,
+                append=False,
+            )
         else:
             opts = dict(
-                fields=args.field, allfields=args.all_fields, newonly=False, append=args.append,
+                fields=args.field,
+                allfields=args.all_fields,
+                newonly=False,
+                append=args.append,
             )
 
         for dst in args.DST:
@@ -972,7 +1228,10 @@ class ChangeTag(DisplayMIXIN, BaseCLI):
         if self.old in tags:
             if self.args.dry_run:
                 return note
-            return note.modify_tags(add=self.new, remove=self.old,).write()
+            return note.modify_tags(
+                add=self.new,
+                remove=self.old,
+            ).write()
 
 
 class VisChangeCLI(DisplayMIXIN, BaseCLI):
@@ -983,7 +1242,14 @@ class VisChangeCLI(DisplayMIXIN, BaseCLI):
             self.outbuffer.flush()
 
         notes = self.find()
-        notes = (note for note in notes if note.change_visibility(args.mode, dry_run=args.dry_run,))
+        notes = (
+            note
+            for note in notes
+            if note.change_visibility(
+                args.mode,
+                dry_run=args.dry_run,
+            )
+        )
         self.display_dispatch(notes)
 
     # Because we do not need to otherwise read the notes
@@ -1001,7 +1267,12 @@ class FormatChangeCLI(DisplayMIXIN, BaseCLI):
             self.outbuffer.write(b"# DRY RUN\n")
             self.outbuffer.flush()
 
-        notes = self.find(noteopts=dict(format=args.format, rewrite_format=True,))
+        notes = self.find(
+            noteopts=dict(
+                format=args.format,
+                rewrite_format=True,
+            )
+        )
         notes = noteread(notes)
         notes = (note for note in notes if note.format != note.format0)
         if not args.dry_run:
@@ -1028,18 +1299,27 @@ class RepairCLI(BaseCLI):
     def repair_metadata(self):
         args = self.args
 
-        notes = self.find(noteopts=self.noteopts, include_orphaned=False,)
+        notes = self.find(
+            noteopts=self.noteopts,
+            include_orphaned=False,
+        )
         notes = noteread(notes)
         for note in notes:
             if note.orphaned:
                 continue  # can happen iff path is DIRECTLY specified
-            if note.repair_metadata(dry_run=args.dry_run, force=args.force_refresh,):
+            if note.repair_metadata(
+                dry_run=args.dry_run,
+                force=args.force_refresh,
+            ):
                 note.write()
                 print(f'repaired{" (DRY-RUN)" if args.dry_run else ""}: {note.filename0}')
 
     def repair_orphaned(self):
         args = self.args
-        notes = self.find(noteopts=self.noteopts, include_orphaned=True,)
+        notes = self.find(
+            noteopts=self.noteopts,
+            include_orphaned=True,
+        )
         notes = (note for note in notes if note.orphaned)
         notes = noteread(notes)
 
@@ -1072,4 +1352,10 @@ class NotePathCLI(BaseCLI):
     def __init__(self, args):
         self.args = args
         for path in args.path:
-            print(Notefile(path, **self.noteopts,).destnote0, flush=True)
+            print(
+                Notefile(
+                    path,
+                    **self.noteopts,
+                ).destnote0,
+                flush=True,
+            )

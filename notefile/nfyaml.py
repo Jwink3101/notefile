@@ -26,14 +26,26 @@ def pss(item):
     Convert strings with '\n' to PreservedScalarString
     and recurse into dicts and lists (and tuples which are converted to lists).
     """
-    if isinstance(item, (list, tuple,),):
+    if isinstance(
+        item,
+        (
+            list,
+            tuple,
+        ),
+    ):
         return [pss(i) for i in item]  # Convert tuples to lists for parsing
     elif isinstance(item, dict):
         item = item.copy()
         for key, val in item.items():
             item[key] = pss(val)
         return item
-    elif isinstance(item, str,) and "\n" in item:
+    elif (
+        isinstance(
+            item,
+            str,
+        )
+        and "\n" in item
+    ):
         return PreservedScalarString(item)
     else:
         return item
@@ -54,8 +66,10 @@ try:
         from yaml import Loader
 
     def load_yaml(txt):
-        return pyyaml.load(txt, Loader=Loader,)
-
+        return pyyaml.load(
+            txt,
+            Loader=Loader,
+        )
 
 except ImportError:
     debug("no pyyaml. Fallback to ruamel_yaml to load")

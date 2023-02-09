@@ -2,6 +2,10 @@
 
 (**_newest_** on *top*)
 
+## Next
+
+- Cleanup documentation and code.
+
 ## 2.20230101.0
 
 - Made the `Notefile` object call `.read()` automatically when needed. Added tests around this and cleaned up code that used to call `.read()`

@@ -6,7 +6,7 @@ from . import debug, DT, warn
 def now_string(Z=False):
     """
     Return an RFC3339 Time string
-    
+
     Options:
     --------
     UTC [False]
@@ -26,7 +26,7 @@ def now_string(Z=False):
 
 class Bunch(dict):
     """
-    Based on sklearn's and the PyPI version, simple dict with 
+    Based on sklearn's and the PyPI version, simple dict with
     dot notation
     """
 
@@ -50,10 +50,10 @@ class Bunch(dict):
         return "Bunch(**{})".format(s)
 
 
-def sha256(filepath, blocksize=2 ** 20):
+def sha256(filepath, blocksize=2**20):
     """
-    Return the sha256 hash of a file. 
-    
+    Return the sha256 hash of a file.
+
     `blocksize` adjusts how much of the file is read into memory at a time.
     This is useful for large files.
         2**20: 1 mb
@@ -92,24 +92,24 @@ def exclude_in_place(
 ):
     """
     Helper tool to apply exclusions IN PLACE in mylist
-    
+
     Options:
     --------
     isdir [False]
         Whether to also test for directories explicitly (trailing / on dirs)
-    
+
     matchcase:
         Match case on exclusions
-    
+
     remove_noteext [False]
         test and compare without NOTESEXT. Also assumes the main file
         does not have a . if the note is hidden
-    
+
     keep_notes_only [None] {None,True,False}
         None: No Filters
         True: Removes *NON* notes
         False: Removes Notes
-    
+
     """
     import fnmatch  # Lazy
     from . import NOTESEXT

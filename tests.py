@@ -69,36 +69,35 @@ def call(s, capture=False):
     except SystemExit:
         raise SysExitError()
 
+
 class CaptureDebug:
     def __init__(self):
         self.stdout = None
         self.stderr = None
-        
+
     def __enter__(self):
-        print('__enter__')
         self._o, self._e = sys.stdout, sys.stderr
         sys.stdout = io.StringIO()
         sys.stdout.buffer = sys.stdout
         sys.stderr = io.StringIO()
         sys.stderr.buffer = sys.stderr
-        
+
         self._d = notefile.DEBUG
         notefile.DEBUG = True
-        
+
         return self
+
     def __exit__(self, type, value, traceback):
-        
         notefile.DEBUG = self._d
-        
+
         sys.stdout.flush()
         sys.stderr.flush()
-        
+
         self.stdout = sys.stdout.getvalue()
         self.stderr = sys.stderr.getvalue()
-        
+
         sys.stdout, sys.stderr = self._o, self._e
         sys.stdout.flush()
-        print('__exit__')
         sys.stderr.flush()
 
 
@@ -1322,7 +1321,8 @@ def test_orphan_repair():
     assert warning_parse(e) == {"filewon.txt", "sub/file1.txt"}
 
     _, e = call(
-        "repair --search-exclude '*one*' --search-match-exclude-case --debug", capture=True,
+        "repair --search-exclude '*one*' --search-match-exclude-case --debug",
+        capture=True,
     )
     assert warning_parse(e) == {"sub/file1.txt", "file ONE.txt", "filewon.txt"}
 
@@ -1421,6 +1421,7 @@ def test_nonstr():
 
     os.chdir(TESTDIR)
 
+
 def test_auto_read():
     """test the new automatic read"""
     os.chdir(TESTDIR)
@@ -1430,30 +1431,31 @@ def test_auto_read():
 
     writefile("file1.txt", "file1")
     note = Notefile("file1.txt")
-    
+
     # get data without having to call .read()
-    assert note._data is None # Not yet read
-    note.data # Should cause it to read
+    assert note._data is None  # Not yet read
+    note.data  # Should cause it to read
     assert note._data
     assert note._data is note.data
-    
+
     # Call some methods that used to have errors
-    Notefile("file1.txt").add_note('test')
+    Notefile("file1.txt").add_note("test")
     Notefile("file1.txt").cat()
     Notefile("file1.txt").isempty()
     Notefile("file1.txt").repair_metadata()
-    
+
     # Check the debug
     with CaptureDebug() as de:
-        note = Notefile('file1.txt')
+        note = Notefile("file1.txt")
         note.data
-        note.data = 'new'
-    
+        note.data = "new"
+
     stderr = "".join(de.stderr)
-    assert 'DEBUG: Automatic read()' in stderr
-    assert 'DEBUG: data setter' in stderr
-    
+    assert "DEBUG: Automatic read()" in stderr
+    assert "DEBUG: data setter" in stderr
+
     os.chdir(TESTDIR)
+
 
 if __name__ == "__main__":
     pass

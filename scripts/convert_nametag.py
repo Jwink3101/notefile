@@ -21,7 +21,7 @@ retags = re.compile("^(.*)[\_|-][\[|\(](.*?)[\]|\)]$")
 def get_tag(filename):
     """
     Return: ( [[tag1,...,tagN], nontagname)
-    
+
     Tags are in their "strip"ed format (lowercase and with _)
     """
     base, ext = os.path.splitext(filename)

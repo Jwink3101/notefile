@@ -1,0 +1,33 @@
+#!/usr/bin/env bash
+if [ $# -eq 0 ]; then
+    >&2 echo "
+gpgsign2notefile -- GPG sign file to a notefile.
+
+Usage:
+
+    $ sign2notefile FILE [notefile-flags]
+
+Defaults to the note-field \"gpg-sig\" but can be set with
+the '--note-field' flag.
+
+Can programmatically extract with 
+
+    $ notefile cat --note-field gpg-sig FILE
+
+This can be easily recreated for other signing tools as well. Future versions
+may also optionally add your private key as a field but that can also be done
+manually
+    
+    $ gpg --export --armor | \
+        notefile mod --stdin --replace --note-field \"gpg_pub\" FILE
+
+Last Updated: 2023-01-23
+"
+    exit 1
+fi
+
+file=$1
+shift
+
+gpg --detach-sign --armor --output - "$file" \
+    | notefile mod --stdin --replace --note-field "gpg-sig" "$file" "$@"
