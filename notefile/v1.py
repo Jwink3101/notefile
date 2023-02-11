@@ -2211,7 +2211,7 @@ def cliactions(args):
                     excludes=getattr(args,'exclude',None),
                     matchcase=getattr(args,'match_case',False),
                     maxdepth=getattr(args,'maxdepth',None),
-                    exclude_links=getattr(args,'exclude_links',False),
+                    exclude_links=getattr(args,'exclude_links',False)
                     )
     
     ## Modification Actions

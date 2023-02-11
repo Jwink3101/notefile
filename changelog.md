@@ -2,9 +2,10 @@
 
 (**_newest_** on *top*)
 
-## Next
+## 2.20230211.0
 
-- Cleanup documentation and code.
+- Cleanup documentation and code. Some Python Black commands must have gotten messed up because it was UGLY. Cleaned it up
+- Saving a note makes it `.exist`
 
 ## 2.20230101.0
 

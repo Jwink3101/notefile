@@ -1,4 +1,4 @@
-__version__ = "2.20230101.0"
+__version__ = "2.20230211.0"
 __author__ = "Justin Winokur"
 
 import sys, os
@@ -9,36 +9,10 @@ if sys.version_info < (3, 8):
     sys.exit(1)
 
 # Env Variables
-HIDDEN = (
-    os.environ.get(
-        "NOTEFILE_HIDDEN",
-        "false",
-    )
-    .strip()
-    .lower()
-    == "true"
-)
-DEBUG = (
-    os.environ.get(
-        "NOTEFILE_DEBUG",
-        "false",
-    )
-    .strip()
-    .lower()
-    == "true"
-)
-NOTEFIELD = os.environ.get(
-    "NOTEFILE_NOTEFIELD",
-    "notes",
-).strip()
-FORMAT = (
-    os.environ.get(
-        "NOTEFILE_FORMAT",
-        "yaml",
-    )
-    .strip()
-    .lower()
-)
+HIDDEN = os.environ.get("NOTEFILE_HIDDEN", "false").strip().lower() == "true"
+DEBUG = os.environ.get("NOTEFILE_DEBUG", "false").strip().lower() == "true"
+NOTEFIELD = os.environ.get("NOTEFILE_NOTEFIELD", "notes").strip()
+FORMAT = os.environ.get("NOTEFILE_FORMAT", "yaml").strip().lower()
 
 # Constants
 NOTESEXT = ".notes.yaml"
@@ -61,9 +35,7 @@ from .find import find
 from .notefile import Notefile, get_filenames
 
 
-def query_help(
-    print_help=True,
-):
+def query_help(print_help=True):
     help = """\
 Queries:
 --------

@@ -114,11 +114,7 @@ class Notefile:
             warn(f"hidden files may not always work: {repr(self.filename)}")
 
         # Store the original paths. Will be reset later if link
-        self.destnote0, _ = hidden_chooser(
-            self.vis_note,
-            self.hid_note,
-            hidden,
-        )
+        self.destnote0, _ = hidden_chooser(self.vis_note, self.hid_note, hidden)
         self.filename0 = self.filename
         self.vis_note0 = self.vis_note
         self.hid_note0 = self.hid_note
@@ -242,16 +238,10 @@ class Notefile:
 
         If format is None, will use default. Otherwise, it can be set with a format
         """
-        if self.note_field in self.data and isinstance(
-            self.data[self.note_field],
-            str,
-        ):
+        if self.note_field in self.data and isinstance(self.data[self.note_field], str):
             self.data[self.note_field] = self.data[self.note_field].strip()
 
-        tags = self.data.get(
-            "tags",
-            [],
-        )
+        tags = self.data.get("tags", [])
         tags = set(t.strip() for t in tags if t.strip())
         self.data["tags"] = sorted(tags)
 
@@ -268,11 +258,7 @@ class Notefile:
         if format.lower() == "json":
             _d = {"__comment": f"JSON Formatted notes created with notefile version {__version__}"}
             _d.update(data)
-            return json.dumps(
-                _d,
-                indent=1,
-                ensure_ascii=False,
-            )
+            return json.dumps(_d, indent=1, ensure_ascii=False)
         else:  # the default
             data = ruamel_yaml.comments.CommentedMap(data)
             data.yaml_set_start_comment(
@@ -312,6 +298,7 @@ class Notefile:
         self.make_links()
 
         self._write_count += 1
+        self.exists = True
         return self  # for convenience
 
     save = dump = write
@@ -356,19 +343,13 @@ class Notefile:
         if fields is None:
             fields = [self.note_field]
 
-        if isinstance(
-            fields,
-            str,
-        ):
+        if isinstance(fields, str):
             fields = [fields]
 
         if allfields:
             fields = set(self.data)
 
-        dst_note = Notefile(
-            dst,
-            **noteopts,
-        )
+        dst_note = Notefile(dst, **noteopts)
         if newonly and (exists_or_link(dst_note.destnote0) or exists_or_link(dst_note.destnote)):
             raise ValueError("Dest cannot have a note already")
 
@@ -394,10 +375,7 @@ class Notefile:
                     try:
                         dst_note.data[field] = "\n".join(
                             [
-                                dst_note.data.get(
-                                    field,
-                                    "",
-                                ),
+                                dst_note.data.get(field, ""),
                                 self.data[field],
                             ]
                         ).lstrip()
@@ -407,11 +385,7 @@ class Notefile:
         dst_note.write()
         return dst_note
 
-    copyto = functools.partialmethod(
-        replaceto,
-        newonly=True,
-        allfields=True,
-    )
+    copyto = functools.partialmethod(replaceto, newonly=True, allfields=True)
 
     def ismod(self):
         """
@@ -419,10 +393,7 @@ class Notefile:
         """
         # Will do a dictionary compare at the end so pop() certain keys before
         # we get to that. Since we're removing then, make a copy
-        if not hasattr(
-            self,
-            "data0",
-        ):
+        if not hasattr(self, "data0"):
             return True
 
         old, new = (self.data0.copy(), self.data.copy())
@@ -432,52 +403,23 @@ class Notefile:
             new.pop(key, None)
 
         # In the future, allow for no mtime test
-        if (
-            abs(
-                old.pop(
-                    "mtime",
-                    0,
-                )
-                - new.pop(
-                    "mtime",
-                    99999999,
-                )
-            )
-            >= DT
-        ):
+        if abs(old.pop("mtime", 0) - new.pop("mtime", 99999999)) >= DT:
             return True  # The file has been modified. Always do this
 
         # Make tags comparison based on sets
-        old["tags"] = set(
-            t.lower()
-            for t in old.get(
-                "tags",
-                [],
-            )
-        )
-        new["tags"] = set(
-            t.lower()
-            for t in new.get(
-                "tags",
-                [],
-            )
-        )
+        old["tags"] = set(t.lower() for t in old.get("tags", []))
+        new["tags"] = set(t.lower() for t in new.get("tags", []))
 
         return not old == new
 
-    def make_links(
-        self,
-    ):
+    def make_links(self):
         """
         Build the links if the note is a link.
         """
         # Handle both-type links by linking to the note
         if self.islink and self.link == "both":
             linknote = self.destnote0  # Original path for the note
-            linkpath = os.path.join(
-                os.path.dirname(self.dest0),
-                os.path.basename(self.destnote),
-            )
+            linkpath = os.path.join(os.path.dirname(self.dest0), os.path.basename(self.destnote))
             try:
                 os.remove(linknote)
             except OSError:
@@ -503,15 +445,9 @@ class Notefile:
             )
 
         tagtxt = "<< Comma-seperated tags. DO NOT MODIFY THIS LINE >>"
-        info = "# filename: {}\n# notedest: {}".format(
-            self.filename,
-            self.destnote,
-        )
+        info = "# filename: {}\n# notedest: {}".format(self.filename, self.destnote)
 
-        tags = self.data.get(
-            "tags",
-            [],
-        )
+        tags = self.data.get("tags", [])
         tags = sorted(t for t in set(tt.strip().lower() for tt in tags) if t)
         tags = ", ".join(tags)
 
@@ -521,41 +457,26 @@ class Notefile:
         elif tags_only:
             content = tags + "\n\n# Comma-seperated tags\n" + info
         else:
-            content = self.data.get(
-                self.note_field,
-                "",
-            )  # in case it's a dict
-            if not isinstance(
-                content,
-                str,
-            ):
+            content = self.data.get(self.note_field, "")  # in case it's a dict
+            if not isinstance(content, str):
                 raise TypeError("Cannot edit non-string notes. Edit the full YAML instead")
             content += "\n\n" + tagtxt + "\n"
 
             content += tags + "\n" + "\n" + info + "\n"
 
         tmpfile = tmpfileinpath(self.destnote) + (".yaml" if full else ".txt")
-        with open(
-            tmpfile,
-            "wt",
-        ) as file:
+        with open(tmpfile, "wt") as file:
             file.write(content)
 
         if _TESTEDIT:  # This is ONLY used in testing.
-            with open(
-                tmpfile,
-                "wt",
-            ) as file:
+            with open(tmpfile, "wt") as file:
                 file.write(str(_TESTEDIT))
         elif manual:
             input(f"Edit and save: {repr(tmpfile)}\nPress any key to continue ")
         else:
             subprocess.check_call(shlex.split(editor) + [tmpfile])
 
-        with open(
-            tmpfile,
-            "rt",
-        ) as f:
+        with open(tmpfile, "rt") as f:
             newtxt = f.read()
         os.unlink(tmpfile)
 
@@ -591,10 +512,7 @@ class Notefile:
         if replace:
             self.data[self.note_field] = note
         else:
-            if not isinstance(
-                self.data[self.note_field],
-                str,
-            ):
+            if not isinstance(self.data[self.note_field], str):
                 raise TypeError("Cannot modify non-string notes. Use with replace")
             self.data[self.note_field] += "\n" + note
         self.data[self.note_field] = self.data[self.note_field].strip()
@@ -614,20 +532,11 @@ class Notefile:
             Iterable or str of tags to remove
 
         """
-        tags = set(
-            tag.lower()
-            for tag in self.data.get(
-                "tags",
-                [],
-            )
-        )  # make a mutable set
+        tags = set(tag.lower() for tag in self.data.get("tags", []))  # make a mutable set
 
         if isinstance(add, str):
             add = [add]  # make a list
-        if isinstance(
-            remove,
-            str,
-        ):
+        if isinstance(remove, str):
             remove = [remove]  # make a list
 
         tags.difference_update(remove)
@@ -681,10 +590,7 @@ class Notefile:
 
         try:
             shutil.move(src_note, dst_note)
-        except (
-            OSError,
-            IOError,
-        ) as E:
+        except (OSError, IOError) as E:
             warn(f"Error on move '{src_note}' to '{dst_note}'. Error: {E}")
 
         # Change attributes for this now
@@ -699,35 +605,17 @@ class Notefile:
             return self.writes()
 
         if tags:
-            tags = self.data.get(
-                "tags",
-                [],
-            )
+            tags = self.data.get("tags", [])
             tags = sorted(t.lower() for t in tags)
             return "\n".join(tags)
 
-        txt = self.data.get(
-            self.note_field,
-            "",
-        )
+        txt = self.data.get(self.note_field, "")
         if not isinstance(txt, str):
             warn("Non-string note. Converting to YAML")
             txt = yamltxt(txt)
         return txt
 
-    #     def data2txt(self):
-    #         """
-    #         Fills the text attribute
-    #         """
-    #         txt =  getattr(self,'txt',None)
-    #         if txt:
-    #             return txt
-    #
-    #         return yamltxt(self.data)
-
-    def isempty(
-        self,
-    ):
+    def isempty(self):
         for key in set(self.data) - METADATA:
             if self.data[key]:
                 return False
@@ -758,19 +646,8 @@ class Notefile:
 
         if (
             force
-            or self.data.get(
-                "filesize",
-                -1,
-            )
-            != stat.st_size
-            or abs(
-                self.data.get(
-                    "mtime",
-                    -1,
-                )
-                - stat.st_mtime
-            )
-            > DT
+            or self.data.get("filesize", -1) != stat.st_size
+            or abs(self.data.get("mtime", -1) - stat.st_mtime) > DT
         ):
             if dry_run:
                 return True  # Do not do anything else since we won't be writing
@@ -809,16 +686,7 @@ class Notefile:
         """
         from .find import find
 
-        if (
-            filehash
-            and len(
-                self.data.get(
-                    "sha256",
-                    "",
-                )
-            )
-            != 64
-        ):  # not a computed hash
+        if filehash and len(self.data.get("sha256", "")) != 64:  # not a computed hash
             warn(f"Cannot repair {self.filename} based on hash since it's missing")
             return
 
@@ -928,30 +796,17 @@ class Notefile:
 
         # For all, you need individual regexes but for any, can make a single one
         if match_any:
-            requery = re.compile(
-                "|".join(expr),
-                flags=flags,
-            )
+            requery = re.compile("|".join(expr), flags=flags)
             query = lambda qtext: bool(requery.search(qtext))
         else:
-            requeries = [
-                re.compile(
-                    e,
-                    flags=flags,
-                )
-                for e in expr
-            ]
+            requeries = [re.compile(e, flags=flags) for e in expr]
             query = lambda qtext: all(r.search(qtext) for r in requeries)
 
         if not self._data:
             # To speed this up grep the raw text first before even trying to parse the
             # note. This is a double search but is almost certainly faster than always
             # parsing and only done if we didn't read already
-            txt = getattr(
-                self,
-                "txt",
-                None,
-            )
+            txt = getattr(self, "txt", None)
             if txt and not query(txt):
                 return False
             self.read()
@@ -961,14 +816,8 @@ class Notefile:
         if full_note:
             return query(txt)
 
-        qtext = self.data.get(
-            self.note_field,
-            "",
-        )
-        if not isinstance(
-            qtext,
-            str,
-        ):
+        qtext = self.data.get(self.note_field, "")
+        if not isinstance(qtext, str):
             debug("Note is {}. Converting to string".format(str(type(qtext))))
             qtext = str(qtext)  # Make it a string
 
@@ -1008,15 +857,8 @@ class Notefile:
             "note": self,
             "data": self.data,
             "tags": {t.lower() for t in self.data.get("tags", [])},
-            "notes": self.data.get(
-                self.note_field,
-                "",
-            ),
-            "text": getattr(
-                self,
-                "txt",
-                "",
-            ),
+            "notes": self.data.get(self.note_field, ""),
+            "text": getattr(self, "txt", ""),
         }
 
         ns["grep"] = functools.partial(self.grep, match_any=match_any, **kwargs)
@@ -1029,31 +871,17 @@ class Notefile:
         ns["t"] = ns["tany"]
 
         for expri in expr:
-            full_expr = [
-                i.strip()
-                for i in expri.replace(
-                    "\n",
-                    ";",
-                ).split(";")
-                if i.strip()
-            ]
+            full_expr = [i.strip() for i in expri.replace("\n", ";").split(";") if i.strip()]
             full_expr[-1] = "_res = " + full_expr[-1]
 
-            for (
-                ii,
-                line,
-            ) in enumerate(full_expr):
+            for ii, line in enumerate(full_expr):
                 try:
                     exec(line, ns)
                 except Exception as E:
                     err = E.__class__.__name__
                     desc = str(E)
                     etxt = 'Line {} `{}` raised {}. MSG: "{}". Note: "{}"'.format(
-                        ii,
-                        line,
-                        err,
-                        desc,
-                        self.filename0,
+                        ii, line, err, desc, self.filename0
                     )
                     if allow_exception:
                         warn("Query Error: {}".format(etxt))
@@ -1074,9 +902,7 @@ class Notefile:
         # At this point, we either hit them all with ALL, we hit none with ANY
         return not match_any
 
-    def _isbroken_broken_from_hide(
-        self,
-    ):
+    def _isbroken_broken_from_hide(self):
         """
         Returns whether a link note is broken from being hidden
         """
@@ -1112,9 +938,7 @@ class Notefile:
         with open(linkdest) as fobj:
             return fobj.read()
 
-    def __str__(
-        self,
-    ):
+    def __str__(self):
         return f"Notefile({repr(self.filename0)})"
 
     __repr__ = __str__
@@ -1124,9 +948,7 @@ class QueryError(ValueError):
     pass
 
 
-def get_filenames(
-    filename,
-):
+def get_filenames(filename):
     """
     Normalize filenames for NOTESEXT
 
@@ -1136,10 +958,7 @@ def get_filenames(
     returns:
         filename,vis_note,hid_note
     """
-    (
-        base,
-        name,
-    ) = os.path.split(filename)
+    (base, name) = os.path.split(filename)
 
     if name.endswith(NOTESEXT):  # Given a notefile path
         if name.startswith("."):  # Given a HIDDEN file
