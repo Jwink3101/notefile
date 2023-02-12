@@ -254,8 +254,9 @@ Global Options:
 usage: notefile change-tag [-h] [--debug] [--note-field field] [--version]
                               [-p PATH] [--exclude EXCLUDE] [--exclude-links]
                               [--match-exclude-case] [--max-depth N] [-x] [-0]
-                              [--export] [--tag-mode] [--tag-counts]
-                              [--tag-count-order] [-o FILE] [--symlink DIR]
+                              [--export] [--export-format {yaml,json,jsonl}]
+                              [--tag-mode] [--tag-counts] [--tag-count-order]
+                              [-o FILE] [--symlink DIR]
                               [--link {source,symlink,both}] [-H] [-V]
                               [--no-hash] [--no-refresh]
                               [--format {json,yaml}] [--rewrite-format] [-n]
@@ -298,6 +299,11 @@ Display Options:
   -0, --print0          Terminate names with a null byte. For use with `xargs
                         -0` when filenames have space
   --export              Export notes rather than printing names or tags
+  --export-format {yaml,json,jsonl}
+                        [yaml] Export format. For jsonl, will be a list of
+                        dicts with the filename as '__filename' (to avoid
+                        accidentally clobbering a 'filename' key) and a
+                        metadata entry. The other formats are dictionaries
   --tag-mode            Displays results in terms of *all* tags present in the
                         results
   --tag-counts          Displays results with the counts of *all* tags present
@@ -346,8 +352,9 @@ Create/Modify Options:
 usage: notefile vis [-h] [--debug] [--note-field field] [--version]
                        [-p PATH] [--exclude EXCLUDE] [--exclude-links]
                        [--match-exclude-case] [--max-depth N] [-x] [-0]
-                       [--export] [--tag-mode] [--tag-counts]
-                       [--tag-count-order] [-o FILE] [--symlink DIR] [-n]
+                       [--export] [--export-format {yaml,json,jsonl}]
+                       [--tag-mode] [--tag-counts] [--tag-count-order]
+                       [-o FILE] [--symlink DIR] [-n]
                        {hide,show} [path ...]
 
 positional arguments:
@@ -387,6 +394,11 @@ Display Options:
   -0, --print0          Terminate names with a null byte. For use with `xargs
                         -0` when filenames have space
   --export              Export notes rather than printing names or tags
+  --export-format {yaml,json,jsonl}
+                        [yaml] Export format. For jsonl, will be a list of
+                        dicts with the filename as '__filename' (to avoid
+                        accidentally clobbering a 'filename' key) and a
+                        metadata entry. The other formats are dictionaries
   --tag-mode            Displays results in terms of *all* tags present in the
                         results
   --tag-counts          Displays results with the counts of *all* tags present
@@ -409,8 +421,9 @@ Display Options:
 usage: notefile format [-h] [--debug] [--note-field field] [--version]
                           [-p PATH] [--exclude EXCLUDE] [--exclude-links]
                           [--match-exclude-case] [--max-depth N] [-x] [-0]
-                          [--export] [--tag-mode] [--tag-counts]
-                          [--tag-count-order] [-o FILE] [--symlink DIR] [-n]
+                          [--export] [--export-format {yaml,json,jsonl}]
+                          [--tag-mode] [--tag-counts] [--tag-count-order]
+                          [-o FILE] [--symlink DIR] [-n]
                           {yaml,json} [path ...]
 
 positional arguments:
@@ -450,6 +463,11 @@ Display Options:
   -0, --print0          Terminate names with a null byte. For use with `xargs
                         -0` when filenames have space
   --export              Export notes rather than printing names or tags
+  --export-format {yaml,json,jsonl}
+                        [yaml] Export format. For jsonl, will be a list of
+                        dicts with the filename as '__filename' (to avoid
+                        accidentally clobbering a 'filename' key) and a
+                        metadata entry. The other formats are dictionaries
   --tag-mode            Displays results in terms of *all* tags present in the
                         results
   --tag-counts          Displays results with the counts of *all* tags present
@@ -609,9 +627,9 @@ Global Options:
 usage: notefile find [-h] [--debug] [--note-field field] [--version]
                         [-p PATH] [--exclude EXCLUDE] [--exclude-links]
                         [--match-exclude-case] [--max-depth N] [-x] [-0]
-                        [--export] [--tag-mode] [--tag-counts]
-                        [--tag-count-order] [-o FILE] [--symlink DIR]
-                        [--orphaned]
+                        [--export] [--export-format {yaml,json,jsonl}]
+                        [--tag-mode] [--tag-counts] [--tag-count-order]
+                        [-o FILE] [--symlink DIR] [--orphaned]
 
 optional arguments:
   -h, --help            show this help message and exit
@@ -647,6 +665,11 @@ Display Options:
   -0, --print0          Terminate names with a null byte. For use with `xargs
                         -0` when filenames have space
   --export              Export notes rather than printing names or tags
+  --export-format {yaml,json,jsonl}
+                        [yaml] Export format. For jsonl, will be a list of
+                        dicts with the filename as '__filename' (to avoid
+                        accidentally clobbering a 'filename' key) and a
+                        metadata entry. The other formats are dictionaries
   --tag-mode            Displays results in terms of *all* tags present in the
                         results
   --tag-counts          Displays results with the counts of *all* tags present
@@ -672,8 +695,9 @@ usage: notefile search [-h] [--debug] [--note-field field] [--version]
                           [--grep expr] [--fixed-strings] [--full-note]
                           [--full-word] [--match-expr-case] [--query expr]
                           [-e] [-t TAG] [--tag-all] [-0] [--export]
-                          [--tag-mode] [--tag-counts] [--tag-count-order]
-                          [-o FILE] [--symlink DIR]
+                          [--export-format {yaml,json,jsonl}] [--tag-mode]
+                          [--tag-counts] [--tag-count-order] [-o FILE]
+                          [--symlink DIR]
 
 optional arguments:
   -h, --help            show this help message and exit
@@ -736,6 +760,11 @@ Display Options:
   -0, --print0          Terminate names with a null byte. For use with `xargs
                         -0` when filenames have space
   --export              Export notes rather than printing names or tags
+  --export-format {yaml,json,jsonl}
+                        [yaml] Export format. For jsonl, will be a list of
+                        dicts with the filename as '__filename' (to avoid
+                        accidentally clobbering a 'filename' key) and a
+                        metadata entry. The other formats are dictionaries
   --tag-mode            Displays results in terms of *all* tags present in the
                         results
   --tag-counts          Displays results with the counts of *all* tags present
@@ -760,7 +789,8 @@ usage: notefile query [-h] [--debug] [--note-field field] [--version]
                          [--match-exclude-case] [--max-depth N] [-x] [--all]
                          [--grep expr] [--fixed-strings] [--full-note]
                          [--full-word] [--match-expr-case] [--query expr] [-e]
-                         [-t TAG] [--tag-all] [-0] [--export] [--tag-mode]
+                         [-t TAG] [--tag-all] [-0] [--export]
+                         [--export-format {yaml,json,jsonl}] [--tag-mode]
                          [--tag-counts] [--tag-count-order] [-o FILE]
                          [--symlink DIR]
                          [query ...]
@@ -829,6 +859,11 @@ Display Options:
   -0, --print0          Terminate names with a null byte. For use with `xargs
                         -0` when filenames have space
   --export              Export notes rather than printing names or tags
+  --export-format {yaml,json,jsonl}
+                        [yaml] Export format. For jsonl, will be a list of
+                        dicts with the filename as '__filename' (to avoid
+                        accidentally clobbering a 'filename' key) and a
+                        metadata entry. The other formats are dictionaries
   --tag-mode            Displays results in terms of *all* tags present in the
                         results
   --tag-counts          Displays results with the counts of *all* tags present
@@ -844,16 +879,16 @@ Display Options:
 
 Queries:
 --------
-Queries are single expression statements that evaluate to True or False and
-based on the note. It is evaluated as Python (with no sandboxing or sanitizing
-so do not evaluate untrusted input). The following variables are defined:
+Queries are single statements where the last line myst evaluate to True or False. 
+It is evaluated as Python (with no sandboxing or sanitizing so DO NOT EVALUATE 
+UNTRUSTED INPUT). The following variables are defined:
 
     note    Notefile object including attributes such as 'filename',
-            'destnote','hidden', etc. See Notefile documention
-    data    Dictionary of the note
-    notes   == data['notes']. The note text
-    tags    == data['tags']. Set of tags (note, all lower case)
-    text    Raw YAML of the note
+            'destnote','hidden', etc. See notefile.Notefile documention
+    data    Dictionary of the note itself.
+    notes   == data['notes'] or data[<note_field>] if set. The note text
+    tags    == data['tags']. Set object of tags (note, all lower case)
+    text    Raw contents (YAML/JSON) of the note
 
 And it includes the following functions:
 
@@ -875,9 +910,10 @@ And it includes the following functions:
     
     t       aliased to tany
     
-It also includes the `re` module and `ss = shlex.split`
+It also includes the `re` module and `ss = shlex.split`. More cn be imported with
+multiple lines.
 
-Queries can replace search-tags and grep but grep is faster if it can be used since it 
+Queries can replace --tag and grep but grep is faster if it can be used since it 
 is accelerated by not parsing YAML unless needed.
 
 For example, the following return the same thing:
@@ -895,6 +931,11 @@ Limited multi-line support exists. Multiple lines can be delineated by ';'.
 However, the last line must evaluate the query. Example:
 
     $ notefile query "tt = ['a','b','c']; all(t in tags for t in tt)"
+
+Or even using multiple lines in the shell
+    
+    $ notefile query "tt = ['a','b','c']
+    > all(t in tags for t in tt)"
     
 Can also pass STDIN with the expression `-` to make quoting a bit less onerous 
     
@@ -911,7 +952,7 @@ tany and/or tall could also be used:
 Queries are pretty flexible and give a good bit of control but some actions
 and queries are still better handled directly in Python.
 
-Reminder: Do not query untrusted input!
+Reminder: DO NOT QUERY UNTRUSTED INPUT! There is nothing stopping shell injection!
 
 ```
 
