@@ -1,5 +1,6 @@
 import os, sys
 import argparse
+import json
 
 # 100 --------------------------------------------------------------------------------------------->
 
@@ -96,6 +97,16 @@ def cli(argv=None):
     )
     disp_parent_group.add_argument(
         "--export", action="store_true", help="Export notes rather than printing names or tags"
+    )
+    disp_parent_group.add_argument(
+        "--export-format",
+        choices=["yaml", "json", "jsonl"],
+        default="yaml",
+        help=(
+            "[%(default)s] Export format. For jsonl, will be a list of dicts with the "
+            "filename as '__filename' (to avoid accidentally clobbering a 'filename' key) "
+            "and a metadata entry. The other formats are dictionaries"
+        ),
     )
     disp_parent_group.add_argument(
         "--tag-mode",
@@ -880,20 +891,38 @@ class DisplayMIXIN:
                     utils.symlink_file(note, dirdest)
 
     def export(self, notes):
-        res = {}
+        res = {"__comment": None}
         res["description"] = "notefile export"
         res["time"] = utils.now_string()
         res["notefile version"] = __version__
-        res["notes"] = {}
-        for note in notes:
-            res["notes"][note.filename0] = note.data
+        if self.args.export_format in ["yaml", "json"]:
+            res["notes"] = {}
+            for note in notes:
+                res["notes"][note.filename0] = note.data
 
-        # All exports are YAML regardless of mode.
-        res = pss(res)
-        res = ruamel_yaml.comments.CommentedMap(res)
-        res.yaml_set_start_comment("YAML Formatted notefile export")
+            if self.args.export_format == "yaml":
+                del res["__comment"]
+                res = pss(res)
+                res = ruamel_yaml.comments.CommentedMap(res)
+                res.yaml_set_start_comment("YAML formatted notefile export")
 
-        yaml.dump(res, self.outbuffer)
+                yaml.dump(res, self.outbuffer)
+            else:
+                res["__comment"] = "YAML formatted notefile export"
+                dump = json.dumps(res, indent=1, ensure_ascii=False)
+                self.outbuffer.write(dump.encode("utf8"))  # Needs to be bytes so two step
+        else:
+            res["__comment"] = "json lines formatted notefile export"
+
+            meta = json.dumps(res, ensure_ascii=False)
+            self.outbuffer.write(meta.encode("utf8") + b"\n")
+
+            for note in notes:
+                row = {"__filename": note.filename0}
+                row.update(note.data)
+                row = json.dumps(row, ensure_ascii=False)
+                self.outbuffer.write(row.encode("utf8") + b"\n")
+                self.outbuffer.flush()
 
 
 class SearchCLI(DisplayMIXIN, BaseCLI):

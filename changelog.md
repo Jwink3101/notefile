@@ -2,6 +2,10 @@
 
 (**_newest_** on *top*)
 
+## 2.20230212.0
+
+- Added additional export formats. json and jsonl (line-delineated json).
+
 ## 2.20230211.0
 
 - Cleanup documentation and code. Some Python Black commands must have gotten messed up because it was UGLY. Cleaned it up

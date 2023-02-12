@@ -752,9 +752,28 @@ def test_outputs_export():
     # Other tag modes like --tag-counts and --tag-count-order are in test_search()
 
     ## export
-    call("export -o tmp")
-    with open("tmp") as f:
-        export = notefile.nfyaml.load_yaml(f.read())
+    for format in ["yaml", "json", "jsonl"]:
+        call(f"export -o tmp --export-format {format}")
+        if format == "yaml":
+            with open("tmp") as f:
+                export = notefile.nfyaml.load_yaml(f.read())
+        elif format == "json":
+            # Explicitly check that json can load it
+            with open("tmp") as f:
+                export = json.load(f)
+            assert export.pop("__comment", False)
+        else:
+            with open("tmp") as fp:
+                export = [json.loads(line) for line in fp]
+            comment = export.pop(0)
+            assert comment.pop("__comment", False)
+
+            export0, export = export, {}
+            export.update(comment)
+            export["notes"] = {}
+            for line in export0:
+                export["notes"][line.pop("__filename")] = line
+
     assert set(export.keys()) == {"notefile version", "notes", "description", "time"}
     assert set(export["notes"]) == {"sub/file1.txt", "sub2/file3.exc", "file1.txt"}
     tags = set()
