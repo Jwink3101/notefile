@@ -2,6 +2,10 @@
 
 (**_newest_** on *top*)
 
+## 2.20230215.1
+
+- Bug fix for `one_file_system`
+
 ## 2.20230215.0
 
 - Allows you to enter tags with commas at the CLI. 

@@ -115,7 +115,7 @@ def find(
         exclude_in_place(dirs, excludes, matchcase=matchcase, isdir=True)
 
         if one_file_system:
-            dirs[:] = [d for d in dirs if os.stat(os.path.join(root, d)).stdev == dev0]
+            dirs[:] = [d for d in dirs if os.stat(os.path.join(root, d)).st_dev == dev0]
 
         rel = os.path.relpath(root, path)
         depth = rel.count("/") + 1 if rel != "." else 0

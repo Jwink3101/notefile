@@ -1,4 +1,4 @@
-__version__ = "2.20230215.0"
+__version__ = "2.20230215.1"
 __author__ = "Justin Winokur"
 
 import sys, os
