@@ -171,6 +171,13 @@ def test_mod():
     assert note1.data.notes == "note1\nmore"
     assert set(note1.data.tags) == {"tag3", "tag2"}
 
+    # Test adding via commas
+    call('mod -t "tag4,tag 5" -t tag6,tag7 -r "tag2, tag3" file1.txt')
+    note1 = Notefile("file1.txt").read()
+    assert set(note1.data.tags) == {"tag 5", "tag4", "tag6", "tag7"}
+    note1.data.tags = "tag3", "tag2"  # Reset
+    note1.write()
+
     call('mod --replace --note "new" file1.txt')
     note1 = Notefile("file1.txt").read()
     assert note1.data.notes == "new"

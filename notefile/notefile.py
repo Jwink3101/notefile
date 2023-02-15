@@ -1,6 +1,6 @@
 from . import HIDDEN, NOTEFIELD, NOHASH, NOTESEXT, debug, warn, __version__, DT, FORMAT
 from .nfyaml import pss, load_yaml, ruamel_yaml, yaml, yamltxt
-from .utils import now_string, Bunch, sha256, tmpfileinpath, flattenlist
+from .utils import now_string, Bunch, sha256, tmpfileinpath, flattenlist, normalize_tags
 from . import find
 
 from pathlib import Path
@@ -208,7 +208,7 @@ class Notefile:
             if tag is False:
                 tag = "no"
             t.append(tag)
-        self._data["tags"][:] = t
+        self._data["tags"][:] = normalize_tags(t)
 
         if self.note_field not in self._data:
             self._data[self.note_field] = ""
@@ -362,25 +362,26 @@ class Notefile:
             # Need to handle appends iff string data or tags. But if the dst is new
             # and therefore doesn't have any non-standard fields, allow it to still
             # work in append mode. Allow field to exist in dest but be empty
-            if not append or not dst_note.data.get(field, None):
+            if not append or not dst_note.data.get(field, None):  # Just replace
                 dst_note.data[field] = self.data[field]
-            else:
-                if field == "tags":
-                    dst_note.data["tags"] = sorted(
-                        {t.lower() for t in self.data.tags}.union(
-                            t.lower() for t in dst_note.data.tags
-                        )
-                    )
-                else:
-                    try:
-                        dst_note.data[field] = "\n".join(
-                            [
-                                dst_note.data.get(field, ""),
-                                self.data[field],
-                            ]
-                        ).lstrip()
-                    except TypeError:
-                        raise TypeError("Cannot append when fields exist and are not strings")
+                continue
+
+            # Try appending. Handle tags but otherwise, try to join strings and catch
+            # the error
+            if field == "tags":
+                curr_tags = normalize_tags(self.data.get("tags", []), sort=False)
+                dest_tags = normalize_tags(dst_note.data.get("tags", []), sort=False)
+                dst_note.data["tags"] = sorted(curr_tags.union(dest_tags))
+                continue
+
+            try:
+                curr_field = self.data[field]
+                dest_field = dst_note.data.get(field, "")
+                joined = "\n".join([dest_field, curr_field]).lstrip()
+                if joined:
+                    dst_note.data[field] = joined
+            except TypeError:
+                raise TypeError("Cannot append when fields exist and are not strings")
 
         dst_note.write()
         return dst_note
@@ -407,8 +408,8 @@ class Notefile:
             return True  # The file has been modified. Always do this
 
         # Make tags comparison based on sets
-        old["tags"] = set(t.lower() for t in old.get("tags", []))
-        new["tags"] = set(t.lower() for t in new.get("tags", []))
+        old["tags"] = normalize_tags(old.get("tags", []), sort=False)
+        new["tags"] = normalize_tags(new.get("tags", []), sort=False)
 
         return not old == new
 
@@ -447,8 +448,7 @@ class Notefile:
         tagtxt = "<< Comma-seperated tags. DO NOT MODIFY THIS LINE >>"
         info = "# filename: {}\n# notedest: {}".format(self.filename, self.destnote)
 
-        tags = self.data.get("tags", [])
-        tags = sorted(t for t in set(tt.strip().lower() for tt in tags) if t)
+        tags = normalize_tags(self.data.get("tags", []))
         tags = ", ".join(tags)
 
         if full:
@@ -499,8 +499,7 @@ class Notefile:
                     break
                 tags.extend(line.split(","))
 
-            tags = sorted(t for t in set(tt.strip().lower() for tt in tags) if t)
-            self.data["tags"] = tags
+            self.data["tags"] = normalize_tags(tags)
 
         return self  # for convenience
 
@@ -532,16 +531,13 @@ class Notefile:
             Iterable or str of tags to remove
 
         """
-        tags = set(tag.lower() for tag in self.data.get("tags", []))  # make a mutable set
+        tags = self.data.get("tags", [])
+        tags = normalize_tags(tags, sort=False)  # set of tags
 
-        if isinstance(add, str):
-            add = [add]  # make a list
-        if isinstance(remove, str):
-            remove = [remove]  # make a list
+        add = normalize_tags(add, sort=False)  # also handles strings
+        remove = normalize_tags(remove, sort=False)  # also handles strings
 
-        tags.difference_update(remove)
-        tags.update(add)
-        self.data["tags"] = sorted(t.lower().strip() for t in tags if t.strip())
+        self.data["tags"] = normalize_tags(tags.union(add).difference(remove))
 
         return self  # for convenience
 
@@ -605,8 +601,7 @@ class Notefile:
             return self.writes()
 
         if tags:
-            tags = self.data.get("tags", [])
-            tags = sorted(t.lower() for t in tags)
+            tags = normalize_tags(self.data.get("tags", []))
             return "\n".join(tags)
 
         txt = self.data.get(self.note_field, "")
@@ -856,7 +851,7 @@ class Notefile:
             "ss": shlex.split,
             "note": self,
             "data": self.data,
-            "tags": {t.lower() for t in self.data.get("tags", [])},
+            "tags": normalize_tags(self.data.get("tags", []), sort=False),
             "notes": self.data.get(self.note_field, ""),
             "text": getattr(self, "txt", ""),
         }
@@ -866,8 +861,9 @@ class Notefile:
         ns["gall"] = functools.partial(self.grep, match_any=False, **kwargs)
         ns["gany"] = functools.partial(self.grep, match_any=True, **kwargs)
 
-        ns["tany"] = lambda *tags: any(t.lower() in self.data["tags"] for t in tags)
-        ns["tall"] = lambda *tags: all(t.lower() in self.data["tags"] for t in tags)
+        # Note that these get normalized which includes flattening them
+        ns["tany"] = lambda *tags: any(t.lower() in ns["tags"] for t in normalize_tags(tags))
+        ns["tall"] = lambda *tags: all(t.lower() in ns["tags"] for t in normalize_tags(tags))
         ns["t"] = ns["tany"]
 
         for expri in expr:

@@ -191,3 +191,27 @@ def flattenlist(*args):
                 yield from flattenlist(*arg)
             except TypeError:  # Not iterable
                 yield arg
+
+
+def normalize_tags(tags, sort=True):
+    """
+    Normalize a list or string of tags. Tags will be split at commas (no escaping),
+    made lower case, and stripped of white space.
+
+    If sort=True (default), will return a sorted list. If False,
+    will return a set
+    """
+    if isinstance(tags, str):
+        tags = [tags]
+
+    # Split tags with commas in them. Do not try to escape commas. It isn't
+    # worth the pain!
+    tags = flattenlist(*(tag.split(",") for tag in tags))
+
+    # lower and stripped
+    tags = {tag.strip().lower() for tag in tags}
+
+    if not sort:
+        return tags
+
+    return sorted(tags)

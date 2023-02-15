@@ -2,6 +2,11 @@
 
 (**_newest_** on *top*)
 
+## 2.20230215.0
+
+- Allows you to enter tags with commas at the CLI. 
+    - Example: `notefile mod -t "tag1,tag2" FILE`
+
 ## 2.20230212.0
 
 - Added additional export formats. json and jsonl (line-delineated json).
