@@ -23,6 +23,7 @@ import time
 import json
 import warnings
 import unicodedata
+import pickle
 
 import notefile  # this *should* import the local version even if it is installed
 import notefile.cli
@@ -1573,6 +1574,21 @@ def test_subdir():
     }
 
 
+def test_pickle():
+    os.chdir(TESTDIR)
+    dirpath = TESTDIR / "pickle"
+    cleanmkdir(dirpath)
+    os.chdir(dirpath)
+
+    writefile("file.txt", "file")
+    call("mod file.txt -t tag -n'some note'")
+    note = Notefile("file.txt").read()
+
+    new = pickle.loads(pickle.dumps(note))
+    assert new.data == note.data
+    assert new is not note
+
+
 if __name__ == "__main__":
     test_mod()
     test_create_opts()
@@ -1594,6 +1610,7 @@ if __name__ == "__main__":
     test_nonstr()
     test_auto_read()
     test_subdir()
+    test_pickle()
 
     print("-=" * 50)
     print("SUCCESS")

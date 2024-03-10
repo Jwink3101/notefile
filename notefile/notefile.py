@@ -10,7 +10,6 @@ import json
 import copy
 import shutil
 import functools
-from collections import namedtuple
 
 METADATA = frozenset(("filesize", "mtime", "sha256", "last-updated", "notefile version"))
 
@@ -961,9 +960,6 @@ class MultipleNotesError(ValueError):
     pass
 
 
-notenames = namedtuple("Names", ("filename", "visible", "hidden", "vsubdir", "hsubdir"))
-
-
 def get_filenames(filename):
     """
     Normalize filenames for NOTESEXT
@@ -995,8 +991,12 @@ def get_filenames(filename):
     filename = os.path.normpath(os.path.join(base, name))
     vis_note = os.path.normpath(os.path.join(base, vis_note))
     hid_note = os.path.normpath(os.path.join(base, hid_note))
-    return notenames(
-        filename, vis_note, hid_note, f"_notefiles/{vis_note}", f".notefiles/{vis_note}"
+    return Bunch(
+        filename=filename,
+        visible=vis_note,
+        hidden=hid_note,
+        vsubdir=f"_notefiles/{vis_note}",
+        hsubdir=f".notefiles/{vis_note}",
     )
 
 

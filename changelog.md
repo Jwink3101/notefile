@@ -2,14 +2,15 @@
 
 (**_newest_** on *top*)
 
+## 2.20240310.1
+
+- Made it pickleable to better enable parallel processing. Added test
+
 ## 2.20240310.0
 
 - **New Feature**: Subdirs. Notes can now be placed in `_notefiles` or `.notefiles` instead of directly in the same directory
 - Removed `v1` command and code. Not needed anymore.
 - Better tag normalization
-
-
-
 
 ## 2.20230215.1
 
