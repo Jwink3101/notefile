@@ -5,7 +5,7 @@ import json
 # 100 --------------------------------------------------------------------------------------------->
 
 from .nfyaml import yaml, pss, ruamel_yaml
-from . import utils, debug, __version__, NOTEFIELD, HIDDEN, FORMAT
+from . import utils, debug, __version__, NOTEFIELD, HIDDEN, SUBDIR, FORMAT
 from .notefile import Notefile
 
 
@@ -20,10 +20,6 @@ def cli(argv=None):
         argv[0] = "--help"
     if argv and argv[0] == "version":
         argv[0] = "--version"
-    if argv and argv[0] == "v1":  # Do this here to save the parsing
-        from . import v1
-
-        sys.exit(v1.cli(argv[1:]))
 
     subparsers = {}
 
@@ -238,6 +234,16 @@ def cli(argv=None):
                 environment variable""",
     )
     new_parent_group.add_argument(
+        "-S",
+        "--subdir",
+        action=argparse.BooleanOptionalAction,
+        default=SUBDIR,
+        help="""Make new notes in a subdir. NOT default unless set with $NOTEFILE_SUBDIR 
+                environment variable. When using --subdir with --hidden, will store
+                in '.notefiles' and when using --subdir with --visible, will store
+                in '_notefiles'. Default %(default)s""",
+    )
+    new_parent_group.add_argument(
         "--no-hash",
         action="store_false",
         dest="hashfile",
@@ -409,7 +415,9 @@ def cli(argv=None):
         help="Do not cross filesystem boundaries when searching for a file",
     )
 
-    parser = argparse.ArgumentParser(description="MAIN", parents=[global_parent])
+    parser = argparse.ArgumentParser(description="Notefile", parents=[global_parent])
+    #### Subparsers
+
     subpar = parser.add_subparsers(
         dest="command",
         title="Commands",
@@ -525,6 +533,17 @@ def cli(argv=None):
         )
         subparsers[mode].add_argument(
             "-n", "--dry-run", action="store_true", help="""Do not make changes"""
+        )
+        subparsers[mode].add_argument(
+            "-S",
+            "--subdir",
+            action=argparse.BooleanOptionalAction,
+            default=None,
+            help="""
+                Make new notes in a subdir. NOT default unless set with $NOTEFILE_SUBDIR 
+                environment variable. When using --subdir with --hidden, will store
+                in '.notefiles' and when using --subdir with --visible, will store
+                in '_notefiles'. Default is based on original setting""",
         )
 
     subparsers["format"] = subpar.add_parser(
@@ -704,13 +723,6 @@ def cli(argv=None):
         "path", nargs="+", help="Specify path(s). Will print in order"
     )
 
-    subparsers["v1"] = subpar.add_parser(
-        "v1",
-        help="""Call the older notefile tool with all args passed to it. 
-                Example: 'notefile v1 search-tags'. v1 will *read* JSON 
-                but cannot *write* it. Will be DEPREACTED soon.""",
-    )
-
     args = parser.parse_args(argv)
 
     global DEBUG
@@ -809,6 +821,7 @@ class BaseCLI:
         args = self.args
         return dict(
             hidden=args.hidden,
+            subdir=args.subdir,
             link=args.link,
             hashfile=args.hashfile,
             note_field=args.note_field,
@@ -842,14 +855,14 @@ class DisplayMIXIN:
         sep = b"\x00" if self.args.print0 else b"\n"
         for note in notes:
             try:
-                self.outbuffer.write(note.filename0.encode() + sep)
+                self.outbuffer.write(note.names0.filename.encode() + sep)
             except:
-                print(f"{note.filename0 = }")
+                print(f"{note.names0.filename = }")
                 raise
             self.outbuffer.flush()
 
             if self.args.symlink:
-                utils.symlink_file(note.filename0, self.args.symlink)
+                utils.symlink_file(note.names0.filename, self.args.symlink)
 
     def display_tags(self, notes):
         """
@@ -862,7 +875,7 @@ class DisplayMIXIN:
 
         for note in notes:
             for tag in note.data.tags:
-                tags[tag].append(note.filename0)
+                tags[tag].append(note.names0.filename)
 
         if not tags:
             return
@@ -898,7 +911,7 @@ class DisplayMIXIN:
         if self.args.export_format in ["yaml", "json"]:
             res["notes"] = {}
             for note in notes:
-                res["notes"][note.filename0] = note.data
+                res["notes"][note.names0.filename] = note.data
 
             if self.args.export_format == "yaml":
                 del res["__comment"]
@@ -918,7 +931,7 @@ class DisplayMIXIN:
             self.outbuffer.write(meta.encode("utf8") + b"\n")
 
             for note in notes:
-                row = {"__filename": note.filename0}
+                row = {"__filename": note.names0.filename}
                 row.update(note.data)
                 row = json.dumps(row, ensure_ascii=False)
                 self.outbuffer.write(row.encode("utf8") + b"\n")
@@ -1075,7 +1088,13 @@ class VisChangeCLI(DisplayMIXIN, BaseCLI):
             self.outbuffer.flush()
 
         notes = self.find()
-        notes = (note for note in notes if note.change_visibility(args.mode, dry_run=args.dry_run))
+        notes = (
+            note
+            for note in notes
+            if note.change_visibility_subdir(
+                mode=args.mode, subdir=args.subdir, dry_run=args.dry_run
+            )
+        )
         self.display_dispatch(notes)
 
     # Because we do not need to otherwise read the notes
@@ -1127,7 +1146,7 @@ class RepairCLI(BaseCLI):
                 continue  # can happen iff path is DIRECTLY specified
             if note.repair_metadata(dry_run=args.dry_run, force=args.force_refresh):
                 note.write()
-                print(f'repaired{" (DRY-RUN)" if args.dry_run else ""}: {note.filename0}')
+                print(f'repaired{" (DRY-RUN)" if args.dry_run else ""}: {note.names0.filename}')
 
     def repair_orphaned(self):
         args = self.args

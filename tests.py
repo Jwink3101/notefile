@@ -22,6 +22,7 @@ from pathlib import Path
 import time
 import json
 import warnings
+import unicodedata
 
 import notefile  # this *should* import the local version even if it is installed
 import notefile.cli
@@ -132,7 +133,7 @@ def readtags(out):
     return {tag: (set(files) if isinstance(files, list) else files) for tag, files in tags.items()}
 
 
-def ishidden(filename, check_dupe=True):
+def is_hidden(filename, check_dupe=True):
     """
     returns whether a file exists and is hidden.
     Will assert that (a) the file exists and (b) there
@@ -377,7 +378,7 @@ def test_copy():
     note3 = Notefile("file3.txt").read()
     for key in set(note1.data).difference(notefile.notefile.METADATA):
         assert note1.data[key] == note2.data[key] == note3.data[key], f"failed {key}"
-    assert note2.ishidden == note3.ishidden == True
+    assert note2.is_hidden == note3.is_hidden == True
 
     try:
         call("copy file1.txt file2.txt --debug")  # --debug to get the error
@@ -504,42 +505,41 @@ def test_change_viz_and_format(vis):
 
     note1 = Notefile("file1.txt").read()
     note2 = Notefile("file2.txt").read()
-    assert not note1.ishidden and note2.ishidden
+    assert not note1.is_hidden and note2.is_hidden
 
-    assert os.path.exists("file1.txt.notes.yaml") and not os.path.exists(
-        ".file1.txt.notes.yaml"
-    )  # verify the built-in settings
-    assert os.path.exists(".file2.txt.notes.yaml") and not os.path.exists("file2.txt.notes.yaml")
+    # verify the built-in settings
+    assert os.path.exists("file1.txt.notes.yaml")
+    assert not os.path.exists(".file1.txt.notes.yaml")
+    assert os.path.exists(".file2.txt.notes.yaml")
+    assert not os.path.exists("file2.txt.notes.yaml")
 
     # Make sure they do not change
-    call(f"{vis} show file1.txt")
-    call(f"{vis} hide file2.txt")
+    call(f"{vis} show file1.txt")  # already vis
+    call(f"{vis} hide file2.txt")  # already hidden
     note1 = Notefile("file1.txt").read()
     note2 = Notefile("file2.txt").read()
-    assert not note1.ishidden and note2.ishidden
+    assert not note1.is_hidden and note2.is_hidden
 
     # Change one
     call(f"{vis} show file2.txt")
     note1 = Notefile("file1.txt").read()
     note2 = Notefile("file2.txt").read()
-    assert not note1.ishidden and not note2.ishidden
+    assert not note1.is_hidden and not note2.is_hidden
 
     # Change both
     call(f"{vis} hide")
     note1 = Notefile("file1.txt").read()
     note2 = Notefile("file2.txt").read()
-    assert note1.ishidden and note2.ishidden
+    assert note1.is_hidden and note2.is_hidden
 
     call(f"{vis} show --dry-run")
     note1 = Notefile("file1.txt").read()
     note2 = Notefile("file2.txt").read()
-    assert note1.ishidden and note2.ishidden
+    assert note1.is_hidden and note2.is_hidden
 
     shutil.copy(".file1.txt.notes.yaml", "file1.txt.notes.yaml")
-    _, err = call("vis --debug show file1.txt", capture=True)
-    assert (
-        err == "WARNING: Both hidden and visible notes exist for 'file1.txt'. Not changing mode\n"
-    )
+    with pytest.raises(notefile.notefile.MultipleNotesError):
+        call("vis --debug show file1.txt", capture=True)
     os.unlink("file1.txt.notes.yaml")
 
     ## JSON vs YAML
@@ -1109,7 +1109,7 @@ def test_links():
 
     file10 = Notefile("file10").read()
     link10 = Notefile("link10").read()
-    assert link10.ishidden and not file10.ishidden
+    assert link10.is_hidden0 and not file10.is_hidden
 
     ## Break by vis
     call("vis hide file10")
@@ -1161,13 +1161,26 @@ def test_unicode_spaces():
 
     call('find -o "tmp"')
     call("find -0o tmp0")
-    assert readout("tmp") == readout("tmp0") == {"s°b dir/spüd.txt", "file 1", " leading.txt"}
+
+    un = lambda f: unicodedata.normalize("NFC", f)
+
+    tmp = {un(f) for f in readout("tmp")}
+    tmp0 = {un(f) for f in readout("tmp0")}
+    truth = {un(f) for f in {"s°b dir/spüd.txt", "file 1", " leading.txt"}}
+    assert tmp == tmp0 == truth
 
     call("find --tag-mode -o tmp")
-    assert readtags("tmp") == {
-        "tttt": {" leading.txt", "s°b dir/spüd.txt"},
-        "t°gs": {"file 1"},
+
+    data = {un(k): {un(_v) for _v in v} for k, v in readtags("tmp").items()}
+    truth = {
+        un(k): {un(_v) for _v in v}
+        for k, v in {
+            "tttt": {" leading.txt", "s°b dir/spüd.txt"},
+            "t°gs": {"file 1"},
+        }.items()
     }
+
+    assert data == truth
 
     os.chdir(TESTDIR)
 
@@ -1483,27 +1496,104 @@ def test_auto_read():
     os.chdir(TESTDIR)
 
 
+def test_subdir():
+    os.chdir(TESTDIR)
+    dirpath = TESTDIR / "subdirs"
+    cleanmkdir(dirpath)
+    os.chdir(dirpath)
+
+    writefile("subdir_vis.txt", "subdir_vis")
+    writefile("subdir_hid.txt", "subdir_hid")
+    writefile("no-subdir_vis.txt", "no-subdir_vis")
+    writefile("no-subdir_hid.txt", "no-subdir_hid")
+
+    call("mod subdir_vis.txt    -t tag --visible --subdir")
+    call("mod subdir_hid.txt    -t tag --hidden  --subdir")
+    call("mod no-subdir_vis.txt -t tag --visible --no-subdir")
+    call("mod no-subdir_hid.txt -t tag --hidden  --no-subdir")
+
+    assert {str(p) for p in Path(".").rglob("*.yaml")} == {
+        "_notefiles/subdir_vis.txt.notes.yaml",
+        ".notefiles/subdir_hid.txt.notes.yaml",
+        "no-subdir_vis.txt.notes.yaml",
+        ".no-subdir_hid.txt.notes.yaml",
+    }
+
+    # Make sure it doesn't change when I add a tag. Note the flags are all reverse
+    call("mod subdir_vis.txt    -t tag2 --hidden  --no-subdir")
+    call("mod subdir_hid.txt    -t tag2 --visible --no-subdir")
+    call("mod no-subdir_vis.txt -t tag2 --hidden  --subdir")
+    call("mod no-subdir_hid.txt -t tag2 --visible --subdir")
+
+    assert {str(p) for p in Path(".").rglob("*.yaml")} == {  # same as above
+        "_notefiles/subdir_vis.txt.notes.yaml",
+        ".notefiles/subdir_hid.txt.notes.yaml",
+        "no-subdir_vis.txt.notes.yaml",
+        ".no-subdir_hid.txt.notes.yaml",
+    }
+
+    # Now change them
+    call("vis hide subdir_vis.txt    --no-subdir")
+    call("vis show subdir_hid.txt    --no-subdir")
+    call("vis hide no-subdir_vis.txt --subdir")
+    call("vis show no-subdir_hid.txt --subdir")
+
+    assert {str(p) for p in Path(".").rglob("*.yaml")} == {
+        ".notefiles/no-subdir_vis.txt.notes.yaml",
+        "_notefiles/no-subdir_hid.txt.notes.yaml",
+        ".subdir_vis.txt.notes.yaml",
+        "subdir_hid.txt.notes.yaml",
+    }
+
+    # reset
+    call("vis show subdir_vis.txt    --subdir")
+    call("vis hide subdir_hid.txt    --subdir")
+    call("vis show no-subdir_vis.txt --no-subdir")
+    call("vis hide no-subdir_hid.txt --no-subdir")
+
+    # Change vis without subdir flags
+    call("vis hide subdir_vis.txt")
+    call("vis show subdir_hid.txt")
+    call("vis hide no-subdir_vis.txt")
+    call("vis show no-subdir_hid.txt")
+
+    assert {str(p) for p in Path(".").rglob("*.yaml")} == {
+        ".notefiles/subdir_vis.txt.notes.yaml",
+        "_notefiles/subdir_hid.txt.notes.yaml",
+        ".no-subdir_vis.txt.notes.yaml",
+        "no-subdir_hid.txt.notes.yaml",
+    }
+
+    findff = call("find -o res.txt")
+    assert set(Path("res.txt").read_text().split()) == {
+        "subdir_hid.txt",
+        "no-subdir_hid.txt",
+        "subdir_vis.txt",
+        "no-subdir_vis.txt",
+    }
+
+
 if __name__ == "__main__":
-    pass
-    #     test_mod()
-    #     test_create_opts()
-    #     test_copy()
-    #     test_replace()
-    #     test_change_viz_and_format(True)
-    #     test_change_viz_and_format(False)
-    #     test_change_tag()
-    #     test_find_exclusions()
-    #     test_outputs_export()
-    #     test_search()
-    #     test_links()
-    #     test_unicode_spaces()
-    #     test_notepath()
-    #     test_metadata_repair()
-    #     test_orphan_repair()
-    #     test_cat()
-    #     test_notefield()
-    #     test_nonstr()
-    #     test_auto_read()
+    test_mod()
+    test_create_opts()
+    test_copy()
+    test_replace()
+    test_change_viz_and_format(True)
+    test_change_viz_and_format(False)
+    test_change_tag()
+    test_find_exclusions()
+    test_outputs_export()
+    test_search()
+    test_links()
+    test_unicode_spaces()
+    test_notepath()
+    test_metadata_repair()
+    test_orphan_repair()
+    test_cat()
+    test_notefield()
+    test_nonstr()
+    test_auto_read()
+    test_subdir()
 
     print("-=" * 50)
     print("SUCCESS")

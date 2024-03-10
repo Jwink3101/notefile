@@ -1,4 +1,4 @@
-from . import HIDDEN, NOTEFIELD, NOHASH, NOTESEXT, debug, warn, __version__, DT, FORMAT
+from . import HIDDEN, SUBDIR, NOTEFIELD, NOHASH, NOTESEXT, debug, warn, __version__, DT, FORMAT
 from .nfyaml import pss, load_yaml, ruamel_yaml, yaml, yamltxt
 from .utils import now_string, Bunch, sha256, tmpfileinpath, flattenlist, normalize_tags
 from . import find
@@ -10,6 +10,7 @@ import json
 import copy
 import shutil
 import functools
+from collections import namedtuple
 
 METADATA = frozenset(("filesize", "mtime", "sha256", "last-updated", "notefile version"))
 
@@ -27,6 +28,9 @@ class Notefile:
 
     hidden [environment variable $NOTEFILE_HIDDEN otherwise False]
         Whether or not to *prefer* the hidden notefile
+
+    subdir [environment variable $NOTEFILE_SUBDIR otherwise False]
+        Whether or not to *prefer* the subdir notefile
 
     format [environment variable $NOTEFILE_FORMAT otherwise 'yaml']
         Specify 'yaml' or 'json' for output format. Note that the extensions
@@ -49,10 +53,10 @@ class Notefile:
     Any attribute with 0 is the original. The version without 0 is the refferent
     if the file is a symlink and not 'symlink' mode
 
-    filename0,filename: str
+    filename0, filename: str
         File being noted
 
-    destnote0,destnote: str
+    destnote0, destnote: str
         The final note location.
 
     islink: bool
@@ -93,6 +97,7 @@ class Notefile:
         self,
         filename,
         hidden=HIDDEN,
+        subdir=SUBDIR,
         format=FORMAT,
         rewrite_format=False,
         link="both",
@@ -108,16 +113,16 @@ class Notefile:
         # _0 is specified format. NOT actual format which will get reset
         self.format = self.format0 = format.lower()
         self.rewrite_format = rewrite_format
-        self.filename, self.vis_note, self.hid_note = get_filenames(filename)
+        self.names = self.names0 = get_filenames(filename)
 
-        if os.path.basename(self.filename).startswith("."):
-            warn(f"hidden files may not always work: {repr(self.filename)}")
+        if os.path.basename(self.names0.filename).startswith("."):
+            warn(f"hidden files may not always work: {repr(self.names.filename)}")
 
         # Store the original paths. Will be reset later if link
-        self.destnote0, _ = hidden_chooser(self.vis_note, self.hid_note, hidden)
-        self.filename0 = self.filename
-        self.vis_note0 = self.vis_note
-        self.hid_note0 = self.hid_note
+        #         self.destnote0, *_ = hidden_chooser(self.names, hidden=hidden, subdir=subdir)
+        self.destnote0, self.exists0, self.is_hidden0, self.is_subdir0 = hidden_chooser(
+            self.names, hidden=hidden, subdir=subdir
+        )
 
         ## Handle links. If both or source, reset to the referent if the link
         # mode cannot be deduced. If it can, use that!
@@ -125,34 +130,37 @@ class Notefile:
             raise ValueError("'link' must be in {'both','symlink','source'}")
 
         # Be False even if link for 'symlink' mode
-        self.islink = os.path.islink(self.filename) and link in {"both", "source"}
+        self.islink = os.path.islink(self.names.filename) and link in {"both", "source"}
 
         if self.islink:
             # Edge Case: Note created in symlink mode but isn't being modified
             # as such. Change to that
             if os.path.isfile(self.destnote0) and not os.path.islink(self.destnote0):
                 warn(
-                    f"Linked file ({repr(self.filename0)}) has conflicting notes. "
+                    f"Linked file ({repr(self.names0.filename)}) has conflicting notes. "
                     "Changing to 'symlink' mode"
                 )
                 self.islink = False
                 self.link == "symlink"
             else:
-                self.dest0 = os.readlink(self.filename)
-                dest = os.path.join(os.path.dirname(self.filename), self.dest0)
-                self.filename, self.vis_note, self.hid_note = get_filenames(dest)
+                self.dest0 = os.readlink(self.names.filename)
+                dest = os.path.join(os.path.dirname(self.names.filename), self.dest0)
+                self.names = get_filenames(dest)  # reset this
 
-                debug(f"Linked Note: {repr(self.filename)} --> {repr(self.dest0)}")
+                debug(f"Linked Note: {repr(self.names.filename)} --> {repr(self.dest0)}")
 
         # Get the actual notefile path (destnote) regardless of hidden settings
         # And whether it exists
-        self.destnote, self.exists = hidden_chooser(self.vis_note, self.hid_note, hidden)
-        self.hidden = hidden
-        self.ishidden = self.destnote0 == self.hid_note0
-        debug(f"Hidden setting: {self.hidden}. Is hidden: {self.ishidden}")
+        self.destnote, self.exists, self.is_hidden, self.is_subdir = hidden_chooser(
+            self.names, hidden=hidden, subdir=subdir
+        )
+        self.hidden, self.subdir = hidden, subdir  # Settings may not be reality
+
+        self.filename = self.names.filename
+        self.filename0 = self.names0.filename
 
         # Check if orphhaned on original file (broken links are still NOT orphaned)
-        self.orphaned = not exists_or_link(self.filename0)
+        self.orphaned = not exists_or_link(self.names0.filename)
 
         self.txt = None
         self._data = None
@@ -180,16 +188,18 @@ class Notefile:
             debug("New notefile")
             self._data = {}
             try:
-                stat = os.stat(self.filename)
+                stat = os.stat(self.names.filename)
 
                 self._data["filesize"] = stat.st_size
                 self._data["mtime"] = stat.st_mtime
                 if self.hashfile:
-                    self._data["sha256"] = sha256(self.filename)
+                    self._data["sha256"] = sha256(self.names.filename)
                 self.txt = self.writes()
             except Exception as E:
-                if os.path.islink(self.filename0):
-                    warn(f"{repr(self.filename0)} is a broken link to {repr(self.filename)}.")
+                if os.path.islink(self.names0.filename):
+                    warn(
+                        f"{repr(self.names0.filename)} is a broken link to {repr(self.names.filename)}."
+                    )
                     self._data["filesize"] = -1
                     self._data["mtime"] = -1
                 else:
@@ -291,6 +301,7 @@ class Notefile:
 
         # Make the write atomic
         tmpfile = Path(self.destnote).with_suffix(".yaml.swp")
+        tmpfile.parent.mkdir(exist_ok=True, parents=True)
         tmpfile.write_text(txt)
         tmpfile.rename(self.destnote)
         debug(f"Wrote {self.destnote}")
@@ -446,7 +457,7 @@ class Notefile:
             )
 
         tagtxt = "<< Comma-seperated tags. DO NOT MODIFY THIS LINE >>"
-        info = "# filename: {}\n# notedest: {}".format(self.filename, self.destnote)
+        info = "# filename: {}\n# notedest: {}".format(self.names.filename, self.destnote)
 
         tags = normalize_tags(self.data.get("tags", []))
         tags = ", ".join(tags)
@@ -465,6 +476,7 @@ class Notefile:
             content += tags + "\n" + "\n" + info + "\n"
 
         tmpfile = tmpfileinpath(self.destnote) + (".yaml" if full else ".txt")
+        Path(tmpfile).parent.mkdir(exist_ok=True, parents=True)
         with open(tmpfile, "wt") as file:
             file.write(content)
 
@@ -541,14 +553,17 @@ class Notefile:
 
         return self  # for convenience
 
-    def change_visibility(self, mode, dry_run=False):
+    def change_visibility_subdir(self, *, mode=None, subdir=None, dry_run=False):
         """
         Change the visibility to 'hide' or 'show'
 
         Inputs:
         -------
-        mode
-            Specify 'hide' or 'show'
+        mode [None]
+            Specify 'hide' or 'show' to set it or None to keep as is.
+
+        subdir [None]
+            Specify True or False to set it or None to keep it as is.
 
         dry_run [False]
             If True, do not make the change
@@ -557,41 +572,40 @@ class Notefile:
         --------
         True if mode changed or False
         """
-        #  Use the _0 versions since we want the link itself if given
-        vis_note = self.vis_note0
-        hid_note = self.hid_note0
+        if mode is None:
+            mode = "hide" if self.is_hidden else "show"
+        if subdir is None:
+            subdir = self.is_subdir
+        newnames = get_filenames(self.names0.filename)
+        desired_destnote = {  # (hidden,subdir)
+            (True, True): newnames.hsubdir,
+            (True, False): newnames.hidden,
+            (False, True): newnames.vsubdir,
+            (False, False): newnames.visible,
+        }[mode == "hide", subdir]
 
-        # This will raise a warning no matter the current state by design
-        if os.path.exists(vis_note) and os.path.exists(hid_note):
+        if desired_destnote == self.destnote0:
+            return False  # Do nothing
+
+        if os.path.exists(desired_destnote):
             warn(
-                f"Both hidden and visible notes exist for {repr(self.filename)}. Not changing mode"
+                f"Both source and dest notes exist for {repr(self.names.filename)}. Not changing mode"
             )
             return False
-
-        if mode == "hide":
-            if self.ishidden:
-                return False
-            src_note = vis_note
-            dst_note = hid_note
-        elif mode == "show":
-            if not self.ishidden:
-                return False
-            src_note = hid_note
-            dst_note = vis_note
-        else:
-            raise ValueError("Not a valid mode")
 
         if dry_run:
             return True
 
+        Path(desired_destnote).parent.mkdir(exist_ok=True, parents=True)
         try:
-            shutil.move(src_note, dst_note)
+            shutil.move(self.destnote0, desired_destnote)
         except (OSError, IOError) as E:
             warn(f"Error on move '{src_note}' to '{dst_note}'. Error: {E}")
 
         # Change attributes for this now
-        self.ishidden = mode == "hide"
-        self.destnote = dst_note  # Using the 0 above
+        self.is_hidden = mode == "hide"
+        self.is_subdir = subdir
+        self.destnote0 = desired_destnote  # Using the 0 above
 
         return True
 
@@ -630,11 +644,11 @@ class Notefile:
         does *NOT* write!
         """
         # This is designed to be called before reading, etc for orphaned
-        if not os.path.exists(self.filename):
-            warn(f"File {repr(self.filename)} is orphaned or link is broken")
+        if not os.path.exists(self.names.filename):
+            warn(f"File {repr(self.names.filename)} is orphaned or link is broken")
             return
 
-        stat = os.stat(self.filename)
+        stat = os.stat(self.names.filename)
 
         if not dry_run and (self._isbroken_broken_from_hide() or force):
             self.make_links()
@@ -650,7 +664,7 @@ class Notefile:
             self.data["filesize"] = stat.st_size
             self.data["mtime"] = stat.st_mtime
             if self.hashfile:
-                self.data["sha256"] = sha256(self.filename)
+                self.data["sha256"] = sha256(self.names.filename)
 
             return True
 
@@ -682,7 +696,7 @@ class Notefile:
         from .find import find
 
         if filehash and len(self.data.get("sha256", "")) != 64:  # not a computed hash
-            warn(f"Cannot repair {self.filename} based on hash since it's missing")
+            warn(f"Cannot repair {self.names.filename} based on hash since it's missing")
             return
 
         files = find(
@@ -695,7 +709,7 @@ class Notefile:
             filemode=True,
         )
 
-        basename = os.path.basename(self.filename0)
+        basename = os.path.basename(self.names0.filename)
 
         candidates = []
         for file in files:
@@ -728,9 +742,8 @@ class Notefile:
 
         newfile = candidates[0]
 
-        filename, notesname, hid_note = get_filenames(newfile)
-        newnote, _ = hidden_chooser(notesname, hid_note, self.ishidden)  # Respect the original note
-
+        names = get_filenames(newfile)
+        newnote, *_ = hidden_chooser(names, hidden=self.is_hidden, subdir=self.is_subdir)
         if os.path.exists(newnote):
             warn(f"Notefile exists. Not Moving!\n   SRC:{self.destnote0}\n   DST:{newnote}")
             return
@@ -877,7 +890,7 @@ class Notefile:
                     err = E.__class__.__name__
                     desc = str(E)
                     etxt = 'Line {} `{}` raised {}. MSG: "{}". Note: "{}"'.format(
-                        ii, line, err, desc, self.filename0
+                        ii, line, err, desc, self.names0.filename
                     )
                     if allow_exception:
                         warn("Query Error: {}".format(etxt))
@@ -935,13 +948,20 @@ class Notefile:
             return fobj.read()
 
     def __str__(self):
-        return f"Notefile({repr(self.filename0)})"
+        return f"Notefile({repr(self.names0.filename)})"
 
     __repr__ = __str__
 
 
 class QueryError(ValueError):
     pass
+
+
+class MultipleNotesError(ValueError):
+    pass
+
+
+notenames = namedtuple("Names", ("filename", "visible", "hidden", "vsubdir", "hsubdir"))
 
 
 def get_filenames(filename):
@@ -952,7 +972,7 @@ def get_filenames(filename):
     NOT hidden.
 
     returns:
-        filename,vis_note,hid_note
+        notenames NamedTuple
     """
     (base, name) = os.path.split(filename)
 
@@ -975,24 +995,56 @@ def get_filenames(filename):
     filename = os.path.normpath(os.path.join(base, name))
     vis_note = os.path.normpath(os.path.join(base, vis_note))
     hid_note = os.path.normpath(os.path.join(base, hid_note))
+    return notenames(
+        filename, vis_note, hid_note, f"_notefiles/{vis_note}", f".notefiles/{vis_note}"
+    )
 
-    return filename, vis_note, hid_note
 
-
-def hidden_chooser(notesfile, hnotesfile, hidden):
+def hidden_chooser(names, *, hidden, subdir):
     """
     Simple util but I keep needing it.
 
     Searches for an existing notefile searching in order of `hidden`.
 
     Retuns:
-        notefilepath,<whether or not it exists>
+        notefilepath,<whether or not it exists>,is_hidden,is_subdir
+
+    where the latter two are based on the settings if not found
     """
-    testfiles = [hnotesfile, notesfile] if hidden else [notesfile, hnotesfile]
+    # Set the order to test based on hidden and subdir
+    # but note that hidden is considered priority over subdir
+    if hidden and subdir:
+        testfiles = [names.hsubdir, names.hidden, names.vsubdir, names.visible]
+    elif not hidden and subdir:
+        testfiles = [names.vsubdir, names.visible, names.hsubdir, names.hidden]
+    elif hidden and not subdir:
+        testfiles = [names.hidden, names.hsubdir, names.visible, names.vsubdir]
+    elif not hidden and not subdir:
+        testfiles = [names.visible, names.vsubdir, names.hidden, names.hsubdir]
+
+    lookup = {  # is_hidden,is_subdir
+        names.hsubdir: (True, True),
+        names.hidden: (True, False),
+        names.vsubdir: (False, True),
+        names.visible: (False, False),
+    }
+
+    found = []
+
     for testfile in testfiles:
         if exists_or_link(testfile):
-            return testfile, True
-    return testfiles[0], False  # first one from hidden
+            is_hidden, is_subdir = lookup[testfile]
+            found.append((testfile, True, is_hidden, is_subdir))
+
+    if len(found) > 1:
+        txt = f"Too many notes exist for {names.filename!r}: "
+        txt += ", ".join(f"{n[0]!r}" for n in found)
+        raise MultipleNotesError(txt)
+
+    if found:
+        return found[0]
+
+    return testfiles[0], False, hidden, subdir  # Return the first one and does not exists
 
 
 def exists_or_link(filename):

@@ -8,9 +8,9 @@ Not all alias commands are listed (e.g., `grep` is an alias for `search --grep` 
 ```text
 usage: notefile [-h] [--debug] [--note-field field] [--version] command ...
 
-MAIN
+Notefile
 
-optional arguments:
+options:
   -h, --help          show this help message and exit
 
 Global Options:
@@ -51,9 +51,6 @@ Commands:
     tags              Shortcut for 'notefile.py search --tag-mode --tag'
     note-path         Return the path to the notefile (or potential file if
                       the note doesn't yet exist)
-    v1                Call the older notefile tool with all args passed to it.
-                      Example: 'notefile v1 search-tags'. v1 will *read* JSON
-                      but cannot *write* it. Will be DEPREACTED soon.
 
 ```
 
@@ -63,7 +60,8 @@ Commands:
 ```text
 usage: notefile mod [-h] [-e] [-f] [-m] [--tags-only] [-r TAG] [-t TAG]
                        [-R] [-n NOTE] [-s] [--link {source,symlink,both}] [-H]
-                       [-V] [--no-hash] [--no-refresh] [--format {json,yaml}]
+                       [-V] [-S | --subdir | --no-subdir] [--no-hash]
+                       [--no-refresh] [--format {json,yaml}]
                        [--rewrite-format] [--debug] [--note-field field]
                        [--version]
                        file [file ...]
@@ -71,7 +69,7 @@ usage: notefile mod [-h] [-e] [-f] [-m] [--tags-only] [-r TAG] [-t TAG]
 positional arguments:
   file                  Specify file(s)
 
-optional arguments:
+options:
   -h, --help            show this help message and exit
 
 Interactive Edit:
@@ -112,6 +110,12 @@ Create/Modify Options:
                         $NOTEFILE_HIDDEN environment variable
   -V, --visible         Make new notes visible. Default unless set with
                         $NOTEFILE_HIDDEN environment variable
+  -S, --subdir, --no-subdir
+                        Make new notes in a subdir. NOT default unless set
+                        with $NOTEFILE_SUBDIR environment variable. When using
+                        --subdir with --hidden, will store in '.notefiles' and
+                        when using --subdir with --visible, will store in
+                        '_notefiles'. Default False
   --no-hash             Do *not* compute the SHA256 of the file. Will not be
                         able to repair orphaned notes
   --no-refresh          Do not refresh/repair file metadata when a notefile is
@@ -137,7 +141,8 @@ Global Options:
 
 ```text
 usage: notefile copy [-h] [--link {source,symlink,both}] [-H] [-V]
-                        [--no-hash] [--no-refresh] [--format {json,yaml}]
+                        [-S | --subdir | --no-subdir] [--no-hash]
+                        [--no-refresh] [--format {json,yaml}]
                         [--rewrite-format] [--debug] [--note-field field]
                         [--version]
                         SRC DST [DST ...]
@@ -146,7 +151,7 @@ positional arguments:
   SRC                   Source note
   DST                   Destination file. Must not have ANY notes
 
-optional arguments:
+options:
   -h, --help            show this help message and exit
 
 Create/Modify Options:
@@ -163,6 +168,12 @@ Create/Modify Options:
                         $NOTEFILE_HIDDEN environment variable
   -V, --visible         Make new notes visible. Default unless set with
                         $NOTEFILE_HIDDEN environment variable
+  -S, --subdir, --no-subdir
+                        Make new notes in a subdir. NOT default unless set
+                        with $NOTEFILE_SUBDIR environment variable. When using
+                        --subdir with --hidden, will store in '.notefiles' and
+                        when using --subdir with --visible, will store in
+                        '_notefiles'. Default False
   --no-hash             Do *not* compute the SHA256 of the file. Will not be
                         able to repair orphaned notes
   --no-refresh          Do not refresh/repair file metadata when a notefile is
@@ -188,7 +199,8 @@ Global Options:
 
 ```text
 usage: notefile replace [-h] [--link {source,symlink,both}] [-H] [-V]
-                           [--no-hash] [--no-refresh] [--format {json,yaml}]
+                           [-S | --subdir | --no-subdir] [--no-hash]
+                           [--no-refresh] [--format {json,yaml}]
                            [--rewrite-format] [--debug] [--note-field field]
                            [--version] [--field FIELD] [--all-fields]
                            [--append]
@@ -198,7 +210,7 @@ positional arguments:
   SRC                   Source note
   DST                   Destination file
 
-optional arguments:
+options:
   -h, --help            show this help message and exit
   --field FIELD         Specify fields to replace/update. If NONE are
                         specified, will use --note-field. If ANY flag is set,
@@ -227,6 +239,12 @@ Create/Modify Options:
                         $NOTEFILE_HIDDEN environment variable
   -V, --visible         Make new notes visible. Default unless set with
                         $NOTEFILE_HIDDEN environment variable
+  -S, --subdir, --no-subdir
+                        Make new notes in a subdir. NOT default unless set
+                        with $NOTEFILE_SUBDIR environment variable. When using
+                        --subdir with --hidden, will store in '.notefiles' and
+                        when using --subdir with --visible, will store in
+                        '_notefiles'. Default False
   --no-hash             Do *not* compute the SHA256 of the file. Will not be
                         able to repair orphaned notes
   --no-refresh          Do not refresh/repair file metadata when a notefile is
@@ -258,15 +276,16 @@ usage: notefile change-tag [-h] [--debug] [--note-field field] [--version]
                               [--tag-mode] [--tag-counts] [--tag-count-order]
                               [-o FILE] [--symlink DIR]
                               [--link {source,symlink,both}] [-H] [-V]
-                              [--no-hash] [--no-refresh]
-                              [--format {json,yaml}] [--rewrite-format] [-n]
+                              [-S | --subdir | --no-subdir] [--no-hash]
+                              [--no-refresh] [--format {json,yaml}]
+                              [--rewrite-format] [-n]
                               old new [new ...]
 
 positional arguments:
   old                   old tag to change
   new                   new tag(s)
 
-optional arguments:
+options:
   -h, --help            show this help message and exit
   -n, --dry-run         Do not make changes
 
@@ -331,6 +350,12 @@ Create/Modify Options:
                         $NOTEFILE_HIDDEN environment variable
   -V, --visible         Make new notes visible. Default unless set with
                         $NOTEFILE_HIDDEN environment variable
+  -S, --subdir, --no-subdir
+                        Make new notes in a subdir. NOT default unless set
+                        with $NOTEFILE_SUBDIR environment variable. When using
+                        --subdir with --hidden, will store in '.notefiles' and
+                        when using --subdir with --visible, will store in
+                        '_notefiles'. Default False
   --no-hash             Do *not* compute the SHA256 of the file. Will not be
                         able to repair orphaned notes
   --no-refresh          Do not refresh/repair file metadata when a notefile is
@@ -355,15 +380,22 @@ usage: notefile vis [-h] [--debug] [--note-field field] [--version]
                        [--export] [--export-format {yaml,json,jsonl}]
                        [--tag-mode] [--tag-counts] [--tag-count-order]
                        [-o FILE] [--symlink DIR] [-n]
+                       [-S | --subdir | --no-subdir]
                        {hide,show} [path ...]
 
 positional arguments:
   {hide,show}           Visibility mode for file(s)/dir(s)
   path                  Additional --path arguments
 
-optional arguments:
+options:
   -h, --help            show this help message and exit
   -n, --dry-run         Do not make changes
+  -S, --subdir, --no-subdir
+                        Make new notes in a subdir. NOT default unless set
+                        with $NOTEFILE_SUBDIR environment variable. When using
+                        --subdir with --hidden, will store in '.notefiles' and
+                        when using --subdir with --visible, will store in
+                        '_notefiles'. Default is based on original setting
 
 Global Options:
   --debug               Debug mode
@@ -430,7 +462,7 @@ positional arguments:
   {yaml,json}           Change the note format for file(s)/dir(s)
   path                  Additional --path arguments
 
-optional arguments:
+options:
   -h, --help            show this help message and exit
   -n, --dry-run         Do not make changes
 
@@ -490,7 +522,8 @@ Display Options:
 usage: notefile repair [-h] [--debug] [--note-field field] [--version]
                           [-p PATH] [--exclude EXCLUDE] [--exclude-links]
                           [--match-exclude-case] [--max-depth N] [-x]
-                          [--link {source,symlink,both}] [-H] [-V] [--no-hash]
+                          [--link {source,symlink,both}] [-H] [-V]
+                          [-S | --subdir | --no-subdir] [--no-hash]
                           [--no-refresh] [--format {json,yaml}]
                           [--rewrite-format] [--dry-run] [--force-refresh]
                           [--match {size,mtime,hash,name}]
@@ -504,7 +537,7 @@ usage: notefile repair [-h] [--debug] [--note-field field] [--version]
 positional arguments:
   path                  Additional --path arguments
 
-optional arguments:
+options:
   -h, --help            show this help message and exit
 
 Global Options:
@@ -544,6 +577,12 @@ Create/Modify Options:
                         $NOTEFILE_HIDDEN environment variable
   -V, --visible         Make new notes visible. Default unless set with
                         $NOTEFILE_HIDDEN environment variable
+  -S, --subdir, --no-subdir
+                        Make new notes in a subdir. NOT default unless set
+                        with $NOTEFILE_SUBDIR environment variable. When using
+                        --subdir with --hidden, will store in '.notefiles' and
+                        when using --subdir with --visible, will store in
+                        '_notefiles'. Default False
   --no-hash             Do *not* compute the SHA256 of the file. Will not be
                         able to repair orphaned notes
   --no-refresh          Do not refresh/repair file metadata when a notefile is
@@ -606,7 +645,7 @@ usage: notefile cat [-h] [--debug] [--note-field field] [--version] [-f]
 positional arguments:
   file                Specify file to cat
 
-optional arguments:
+options:
   -h, --help          show this help message and exit
   -f, --full          Display the full YAML note rather than just the note
                       text
@@ -631,7 +670,7 @@ usage: notefile find [-h] [--debug] [--note-field field] [--version]
                         [--tag-mode] [--tag-counts] [--tag-count-order]
                         [-o FILE] [--symlink DIR] [--orphaned]
 
-optional arguments:
+options:
   -h, --help            show this help message and exit
   --orphaned            Find orphaned notes only. Does not repair. See repair-
                         orphaned to repair
@@ -699,7 +738,7 @@ usage: notefile search [-h] [--debug] [--note-field field] [--version]
                           [--tag-counts] [--tag-count-order] [-o FILE]
                           [--symlink DIR]
 
-optional arguments:
+options:
   -h, --help            show this help message and exit
   --all                 Match for all. Default is ANY
 
@@ -798,7 +837,7 @@ usage: notefile query [-h] [--debug] [--note-field field] [--version]
 positional arguments:
   query                 Additional queries added to any --query.
 
-optional arguments:
+options:
   -h, --help            show this help message and exit
   --all                 Match for all. Default is ANY
 
@@ -962,14 +1001,15 @@ Reminder: DO NOT QUERY UNTRUSTED INPUT! There is nothing stopping shell injectio
 ```text
 usage: notefile note-path [-h] [--debug] [--note-field field] [--version]
                              [--link {source,symlink,both}] [-H] [-V]
-                             [--no-hash] [--no-refresh] [--format {json,yaml}]
+                             [-S | --subdir | --no-subdir] [--no-hash]
+                             [--no-refresh] [--format {json,yaml}]
                              [--rewrite-format]
                              path [path ...]
 
 positional arguments:
   path                  Specify path(s). Will print in order
 
-optional arguments:
+options:
   -h, --help            show this help message and exit
   --link {source,symlink,both}
                         ['both'] Specify how to handle symlinks. If 'source',
@@ -982,6 +1022,12 @@ optional arguments:
                         $NOTEFILE_HIDDEN environment variable
   -V, --visible         Make new notes visible. Default unless set with
                         $NOTEFILE_HIDDEN environment variable
+  -S, --subdir, --no-subdir
+                        Make new notes in a subdir. NOT default unless set
+                        with $NOTEFILE_SUBDIR environment variable. When using
+                        --subdir with --hidden, will store in '.notefiles' and
+                        when using --subdir with --visible, will store in
+                        '_notefiles'. Default False
   --no-hash             Do *not* compute the SHA256 of the file. Will not be
                         able to repair orphaned notes
   --no-refresh          Do not refresh/repair file metadata when a notefile is

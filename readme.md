@@ -105,13 +105,27 @@ Note that when using `--no-hash`, the file may still be rehashed in subsequent r
 
 When repairing an orphaned notefile, candidate files are first compared by filesize and then by SHA256. While not foolproof, this *greatly* reduces the number of SHA256 computations to be performed; especially on larger files where it becomes increasingly unlikely to be the exact same size.
 
-## Hidden Notefiles
+## Hidden and Subdir Notefiles
 
-Notefiles can be either visible (default) or can be hidden with a preceeding dot. They are visible by default but can be made to default to hidden by setting the environmental variable `NOTEFILE_HIDDEN=true` (any other value will be false). Regardless of the default, each note can be created as hidden or visible with `-V, --visible` or `-H, --hidden` flags.
+Notes can be hidden and/or in a subdirectory. Consider `file.txt`. When a note is *created* with the following flags, the location of the note is as follows:
+
+| Flags                   | Note Destination                 | comment |
+|-------------------------|----------------------------------|---------|
+| `--visible --no-subdir` | `file.txt.notes.yaml`            | default |
+| `--visible --subdir`    | `_notefiles/file.txt.notes.yaml` |         |
+| `--hidden --no-subdir`  | `.file.txt.notes.yaml`           |         |
+| `--hidden --subdir`     | `.notefiles/file.txt.notes.yaml` |         |
+
+
+The default is `--visible` and `--no-subdir` but both can be controlled with environmental variables:
+
+    $ export NOTEFILE_HIDDEN=true
+    $ export NOTEFILE_SUBDIR=true
+
 
 Note that the flags *only* apply to creating a *new* note. For example if a visible note already exists, it will always go to that even if `-H` is set.
 
-To hide or unhide a note, use `notefile vis hide` or `notefile vis show` on either file(s) or dir(s). If specified as dir, will apply to all items following exclusion flags.
+To hide or unhide a note, use `notefile vis hide` or `notefile vis show` on either file(s) or dir(s). These will also use the subdir setting
 
 Changing the visibility of a symlinked referent will cause the symlinked note to be broken. However, by design it will still properly read the note and will be fixed when editing or repairing metadata.
 

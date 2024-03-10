@@ -63,7 +63,7 @@ def find(
         Notefile object
 
     """
-    filemode = kwargs.pop("filemode", False)
+    filemode = kwargs.pop("filemode", False)  # Hidden argument
     if kwargs:
         raise ValueError(f"Unrecognized arguments: {list(kwargs)}")
 
@@ -85,7 +85,7 @@ def find(
                 noteopts=noteopts,
                 filemode=filemode,
             ):
-                name = r if filemode else r.filename0
+                name = r if filemode else r.names0.filename
                 if name not in seen:
                     yield r
                 seen.add(name)
@@ -104,6 +104,7 @@ def find(
 
     dev0 = os.stat(path).st_dev
     for root, dirs, files in os.walk(path):
+        # Do regular excludes of files
         exclude_in_place(
             files,
             excludes,
@@ -112,6 +113,24 @@ def find(
             remove_noteext=True,
             keep_notes_only=not filemode,
         )
+
+        # Add subdirs but also check for excludes. Add them to files
+        for subname in ["_notefiles", ".notefiles"]:
+            try:
+                dirs.remove(subname)  # will error if not here
+                subfiles = os.listdir(subname)
+                exclude_in_place(
+                    subfiles,
+                    excludes,
+                    matchcase=matchcase,
+                    isdir=False,
+                    remove_noteext=True,
+                    keep_notes_only=not filemode,
+                )
+                files.extend(subfiles)
+            except ValueError:
+                continue
+
         exclude_in_place(dirs, excludes, matchcase=matchcase, isdir=True)
 
         if one_file_system:
