@@ -11,19 +11,22 @@ import datetime
 
 import notefile
 
-__version__ = "20230209.0"
+__version__ = "20240403.0"
 
-now = datetime.datetime.now().astimezone().strftime("%Y-%m-%dT%H:%M:%S.%f%z")
+HISTORY_FILE = "~/.tags_notefile_finder.db"
+
+now = datetime.datetime.now().astimezone().isoformat()
+
 parser = argparse.ArgumentParser(
     description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
 )
 
 parser.add_argument("--dry-run", action="store_true", help="Dry Run")
-parser.add_argument("--path", default=".", help="Specify path")
+parser.add_argument("--path", default=".", help="Specify path. Default '.'")
 parser.add_argument(
     "--history-file",
-    default="~/.tags_notefile_finder.db",
-    help="Specify where to store the history file of tags",
+    default=HISTORY_FILE,
+    help=f"Specify where to store the history file of tags. Default: {HISTORY_FILE!r}",
 )
 parser.add_argument(
     "--map-tags",
@@ -56,30 +59,35 @@ def get_db():
 
 
 db = get_db()
-db.execute(
-    """
-    CREATE TABLE IF NOT EXISTS status(
-        fullpath STRING,
-        tag STRING,           -- always use notefile's as canonical
-        UNIQUE(fullpath, tag) -- See reference
-    )"""
-)
-db.execute(
-    """
-    CREATE TABLE IF NOT EXISTS meta(
-        key STRING PRIMARY KEY,
-        value STRING)
-    """
-)
+with db:
+    db.execute(
+        """
+        CREATE TABLE IF NOT EXISTS status(
+            fullpath STRING,
+            tag STRING,           -- always use notefile's as canonical
+            UNIQUE(fullpath, tag) -- See reference
+        )"""
+    )
+    db.execute(
+        """
+        CREATE TABLE IF NOT EXISTS meta(
+            key STRING PRIMARY KEY,
+            value STRING)
+        """
+    )
 
-db.execute(
-    """
-        INSERT OR IGNORE -- Do not replace. Ignore if already set 
-        INTO meta VALUES (?,?)""",
-    ("created", now),
-)
-
-db.commit()
+    db.execute(
+        """
+            INSERT OR IGNORE -- Do not replace. Ignore if already set 
+            INTO meta VALUES (?,?)""",
+        ("created", now),
+    )
+    db.execute(
+        """
+            INSERT OR IGNORE -- Do not replace. Ignore if already set 
+            INTO meta VALUES (?,?)""",
+        ("version", __version__),
+    )
 
 
 ### Get Tags on everything
@@ -240,31 +248,30 @@ for path, tag in finder_to_remove:
 # status
 if not args.dry_run:
     db = get_db()
-    db.executemany(
-        """
-        INSERT OR REPLACE INTO status
-        VALUES (?,?)""",
-        status_to_add,
-    )
-
-    db.executemany(
-        """
-        DELETE FROM status
-        WHERE
-            fullpath = ?
-        AND
-            tag = ?
-        """,
-        status_to_remove,
-    )
-
-    if status_to_remove or status_to_add:
-        db.execute(
+    with db:
+        db.executemany(
             """
-            INSERT OR REPLACE
-            INTO meta 
+            INSERT OR REPLACE INTO status
             VALUES (?,?)""",
-            ("modified", now),
+            status_to_add,
         )
 
-    db.commit()
+        db.executemany(
+            """
+            DELETE FROM status
+            WHERE
+                fullpath = ?
+            AND
+                tag = ?
+            """,
+            status_to_remove,
+        )
+
+        if status_to_remove or status_to_add:
+            db.execute(
+                """
+                INSERT OR REPLACE
+                INTO meta 
+                VALUES (?,?)""",
+                ("modified", now),
+            )

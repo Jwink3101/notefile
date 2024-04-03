@@ -1573,6 +1573,24 @@ def test_subdir():
         "no-subdir_vis.txt",
     }
 
+    # Test again with a subdirectory
+    writefile("asubdir/vis.txt", "in a subdir vis")
+    writefile("asubdir/hid.txt", "in a subdir hid")
+    call("mod asubdir/vis.txt -t tag --visible --subdir")
+    call("mod asubdir/hid.txt -t tag --hidden --subdir")
+    assert os.path.exists("asubdir/_notefiles/vis.txt.notes.yaml")
+    assert os.path.exists("asubdir/.notefiles/hid.txt.notes.yaml")
+
+    findff = call("find -o res.txt")
+    assert set(Path("res.txt").read_text().split()) == {
+        "subdir_hid.txt",
+        "no-subdir_hid.txt",
+        "subdir_vis.txt",
+        "no-subdir_vis.txt",
+        "asubdir/vis.txt",
+        "asubdir/hid.txt",
+    }
+
 
 def test_pickle():
     os.chdir(TESTDIR)

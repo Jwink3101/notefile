@@ -970,9 +970,13 @@ def get_filenames(filename):
     returns:
         notenames NamedTuple
     """
-    (base, name) = os.path.split(filename)
+    base, name = os.path.split(filename)
 
     if name.endswith(NOTESEXT):  # Given a notefile path
+        parentbase, parentname = os.path.split(base)
+        if parentname in {"_notefiles", ".notefiles"}:
+            base = parentbase
+
         if name.startswith("."):  # Given a HIDDEN file
             vis_note = name[1:]
             hid_note = name
@@ -988,15 +992,12 @@ def get_filenames(filename):
             vis_note = name + NOTESEXT
             hid_note = "." + vis_note
 
-    filename = os.path.normpath(os.path.join(base, name))
-    vis_note = os.path.normpath(os.path.join(base, vis_note))
-    hid_note = os.path.normpath(os.path.join(base, hid_note))
     return Bunch(
-        filename=filename,
-        visible=vis_note,
-        hidden=hid_note,
-        vsubdir=f"_notefiles/{vis_note}",
-        hsubdir=f".notefiles/{vis_note}",
+        filename=os.path.normpath(os.path.join(base, name)),
+        visible=os.path.normpath(os.path.join(base, vis_note)),
+        hidden=os.path.normpath(os.path.join(base, hid_note)),
+        vsubdir=os.path.normpath(os.path.join(base, "_notefiles", vis_note)),
+        hsubdir=os.path.normpath(os.path.join(base, ".notefiles", vis_note)),
     )
 
 

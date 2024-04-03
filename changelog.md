@@ -2,6 +2,10 @@
 
 (**_newest_** on *top*)
 
+## 2.202400403.0
+
+- Fixed bug with location of subdirs when specifying paths
+
 ## 2.20240310.1
 
 - Made it pickleable to better enable parallel processing. Added test

@@ -1,6 +1,7 @@
 """
 Main module-level utilities
 """
+
 from .notefile import Notefile
 from . import NOTESEXT
 
@@ -118,7 +119,7 @@ def find(
         for subname in ["_notefiles", ".notefiles"]:
             try:
                 dirs.remove(subname)  # will error if not here
-                subfiles = os.listdir(subname)
+                subfiles = os.listdir(os.path.join(root, subname))
                 exclude_in_place(
                     subfiles,
                     excludes,
@@ -127,7 +128,7 @@ def find(
                     remove_noteext=True,
                     keep_notes_only=not filemode,
                 )
-                files.extend(subfiles)
+                files.extend(os.path.join(subname, subfile) for subfile in subfiles)
             except ValueError:
                 continue
 
