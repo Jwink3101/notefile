@@ -329,8 +329,11 @@ def cli(argv=None):
         default=[],
         help="""Notes to add (or replace). Each argument is its own line. Specify 
                 `--note ""` to add empty line. Notes will come _after_ stdin if 
-                applicable""",
+                applicable. Will use --note-field settings""",
     )
+
+    # TODO Add --json
+
     editmod_parent_mod.add_argument(
         "-s",
         "--stdin",

@@ -11,9 +11,14 @@ import datetime
 
 import notefile
 
-__version__ = "20240403.0"
+__version__ = "20250726.0"
 
-HISTORY_FILE = "~/.tags_notefile_finder.db"
+HISTORY_FILE = os.environ.get(
+    "MACOS_NOTEFILE_TAG_SYNC_DB",
+    os.path.expanduser("~/.tags_notefile_finder.db"),
+)
+
+NOTEFILETAG = "_notefile"
 
 now = datetime.datetime.now().astimezone().isoformat()
 
@@ -26,7 +31,16 @@ parser.add_argument("--path", default=".", help="Specify path. Default '.'")
 parser.add_argument(
     "--history-file",
     default=HISTORY_FILE,
-    help=f"Specify where to store the history file of tags. Default: {HISTORY_FILE!r}",
+    help=f"""
+        Specify where to store the history file of tags. 
+        
+        Can also be specified via the 
+        $MACOS_NOTEFILE_TAG_SYNC_DB environment variable.
+        
+        $MACOS_NOTEFILE_TAG_SYNC_DB is currently 
+        {'set to ' if 'MACOS_NOTEFILE_TAG_SYNC_DB' in os.environ else 'not set. Default '}
+        {HISTORY_FILE!r}.
+        """,
 )
 parser.add_argument(
     "--map-tags",
@@ -35,6 +49,17 @@ parser.add_argument(
     default=[],
     help="""Specify mappings from notefile to finder tags. Can specify multiple times""",
 )
+
+parser.add_argument(
+    "--tag-notefiles",
+    action=argparse.BooleanOptionalAction,
+    default=False,
+    help=f"""
+        Apply a Finder tag of {NOTEFILETAG!r} if there is a notefile of any kind.
+        Default %(default)s.
+        """,
+)
+
 parser.add_argument("-v", "--version", action="version", version="%(prog)s-" + __version__)
 
 args = parser.parse_args()
@@ -93,6 +118,7 @@ with db:
 ### Get Tags on everything
 # Finder
 finder = set()
+finder_has_note = set()
 
 proc = subprocess.Popen(["tag", "-RG"], stdout=subprocess.PIPE, cwd=args.path)
 with proc.stdout:
@@ -109,17 +135,26 @@ with proc.stdout:
         for tag in tags.split(","):
             tag = tag.lower().strip()
             tag = finder2notefile.get(tag, tag)
-            finder.add((filename, tag))
+            if tag == NOTEFILETAG:
+                # Need to use a different set to store
+                # for now
+                finder_has_note.add((filename, NOTEFILETAG))
+            else:
+                finder.add((filename, tag))
 
 # Notefile
 note = set()
+note_has_note = set()
 
 for nf in notefile.find(path=args.path):
     filename = os.path.abspath(os.path.join(args.path, nf.filename))
+    note_has_note.add((filename, NOTEFILETAG))
+
     for tag in nf.data.tags:
         note.add((filename, tag))
 
 # Status
+# Status does not need "_has_note" since we don't care.
 qpath = args.path
 if not qpath.endswith("/"):
     qpath += "/"  # Makes sure a LIKE query catches full dir
@@ -178,6 +213,11 @@ status = set(status)
 note_to_add, note_to_remove = set(), set()
 finder_to_add, finder_to_remove = set(), set()
 status_to_add, status_to_remove = set(), set()
+
+# Handle NOTEFILETAG first
+if args.tag_notefiles:
+    finder_to_remove.update(finder_has_note - note_has_note)
+    finder_to_add.update(note_has_note - finder_has_note)
 
 # new notefile
 note_is_new = note.difference(finder.union(status))  # note ∖ (finder ⋃ status)

@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 """
-hide all notes and tag them.
+This *JUST* adds a Finder tag to anything that has a note and removes it if it doesn't
 
 Must have https://github.com/jdberry/tag installed: brew install tag.
 
@@ -20,20 +20,26 @@ import itertools
 
 import notefile
 
+__verion__ = "20250914.0"
+
+NOTEFILETAG = "_notefile"
+
 parser = argparse.ArgumentParser(
     description=__doc__, epilog="", formatter_class=argparse.RawDescriptionHelpFormatter
 )
 
 parser.add_argument("--batch-size", default=500, type=int, help="Batch size on calling `tag`")
 parser.add_argument("-H", "--hide", action="store_true", help="Hide all notes")
-parser.add_argument("--tag", default="Red", help="['%(default)s'] Specify the tag to set in Finder")
+parser.add_argument(
+    "--tag", default=NOTEFILETAG, help="['%(default)s'] Specify the tag to set in Finder"
+)
 parser.add_argument("path", default=".", nargs="?", help="Start path")
 
 args = parser.parse_args()
 
 
 notes = set()
-for note in notefile.find_notes(path=args.path, return_note=True, exclude_links=True):
+for note in notefile.find(path=args.path, one_file_system=True, exclude_links=True):
     note = note.filename0
     if note.startswith("./"):
         note = note[2:]

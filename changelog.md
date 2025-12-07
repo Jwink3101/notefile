@@ -2,6 +2,14 @@
 
 (**_newest_** on *top*)
 
+## 2.20251207.0
+
+- Defer hashing on new files until save
+
+## On 2025-07-26 -- Just scripts
+
+- Combined the behavior of macOS_Finder_tag into MacOStag_sync and changed the default
+
 ## 2.202400403.0
 
 - Fixed bug with location of subdirs when specifying paths

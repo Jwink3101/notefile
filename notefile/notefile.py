@@ -15,6 +15,8 @@ METADATA = frozenset(("filesize", "mtime", "sha256", "last-updated", "notefile v
 
 _TESTEDIT = False  # Only used in testing
 
+DEFERRED_HASH = "**NOT YET COMPUTED**"
+
 
 class Notefile:
     """
@@ -165,7 +167,7 @@ class Notefile:
         self._data = None
         self._write_count = 0
 
-    def read(self, _sha256=None):
+    def read(self):
         """
         Read the note and store the data.
         """
@@ -192,7 +194,8 @@ class Notefile:
                 self._data["filesize"] = stat.st_size
                 self._data["mtime"] = stat.st_mtime
                 if self.hashfile:
-                    self._data["sha256"] = sha256(self.names.filename)
+                    # self._data["sha256"] = sha256(self.names.filename)
+                    self._data["sha256"] = DEFERRED_HASH
                 self.txt = self.writes()
             except Exception as E:
                 if os.path.islink(self.names0.filename):
@@ -241,7 +244,7 @@ class Notefile:
         debug("data setter")
         self._data = data
 
-    def writes(self, format=None):
+    def writes(self, format=None, compute_sha256=False):
         """
         Return a string of the notes.
 
@@ -253,6 +256,9 @@ class Notefile:
         tags = self.data.get("tags", [])
         tags = set(t.strip() for t in tags if t.strip())
         self.data["tags"] = sorted(tags)
+
+        if compute_sha256 and self.data.get("sha256", "") == DEFERRED_HASH:
+            self.data["sha256"] = sha256(self.names.filename)
 
         data = pss(self.data)  # Will recurse into lists and dicts too
         data["last-updated"] = now_string()
@@ -296,7 +302,7 @@ class Notefile:
             self.make_links()  # Rebuild the links in case they were broken
             return self
 
-        txt = self.txt = self.writes()
+        txt = self.txt = self.writes(compute_sha256=True)
 
         # Make the write atomic
         tmpfile = Path(self.destnote).with_suffix(".yaml.swp")
