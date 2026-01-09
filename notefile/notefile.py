@@ -1,4 +1,16 @@
-from . import HIDDEN, SUBDIR, NOTEFIELD, NOHASH, NOTESEXT, debug, warn, __version__, DT, FORMAT
+from . import (
+    HIDDEN,
+    SUBDIR,
+    NOTEFIELD,
+    NOHASH,
+    NOTESEXT,
+    debug,
+    warn,
+    __version__,
+    DT,
+    FORMAT,
+    DISABLE_QUERY,
+)
 from .nfyaml import pss, load_yaml, ruamel_yaml, yaml, yamltxt
 from .utils import now_string, Bunch, sha256, tmpfileinpath, flattenlist, normalize_tags
 from . import find
@@ -681,7 +693,7 @@ class Notefile:
         filehash=True,
         name=False,
         dry_run=False,
-        search_path=".",
+        search_path=".",  # Note, in the CLI, this is default to --path
         search_excludes=None,
         search_matchcase=False,
         search_maxdepth=None,
@@ -693,8 +705,6 @@ class Notefile:
 
         Always searches by filesize but can also look for matches by mtime, filehash,
         and/or name (i.e. leaf node).
-
-        Searches from `search_path` with NO EXCLUSIONS.
 
         return the new dest or None
         """
@@ -859,6 +869,9 @@ class Notefile:
         Returns:
             boolean of whether or not it matched
         """
+        if DISABLE_QUERY:
+            raise ValueError("Query is disabled")
+
         from functools import partial
         import re
 

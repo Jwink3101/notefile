@@ -1378,6 +1378,18 @@ def test_orphan_repair():
     o, e = call("repair-orphaned otherfile.txt.notes.yaml", capture=True)
     assert e == "WARNING: Cannot repair otherfile.txt based on hash since it's missing\n"
 
+    # Test from a different location
+
+    writefile("diff_dir.txt", "testing a different dir")
+    call("mod -t test -V diff_dir.txt")
+    shutil.move("diff_dir.txt", "sub/diff-dir.txt")
+    try:
+        os.chdir(os.path.expanduser("~"))
+        call(f"repair-orphaned --path {dirpath}")
+    finally:
+        os.chdir(dirpath)
+    assert os.path.exists("sub/diff-dir.txt.notes.yaml")
+
     os.chdir(TESTDIR)
 
 
@@ -1608,27 +1620,27 @@ def test_pickle():
 
 
 if __name__ == "__main__":
-    test_mod()
-    test_create_opts()
-    test_copy()
-    test_replace()
-    test_change_viz_and_format(True)
-    test_change_viz_and_format(False)
-    test_change_tag()
-    test_find_exclusions()
-    test_outputs_export()
-    test_search()
-    test_links()
-    test_unicode_spaces()
-    test_notepath()
-    test_metadata_repair()
+    #     test_mod()
+    #     test_create_opts()
+    #     test_copy()
+    #     test_replace()
+    #     test_change_viz_and_format(True)
+    #     test_change_viz_and_format(False)
+    #     test_change_tag()
+    #     test_find_exclusions()
+    #     test_outputs_export()
+    #     test_search()
+    #     test_links()
+    #     test_unicode_spaces()
+    #     test_notepath()
+    #     test_metadata_repair()
     test_orphan_repair()
-    test_cat()
-    test_notefield()
-    test_nonstr()
-    test_auto_read()
-    test_subdir()
-    test_pickle()
+    #     test_cat()
+    #     test_notefield()
+    #     test_nonstr()
+    #     test_auto_read()
+    #     test_subdir()
+    #     test_pickle()
 
     print("-=" * 50)
     print("SUCCESS")

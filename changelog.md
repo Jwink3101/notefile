@@ -2,6 +2,10 @@
 
 (**_newest_** on *top*)
 
+## 2.20260109.0
+
+- Changed the default --search-path for orphan repair to be the specified --path
+
 ## 2.20251207.0
 
 - Defer hashing on new files until save

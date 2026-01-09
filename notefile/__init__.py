@@ -1,4 +1,4 @@
-__version__ = "2.20251207.0"
+__version__ = "2.20260109.0"
 __author__ = "Justin Winokur"
 
 import sys, os
@@ -15,6 +15,8 @@ SUBDIR = os.environ.get("NOTEFILE_SUBDIR", "false").strip().lower() == "true"
 DEBUG = os.environ.get("NOTEFILE_DEBUG", "false").strip().lower() == "true"
 NOTEFIELD = os.environ.get("NOTEFILE_NOTEFIELD", "notes").strip()
 FORMAT = os.environ.get("NOTEFILE_FORMAT", "yaml").strip().lower()
+
+DISABLE_QUERY = os.environ.get("NOTEFILE_DISABLE_QUERY", "false").lower() == "true"
 
 # Constants
 NOTESEXT = ".notes.yaml"
@@ -46,17 +48,17 @@ It is evaluated as Python (with no sandboxing or sanitizing so DO NOT EVALUATE
 UNTRUSTED INPUT). The following variables are defined:
 
     note    Notefile object including attributes such as 'filename',
-            'destnote','hidden', etc. See notefile.Notefile documention
+            'destnote','hidden', etc. See notefile.Notefile documention.
     data    Dictionary of the note itself.
-    notes   == data['notes'] or data[<note_field>] if set. The note text
-    tags    == data['tags']. Set object of tags (note, all lower case)
-    text    Raw contents (YAML/JSON) of the note
+    notes   == data['notes'] or data[<note_field>] if set. The note text.
+    tags    == data['tags']. Set object of tags (note, all lower case).
+    text    Raw contents (YAML/JSON) of the note.
 
 And it includes the following functions:
 
     grep    performs a match against 'notes'. Respects the flags:
             '--match-expr-case','--fixed-strings','--full-word' automatically but 
-            can also be overridden with the respective keyword arguments
+            can also be overridden with the respective keyword arguments.
     
     g       Aliased to grep
     
@@ -64,10 +66,10 @@ And it includes the following functions:
     
     gany    Essentially grep with match_any = True
     
-    tany    Returns True if that tag is in tags: e.g
+    tany    Returns True if that tag is in tags: e.g.
                 tany('tag1','tag2') <==> any(t in tags for t in ['tag1','tag2'])
     
-    tall    Returns true if all args are in tags:
+    tall    Returns true if all args are in tags: e.g.
                 tall('tag1','tag2') <==> all(t in tags for t in ['tag1','tag2'])
     
     t       aliased to tany

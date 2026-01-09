@@ -387,8 +387,8 @@ def cli(argv=None):
         action="append",
         help="""Specify path(s). Can specify multiple. Directories will
                 recurse and follow exclusions, etc. Specified files will not. 
-                If not specified, will be '.'. If any path is specified, will ONLY
-                use those paths. """,
+                If not specified, will be --path (or parent if a file). 
+                If *any* path is specified, will ONLY use those paths and not --path""",
     )
     repair_orphaned_parent_group.add_argument(
         "--search-exclude",
@@ -1164,6 +1164,18 @@ class RepairCLI(BaseCLI):
         name = "name" in match
 
         p = "(DRY RUN) " if args.dry_run else ""
+
+        with open("log", "at") as fp:
+            print(f"A {args.search_path = }", file=fp)
+
+        if not args.search_path:
+            for p in args.path:
+                if not p:
+                    continue
+                args.search_path.append(p if os.path.isdir(p) else os.path.dirname(p))
+
+        with open("log", "at") as fp:
+            print(f"B {args.search_path = }", file=fp)
 
         for note in notes:
             r = note.repair_orphaned(

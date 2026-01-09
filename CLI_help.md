@@ -92,7 +92,8 @@ Modify Notes:
   -R, --replace         Replace rather than append the new note
   -n NOTE, --note NOTE  Notes to add (or replace). Each argument is its own
                         line. Specify `--note ""` to add empty line. Notes
-                        will come _after_ stdin if applicable
+                        will come _after_ stdin if applicable. Will use
+                        --note-field settings
   -s, --stdin           Read note from stdin. Prepended to any --note
                         arguments
 
@@ -616,8 +617,9 @@ Repair orphaned options:
   --search-path SEARCH_PATH
                         Specify path(s). Can specify multiple. Directories
                         will recurse and follow exclusions, etc. Specified
-                        files will not. If not specified, will be '.'. If any
-                        path is specified, will ONLY use those paths.
+                        files will not. If not specified, will be --path (or
+                        parent if a file). If *any* path is specified, will
+                        ONLY use those paths and not --path
   --search-exclude SEARCH_EXCLUDE
                         Specify a glob pattern to exclude when looking for
                         files. Directories are also matched with a trailing
@@ -923,17 +925,17 @@ It is evaluated as Python (with no sandboxing or sanitizing so DO NOT EVALUATE
 UNTRUSTED INPUT). The following variables are defined:
 
     note    Notefile object including attributes such as 'filename',
-            'destnote','hidden', etc. See notefile.Notefile documention
+            'destnote','hidden', etc. See notefile.Notefile documention.
     data    Dictionary of the note itself.
-    notes   == data['notes'] or data[<note_field>] if set. The note text
-    tags    == data['tags']. Set object of tags (note, all lower case)
-    text    Raw contents (YAML/JSON) of the note
+    notes   == data['notes'] or data[<note_field>] if set. The note text.
+    tags    == data['tags']. Set object of tags (note, all lower case).
+    text    Raw contents (YAML/JSON) of the note.
 
 And it includes the following functions:
 
     grep    performs a match against 'notes'. Respects the flags:
             '--match-expr-case','--fixed-strings','--full-word' automatically but 
-            can also be overridden with the respective keyword arguments
+            can also be overridden with the respective keyword arguments.
     
     g       Aliased to grep
     
@@ -941,10 +943,10 @@ And it includes the following functions:
     
     gany    Essentially grep with match_any = True
     
-    tany    Returns True if that tag is in tags: e.g
+    tany    Returns True if that tag is in tags: e.g.
                 tany('tag1','tag2') <==> any(t in tags for t in ['tag1','tag2'])
     
-    tall    Returns true if all args are in tags:
+    tall    Returns true if all args are in tags: e.g.
                 tall('tag1','tag2') <==> all(t in tags for t in ['tag1','tag2'])
     
     t       aliased to tany
