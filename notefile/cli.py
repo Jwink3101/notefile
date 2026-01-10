@@ -1165,17 +1165,11 @@ class RepairCLI(BaseCLI):
 
         p = "(DRY RUN) " if args.dry_run else ""
 
-        with open("log", "at") as fp:
-            print(f"A {args.search_path = }", file=fp)
-
         if not args.search_path:
             for p in args.path:
                 if not p:
                     continue
                 args.search_path.append(p if os.path.isdir(p) else os.path.dirname(p))
-
-        with open("log", "at") as fp:
-            print(f"B {args.search_path = }", file=fp)
 
         for note in notes:
             r = note.repair_orphaned(
