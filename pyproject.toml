@@ -1,5 +1,31 @@
+[build-system]
+requires = ["setuptools>=61", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "notefile"
+dynamic = ["version"]
+description = "Create associated notefiles (sidecar files)"
+readme = "readme.md"
+requires-python = ">=3.8"
+license = {text = "MIT"}
+authors = [{name = "Justin Winokur", email = "Jwink3101@@users.noreply.github.com"}]
+dependencies = ["ruamel.yaml"]
+urls = {Homepage = "https://github.com/Jwink3101/notefile"}
+
+[project.scripts]
+notefile = "notefile.cli:cli"
+
+[project.optional-dependencies]
+pyyaml = ["pyyaml"]
+
+[tool.setuptools.dynamic]
+version = {attr = "notefile.__version__"}
+
+[tool.setuptools.packages.find]
+include = ["notefile*"]
+
 [tool.black]
 line-length = 100
 target-version = ['py38']
 include = '\.pyi?$'
-exclude = 'v1\.py'

@@ -8,16 +8,24 @@ os.chdir(os.path.dirname(__file__))
 
 commands = """\
 mod
+edit
 copy
 replace
 change-tag
 vis
+show
+hide
 format
 repair
+repair-metadata
+repair-orphaned
 cat
 find
+export
 search
+grep
 query
+tags
 note-path"""
 
 commands = [l.strip() for l in commands.split("\n") if l.strip()]

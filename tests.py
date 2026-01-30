@@ -27,6 +27,7 @@ import pickle
 
 import notefile  # this *should* import the local version even if it is installed
 import notefile.cli
+from notefile.safe_eval import safe_eval, SafeEvalError
 
 Notefile = notefile.Notefile
 
@@ -998,6 +999,10 @@ def test_search():
     call("""search --query "t('third')" --query "t('other')" --all --tag-mode -o tmp3""")
     assert set(readtags("tmp")) == set(readtags("tmp2")) == {"xcommon", "other", "file1", "third"}
 
+    # Safe query smoke check
+    call("""query -o tmp "any([t('third'), t('other')])" """)
+    assert readout("tmp") == {"file2.txt", "file3.txt"}
+
     ## Errors
     try:
         call('''query "asdf"''')
@@ -1008,6 +1013,255 @@ def test_search():
     o, e = call('''query -e "asdf"''', capture=True)
     assert "WARNING: Query Error" in e
     assert not o
+
+    os.chdir(TESTDIR)
+
+
+def test_safe_query_features():
+    """
+    Coverage for safe_query-specific features referenced in help.
+    """
+    os.chdir(TESTDIR)
+    dirpath = TESTDIR / "safe_query_features"
+    cleanmkdir(dirpath)
+    os.chdir(dirpath)
+
+    writefile("file1.txt", "file1")
+    note1 = Notefile("file1.txt")
+    note1.data.notes = "Alpha\nBeta"
+    note1.data.tags = ["feature", "other"]
+    note1.data.extra = {"k": "v"}
+    note1.write()
+
+    # Safe builtins + container literals
+    call(
+        """query -o tmp "len(set(list(tuple(sorted([3,1,2]))))) == 3 and """
+        """min([2,1]) == 1 and max([2,1]) == 2 and sum([1,2,3]) == 6 and """
+        """any([False, True]) and all([True, True]) and (1,2)[0] == 1 and {1,2} == set([1,2])" """
+    )
+    assert readout("tmp") == {"file1.txt"}
+
+    # Dict method access + slicing/subscripts + string methods
+    call(
+        """query -o tmp "data.get('notes') == notes and """
+        """len(data.keys()) == len(data.values()) == len(data.items()) and """
+        """notes[0] == 'A' and notes[1:3] == 'lp' and """
+        """notes.splitlines()[0].lower() == 'alpha' and notes.splitlines()[1] == 'Beta'" """
+    )
+    assert readout("tmp") == {"file1.txt"}
+
+    # If-expression + comprehensions (list/set/dict/gen)
+    call(
+        """query -o tmp "(1 if t('feature') else 0) == 1 and """
+        """len([t for t in tags]) == len({t for t in tags}) == len({t: 1 for t in tags}) == """
+        """sum(1 for t in tags)" """
+    )
+    assert readout("tmp") == {"file1.txt"}
+
+    # Multi-line statements with assignments
+    call(
+        """query -o tmp "a = t('feature')\n"""
+        """b = notes.splitlines()[0] == 'Alpha'\n"""
+        """a and b" """
+    )
+    assert readout("tmp") == {"file1.txt"}
+
+    # Semicolon-delimited statements with assignments
+    call("""query -o tmp "a = t('feature'); b = notes[0] == 'A'; a and b" """)
+    assert readout("tmp") == {"file1.txt"}
+
+    os.chdir(TESTDIR)
+
+
+def test_safe_eval_features_and_errors():
+    import ast
+    import re
+    import types
+
+    names = {"x": 3, "data": {"a": 1}, "text": "Hello\nWorld", "re": re}
+
+    assert safe_eval("x == 3 and len(text.splitlines()) == 2", dict(names)) is True
+    assert safe_eval("text[0] == 'H' and text[1:3] == 'el'", dict(names)) is True
+    assert safe_eval("data.get('a') == 1 and len(data.keys()) == 1", dict(names)) is True
+    assert safe_eval("{'a': 1}['a'] == 1", dict(names)) is True
+    assert safe_eval("-x == -3 and (not False)", dict(names)) is True
+    assert (
+        safe_eval(
+            "len([i for i in [1,2,3]]) == len({i for i in [1,2,3]}) == len({i: i for i in [1,2,3]}) == sum(1 for i in [1,2,3])",
+            dict(names),
+        )
+        is True
+    )
+    assert safe_eval("1 < 0", dict(names)) is False
+
+    assert safe_eval("re.match('H', text) is not None", dict(names), allowed_modules={re}) is True
+    assert safe_eval("text.splitlines", dict(names)) is not None
+    assert safe_eval("data.keys", dict(names)) is not None
+    assert safe_eval("re.match", {"re": re}, allowed_modules={re}) is not None
+
+    with pytest.raises(SafeEvalError):
+        safe_eval("a =", dict(names))
+
+    with pytest.raises(SafeEvalError):
+        safe_eval("pass\nTrue", dict(names))
+
+    with pytest.raises(SafeEvalError):
+        safe_eval("", dict(names))
+
+    with pytest.raises(SafeEvalError):
+        safe_eval("x = 1", dict(names))
+
+    assert safe_eval("a, b = (1,2)\na == 1 and b == 2", dict(names)) is True
+
+    with pytest.raises(SafeEvalError):
+        safe_eval("a, b = 1\nTrue", dict(names))
+
+    with pytest.raises(SafeEvalError):
+        safe_eval("a, b = (1,2,3)\nTrue", dict(names))
+
+    with pytest.raises(SafeEvalError):
+        safe_eval("data['a'] = 1\nTrue", dict(names))
+
+    with pytest.raises(SafeEvalError):
+        safe_eval("~1", dict(names))
+
+    with pytest.raises(SafeEvalError):
+        safe_eval("1 @ 2", dict(names))
+
+    with pytest.raises(SafeEvalError):
+        safe_eval("lambda: 1", dict(names))
+
+    with pytest.raises(SafeEvalError):
+        safe_eval("f(1)", {"f": lambda x: x})
+
+    with pytest.raises(SafeEvalError):
+        safe_eval("text.center(5)", dict(names))
+
+    with pytest.raises(SafeEvalError):
+        safe_eval("text.center", dict(names))
+
+    with pytest.raises(SafeEvalError):
+        safe_eval("data.clear", dict(names))
+
+    with pytest.raises(SafeEvalError):
+        safe_eval("data.clear()", dict(names))
+
+    with pytest.raises(SafeEvalError):
+        safe_eval("x.real", dict(names))
+
+    with pytest.raises(SafeEvalError):
+        safe_eval("re.match('H', text)", dict(names))
+
+    with pytest.raises(SafeEvalError):
+        safe_eval("len(**{'x': 1})", dict(names))
+
+    with pytest.raises(TypeError):
+        safe_eval("len(text, base=10)", dict(names))
+
+    # Naughty attempts that should be blocked
+    for expr in [
+        "import os",
+        "import subprocess",
+        "__import__('os')",
+        "text.__class__",
+        "text.__class__.__mro__",
+        "text.__getattribute__('__class__')",
+        "text.__class__.__subclasses__()",
+        "data.__class__",
+        "globals()",
+        "open('x')",
+        "(lambda: 1)()",
+    ]:
+        with pytest.raises(SafeEvalError):
+            safe_eval(expr, dict(names))
+
+    m1 = types.ModuleType("m1")
+
+    def f():
+        return True
+
+    m1.f = f
+    with pytest.raises(SafeEvalError):
+        safe_eval("m1.f()", {"m1": m1}, allowed_modules={m1})
+
+    m2 = types.ModuleType("m2")
+
+    class CallNoName:
+        def __call__(self):
+            return True
+
+    m2.x = CallNoName()
+    with pytest.raises(SafeEvalError):
+        safe_eval("m2.x()", {"m2": m2}, allowed_modules={m2})
+
+    m3 = types.ModuleType("m3")
+
+    def visible():
+        return True
+
+    visible.__name__ = "_hidden"
+    m3.x = visible
+    with pytest.raises(SafeEvalError):
+        safe_eval("m3.x()", {"m3": m3}, allowed_modules={m3})
+
+    with pytest.raises(SafeEvalError):
+        safe_eval("[a for (a,b) in [1]]", dict(names))
+
+    assert safe_eval("[a+b for (a,b) in [(1,2),(3,4)]] == [3,7]", dict(names)) is True
+
+    with pytest.raises(SafeEvalError):
+        safe_eval("[(a,b) for (a,b) in [(1,2,3)]]", dict(names))
+
+    with pytest.raises(SafeEvalError):
+        safe_eval("[a for a.b in [(1,2)]]", dict(names))
+
+    evaluator = notefile.safe_eval.SafeEvaluator(dict(names))
+    with pytest.raises(SafeEvalError):
+        evaluator._eval_expr(
+            ast.BoolOp(op=ast.BitAnd(), values=[ast.Constant(True), ast.Constant(True)]), {}
+        )
+    with pytest.raises(SafeEvalError):
+        evaluator._eval_expr(
+            ast.Compare(left=ast.Constant(1), ops=[ast.BitAnd()], comparators=[ast.Constant(1)]),
+            {},
+        )
+    with pytest.raises(SafeEvalError):
+        evaluator._eval_expr(ast.UnaryOp(op=ast.Invert(), operand=ast.Constant(1)), {})
+    with pytest.raises(SafeEvalError):
+        evaluator._eval_expr(
+            ast.BinOp(op=ast.MatMult(), left=ast.Constant(1), right=ast.Constant(2)), {}
+        )
+
+
+def test_unsafe_query_paths():
+    os.chdir(TESTDIR)
+    dirpath = TESTDIR / "unsafe_query"
+    cleanmkdir(dirpath)
+    os.chdir(dirpath)
+
+    writefile("file1.txt", "file1")
+    note1 = Notefile("file1.txt")
+    note1.data.notes = "alpha"
+    note1.data.tags = ["t1", "t2"]
+    note1.write()
+    note1 = Notefile("file1.txt").read()
+
+    with warnings.catch_warnings(record=True) as w:
+        warnings.simplefilter("always", DeprecationWarning)
+        assert note1.unsafe_query("1 == 1") is True
+        assert any(issubclass(wi.category, DeprecationWarning) for wi in w)
+
+    assert note1.unsafe_query("a = 1\nb = 2\na < b") is True
+    assert note1.unsafe_query("a = 1; b = 2; a < b") is True
+
+    with pytest.raises(notefile.notefile.QueryError):
+        note1.unsafe_query("1/0")
+
+    assert note1.unsafe_query("1/0", allow_exception=True) is False
+
+    assert note1.unsafe_query(["False", "True"], match_any=False) is False
+    assert note1.unsafe_query(["False", "False"], match_any=True) is False
+    assert note1.unsafe_query(["True", "False"], match_any=True) is True
 
     os.chdir(TESTDIR)
 

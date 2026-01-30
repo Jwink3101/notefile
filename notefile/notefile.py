@@ -10,9 +10,11 @@ from . import (
     DT,
     FORMAT,
     DISABLE_QUERY,
+    SAFE_QUERY,
 )
 from .nfyaml import pss, load_yaml, ruamel_yaml, yaml, yamltxt
 from .utils import now_string, Bunch, sha256, tmpfileinpath, flattenlist, normalize_tags
+from .safe_eval import safe_eval, SafeEvalError
 from . import find
 
 from pathlib import Path
@@ -22,6 +24,7 @@ import json
 import copy
 import shutil
 import functools
+import warnings
 
 METADATA = frozenset(("filesize", "mtime", "sha256", "last-updated", "notefile version"))
 
@@ -846,7 +849,7 @@ class Notefile:
 
         return query(qtext)
 
-    def query(self, *expr, allow_exception=False, match_any=True, **kwargs):
+    def unsafe_query(self, *expr, allow_exception=False, match_any=True, **kwargs):
         """
         Perform python queries on notes:
 
@@ -868,9 +871,19 @@ class Notefile:
 
         Returns:
             boolean of whether or not it matched
+
+        Note:
+            Safe queries are the default. Unsafe queries can be enabled with
+            NOTEFILE_SAFE_QUERY=false.
         """
         if DISABLE_QUERY:
             raise ValueError("Query is disabled")
+        warnings.warn(
+            "Unsafe queries are deprecated and will be removed in a future release. "
+            "Enable safe queries by setting NOTEFILE_SAFE_QUERY=true.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
 
         from functools import partial
         import re
@@ -885,6 +898,8 @@ class Notefile:
             "tags": normalize_tags(self.data.get("tags", []), sort=False),
             "notes": self.data.get(self.note_field, ""),
             "text": getattr(self, "txt", ""),
+            "filename": self.names0.filename,
+            "notefile_path": self.destnote,
         }
 
         ns["grep"] = functools.partial(self.grep, match_any=match_any, **kwargs)
@@ -896,6 +911,7 @@ class Notefile:
         ns["tany"] = lambda *tags: any(t.lower() in ns["tags"] for t in normalize_tags(tags))
         ns["tall"] = lambda *tags: all(t.lower() in ns["tags"] for t in normalize_tags(tags))
         ns["t"] = ns["tany"]
+        ns["norm_tags"] = normalize_tags
 
         for expri in expr:
             full_expr = [i.strip() for i in expri.replace("\n", ";").split(";") if i.strip()]
@@ -928,6 +944,101 @@ class Notefile:
 
         # At this point, we either hit them all with ALL, we hit none with ANY
         return not match_any
+
+    def safe_query(self, *expr, allow_exception=False, match_any=True, **kwargs):
+        """
+        Perform safe queries on notes using a restricted parser (no eval/exec).
+
+        Inputs:
+        -------
+        expr ['']
+            Query expression(s). See query_help() for details. Also can pass a tuple
+            or list. All arguments are flattened (list of strings) and combined
+
+        allow_exception [False]
+            If True, raises a warning instead of an exception
+
+        match_any [True]
+            Whether to match any expr. Also passed to grep
+
+        **kwargs
+            Passed to grep. Notably:
+                matchcase,full_note,full_word,fixed_strings
+
+        Returns:
+            boolean of whether or not it matched
+
+        Note:
+            Safe queries are the default. Unsafe queries can be enabled with
+            NOTEFILE_SAFE_QUERY=false.
+        """
+        if DISABLE_QUERY:
+            raise ValueError("Query is disabled")
+
+        from functools import partial
+        import re
+
+        expr = list(flattenlist(expr))  # will make  a list of all strings
+
+        ns = {
+            "re": re,
+            "ss": shlex.split,
+            "data": self.data,
+            "tags": frozenset(normalize_tags(self.data.get("tags", []), sort=False)),
+            "notes": self.data.get(self.note_field, ""),
+            "text": getattr(self, "txt", ""),
+            "filename": self.names0.filename,
+            "notefile_path": self.destnote,
+        }
+
+        ns["grep"] = functools.partial(self.grep, match_any=match_any, **kwargs)
+        ns["g"] = ns["grep"]
+        ns["gall"] = functools.partial(self.grep, match_any=False, **kwargs)
+        ns["gany"] = functools.partial(self.grep, match_any=True, **kwargs)
+
+        # Note that these get normalized which includes flattening them
+        ns["tany"] = lambda *tags: any(t.lower() in ns["tags"] for t in normalize_tags(tags))
+        ns["tall"] = lambda *tags: all(t.lower() in ns["tags"] for t in normalize_tags(tags))
+        ns["t"] = ns["tany"]
+        ns["norm_tags"] = normalize_tags
+
+        allowed_callables = {
+            ns["grep"],
+            ns["g"],
+            ns["gall"],
+            ns["gany"],
+            ns["tany"],
+            ns["tall"],
+            ns["t"],
+            ns["ss"],
+            ns["norm_tags"],
+        }
+
+        for expri in expr:
+            try:
+                r = bool(
+                    safe_eval(expri, ns, allowed_callables=allowed_callables, allowed_modules={re})
+                )
+            except SafeEvalError as E:
+                etxt = 'Query error: {}. Note: "{}"'.format(str(E), self.names0.filename)
+                if allow_exception:
+                    warn("Query Error: {}".format(etxt))
+                    r = False
+                else:
+                    raise QueryError(etxt)
+
+            # Short circuit
+            if not match_any:
+                if not r:
+                    return False
+            else:
+                if r:
+                    return True
+
+        # At this point, we either hit them all with ALL, we hit none with ANY
+        return not match_any
+
+    query = safe_query
 
     def _isbroken_broken_from_hide(self):
         """

@@ -5,7 +5,7 @@ import json
 # 100 --------------------------------------------------------------------------------------------->
 
 from .nfyaml import yaml, pss, ruamel_yaml
-from . import utils, debug, __version__, NOTEFIELD, HIDDEN, SUBDIR, FORMAT
+from . import utils, debug, __version__, NOTEFIELD, HIDDEN, SUBDIR, FORMAT, SAFE_QUERY
 from .notefile import Notefile
 
 
@@ -688,7 +688,7 @@ def cli(argv=None):
         help="""Shortcut for '%(prog)s search --query'. Also has additional details 
                 on queries""",
         formatter_class=argparse.RawDescriptionHelpFormatter,
-        epilog=query_help(print_help=False),
+        epilog=query_help(print_help=False, safe=SAFE_QUERY),
         parents=[
             global_parent,
             find_parent,

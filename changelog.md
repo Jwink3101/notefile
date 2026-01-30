@@ -2,6 +2,15 @@
 
 (**_newest_** on *top*)
 
+## 0.9.0
+
+- Move to numeric versioning over date
+- The queries now default to the new safe_eval! This allows much of the same functionality in a safe manner. The unsafe method is still there but you must set `$NOTEFILE_SAFE_QUERY=false` or use the API. (Developed with Codex)
+- Move everything to pyproject.toml
+- Some tooling around Codex and other agents.
+
+-----
+
 ## 2.20260109.1
 
 - Fixed leftover debug

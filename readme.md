@@ -39,13 +39,17 @@ The extension will **always** be `.yaml` as YAML is a superset of JSON and any Y
 
 Install right from github:
 
-    $ python -m pip install --no-use-pep517 git+https://github.com/Jwink3101/notefile.git
+    $ python -m pip install git+https://github.com/Jwink3101/notefile.git
 
-This will throw a lot of warnings but they will be fixed when I get a chance!
+Optional PyYAML backend (LibYAML speedup when available):
+
+    $ python -m pip install "git+https://github.com/Jwink3101/notefile.git#egg=notefile[pyyaml]"
 
 ### Requirements
 
-The only *real* requirement is `ruamel.yaml`. However, if you have `pyyaml` ([website](https://pyyaml.org/)) installed, notefile will use that for parser as it is about 2x faster by default. Even better, if you [LibYAML](https://pyyaml.org/wiki/LibYAML), it will be about 25x faster
+The only *real* requirement is `ruamel.yaml`. However, if you have `pyyaml` ([website](https://pyyaml.org/)) installed, notefile will use that as a faster **read-only** parser (writes still use ruamel.yaml). Even better, if you have [LibYAML](https://pyyaml.org/wiki/LibYAML), it will be about 25x faster for reads.
+
+Note: We avoid writing with PyYAML due to known issues. See [PyYAML issue #121](https://github.com/yaml/pyyaml/issues/121).
 
 To install LibYAML, see: (based on [these instructions](https://pyyaml.org/wiki/LibYAML)):
 
@@ -60,6 +64,10 @@ To install LibYAML, see: (based on [these instructions](https://pyyaml.org/wiki/
 Then to install pyyaml,
 
     $ python -m pip install pyyaml
+
+Or via the optional extra:
+
+    $ python -m pip install "notefile[pyyaml]"
 
 In my (limited) experience, pyyaml comes with Anaconda but not miniconda
 
@@ -182,5 +190,3 @@ Note that notefile does support setting alternative note fields (but not tags) s
 ## Changelog
 
 See [Changelog](changelog.md)
-
-
