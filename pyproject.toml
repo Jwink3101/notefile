@@ -9,7 +9,7 @@ description = "Create associated notefiles (sidecar files)"
 readme = "readme.md"
 requires-python = ">=3.8"
 license = {text = "MIT"}
-authors = [{name = "Justin Winokur", email = "Jwink3101@@users.noreply.github.com"}]
+authors = [{name = "Justin Winokur", email = "Jwink3101@users.noreply.github.com"}]
 dependencies = ["ruamel.yaml"]
 urls = {Homepage = "https://github.com/Jwink3101/notefile"}
 
