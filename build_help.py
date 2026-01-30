@@ -45,14 +45,13 @@ for command in commands:
     name = command if command else "No Command"
     helpmd.append(f"# {name}")
 
-    cmd = [sys.executable, "notefile.py"]
+    cmd = [sys.executable, "-m", "notefile.cli"]
     if command:
         cmd.append(command)
     cmd.append("--help")
 
-    help = (
-        subprocess.check_output(cmd).decode().replace("usage: notefile.py", "usage: notefile")
-    )  # long comment
+    help = subprocess.check_output(cmd).decode()
+    help = help.replace("usage: cli.py", "usage: notefile")
 
     helpmd.append(
         f"""
