@@ -1,7 +1,8 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
-import os, sys
+import os
+import sys
 import subprocess
 
 os.chdir(os.path.dirname(__file__))
@@ -45,18 +46,22 @@ for command in commands:
     name = command if command else "No Command"
     helpmd.append(f"# {name}")
 
-    cmd = [sys.executable, "-m", "notefile.cli"]
+    cmd = [
+        sys.executable,
+        "-c",
+        "import sys; sys.argv[0] = 'notefile'; from notefile.cli import cli; cli()",
+    ]
     if command:
         cmd.append(command)
     cmd.append("--help")
 
-    help = subprocess.check_output(cmd).decode()
-    help = help.replace("usage: cli.py", "usage: notefile")
+    help_text = subprocess.check_output(cmd).decode()
+    help_text = help_text.replace("usage: cli.py", "usage: notefile")
 
     helpmd.append(
         f"""
 ```text
-{help}
+{help_text}
 ```"""
     )
 
