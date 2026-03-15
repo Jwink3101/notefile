@@ -351,12 +351,12 @@ Global Options:
 ```text
 usage: notefile change-tag [-h] [--debug] [--note-field field] [--version]
                            [-p PATH] [--exclude EXCLUDE] [--exclude-links]
-                           [--match-exclude-case] [--max-depth N] [-x] [-0]
-                           [--export] [--export-format {yaml,json,jsonl}]
-                           [--tag-mode] [--tag-counts] [--tag-count-order]
-                           [-o FILE] [--symlink DIR]
-                           [--link {source,symlink,both}] [-H] [-V]
-                           [-S | --subdir | --no-subdir] [--no-hash]
+                           [--match-exclude-case] [--max-depth N] [-x]
+                           [--type {dir,file,both}] [-0] [--export]
+                           [--export-format {yaml,json,jsonl}] [--tag-mode]
+                           [--tag-counts] [--tag-count-order] [-o FILE]
+                           [--symlink DIR] [--link {source,symlink,both}] [-H]
+                           [-V] [-S | --subdir | --no-subdir] [--no-hash]
                            [--no-refresh] [--format {json,yaml}]
                            [--rewrite-format] [-n]
                            old new [new ...]
@@ -391,6 +391,8 @@ find Options:
                         current directory is 0
   -x, --one-file-system
                         Do not cross filesystem boundaries
+  --type {dir,file,both}
+                        Filter note targets by type when searching
 
 Display Options:
   Some flags will be ignored and/or are mutually exclusive
@@ -456,9 +458,10 @@ Create/Modify Options:
 ```text
 usage: notefile vis [-h] [--debug] [--note-field field] [--version] [-p PATH]
                     [--exclude EXCLUDE] [--exclude-links]
-                    [--match-exclude-case] [--max-depth N] [-x] [-0]
-                    [--export] [--export-format {yaml,json,jsonl}]
-                    [--tag-mode] [--tag-counts] [--tag-count-order] [-o FILE]
+                    [--match-exclude-case] [--max-depth N] [-x]
+                    [--type {dir,file,both}] [-0] [--export]
+                    [--export-format {yaml,json,jsonl}] [--tag-mode]
+                    [--tag-counts] [--tag-count-order] [-o FILE]
                     [--symlink DIR] [-n] [-S | --subdir | --no-subdir]
                     {hide,show} [path ...]
 
@@ -498,6 +501,8 @@ find Options:
                         current directory is 0
   -x, --one-file-system
                         Do not cross filesystem boundaries
+  --type {dir,file,both}
+                        Filter note targets by type when searching
 
 Display Options:
   Some flags will be ignored and/or are mutually exclusive
@@ -531,9 +536,10 @@ Display Options:
 ```text
 usage: notefile show [-h] [--debug] [--note-field field] [--version] [-p PATH]
                      [--exclude EXCLUDE] [--exclude-links]
-                     [--match-exclude-case] [--max-depth N] [-x] [-0]
-                     [--export] [--export-format {yaml,json,jsonl}]
-                     [--tag-mode] [--tag-counts] [--tag-count-order] [-o FILE]
+                     [--match-exclude-case] [--max-depth N] [-x]
+                     [--type {dir,file,both}] [-0] [--export]
+                     [--export-format {yaml,json,jsonl}] [--tag-mode]
+                     [--tag-counts] [--tag-count-order] [-o FILE]
                      [--symlink DIR] [-n] [-S | --subdir | --no-subdir]
                      [path ...]
 
@@ -572,6 +578,8 @@ find Options:
                         current directory is 0
   -x, --one-file-system
                         Do not cross filesystem boundaries
+  --type {dir,file,both}
+                        Filter note targets by type when searching
 
 Display Options:
   Some flags will be ignored and/or are mutually exclusive
@@ -605,9 +613,10 @@ Display Options:
 ```text
 usage: notefile hide [-h] [--debug] [--note-field field] [--version] [-p PATH]
                      [--exclude EXCLUDE] [--exclude-links]
-                     [--match-exclude-case] [--max-depth N] [-x] [-0]
-                     [--export] [--export-format {yaml,json,jsonl}]
-                     [--tag-mode] [--tag-counts] [--tag-count-order] [-o FILE]
+                     [--match-exclude-case] [--max-depth N] [-x]
+                     [--type {dir,file,both}] [-0] [--export]
+                     [--export-format {yaml,json,jsonl}] [--tag-mode]
+                     [--tag-counts] [--tag-count-order] [-o FILE]
                      [--symlink DIR] [-n] [-S | --subdir | --no-subdir]
                      [path ...]
 
@@ -646,6 +655,8 @@ find Options:
                         current directory is 0
   -x, --one-file-system
                         Do not cross filesystem boundaries
+  --type {dir,file,both}
+                        Filter note targets by type when searching
 
 Display Options:
   Some flags will be ignored and/or are mutually exclusive
@@ -679,10 +690,11 @@ Display Options:
 ```text
 usage: notefile format [-h] [--debug] [--note-field field] [--version]
                        [-p PATH] [--exclude EXCLUDE] [--exclude-links]
-                       [--match-exclude-case] [--max-depth N] [-x] [-0]
-                       [--export] [--export-format {yaml,json,jsonl}]
-                       [--tag-mode] [--tag-counts] [--tag-count-order]
-                       [-o FILE] [--symlink DIR] [-n]
+                       [--match-exclude-case] [--max-depth N] [-x]
+                       [--type {dir,file,both}] [-0] [--export]
+                       [--export-format {yaml,json,jsonl}] [--tag-mode]
+                       [--tag-counts] [--tag-count-order] [-o FILE]
+                       [--symlink DIR] [-n]
                        {yaml,json} [path ...]
 
 positional arguments:
@@ -715,6 +727,8 @@ find Options:
                         current directory is 0
   -x, --one-file-system
                         Do not cross filesystem boundaries
+  --type {dir,file,both}
+                        Filter note targets by type when searching
 
 Display Options:
   Some flags will be ignored and/or are mutually exclusive
@@ -749,8 +763,8 @@ Display Options:
 usage: notefile repair [-h] [--debug] [--note-field field] [--version]
                        [-p PATH] [--exclude EXCLUDE] [--exclude-links]
                        [--match-exclude-case] [--max-depth N] [-x]
-                       [--link {source,symlink,both}] [-H] [-V]
-                       [-S | --subdir | --no-subdir] [--no-hash]
+                       [--type {dir,file,both}] [--link {source,symlink,both}]
+                       [-H] [-V] [-S | --subdir | --no-subdir] [--no-hash]
                        [--no-refresh] [--format {json,yaml}]
                        [--rewrite-format] [--dry-run] [--force-refresh]
                        [--match {size,mtime,hash,name}]
@@ -788,6 +802,8 @@ find Options:
                         current directory is 0
   -x, --one-file-system
                         Do not cross filesystem boundaries
+  --type {dir,file,both}
+                        Filter note targets by type when searching
 
 Create/Modify Options:
   Flags for creating and saving notes. Not all flags are always applicable!
@@ -868,7 +884,7 @@ Repair orphaned options:
 usage: notefile repair-metadata [-h] [--debug] [--note-field field]
                                 [--version] [-p PATH] [--exclude EXCLUDE]
                                 [--exclude-links] [--match-exclude-case]
-                                [--max-depth N] [-x]
+                                [--max-depth N] [-x] [--type {dir,file,both}]
                                 [--link {source,symlink,both}] [-H] [-V]
                                 [-S | --subdir | --no-subdir] [--no-hash]
                                 [--no-refresh] [--format {json,yaml}]
@@ -904,6 +920,8 @@ find Options:
                         current directory is 0
   -x, --one-file-system
                         Do not cross filesystem boundaries
+  --type {dir,file,both}
+                        Filter note targets by type when searching
 
 Create/Modify Options:
   Flags for creating and saving notes. Not all flags are always applicable!
@@ -953,7 +971,7 @@ Repair metadata options:
 usage: notefile repair-orphaned [-h] [--debug] [--note-field field]
                                 [--version] [-p PATH] [--exclude EXCLUDE]
                                 [--exclude-links] [--match-exclude-case]
-                                [--max-depth N] [-x]
+                                [--max-depth N] [-x] [--type {dir,file,both}]
                                 [--link {source,symlink,both}] [-H] [-V]
                                 [-S | --subdir | --no-subdir] [--no-hash]
                                 [--no-refresh] [--format {json,yaml}]
@@ -995,6 +1013,8 @@ find Options:
                         current directory is 0
   -x, --one-file-system
                         Do not cross filesystem boundaries
+  --type {dir,file,both}
+                        Filter note targets by type when searching
 
 Create/Modify Options:
   Flags for creating and saving notes. Not all flags are always applicable!
@@ -1094,9 +1114,10 @@ Global Options:
 ```text
 usage: notefile find [-h] [--debug] [--note-field field] [--version] [-p PATH]
                      [--exclude EXCLUDE] [--exclude-links]
-                     [--match-exclude-case] [--max-depth N] [-x] [-0]
-                     [--export] [--export-format {yaml,json,jsonl}]
-                     [--tag-mode] [--tag-counts] [--tag-count-order] [-o FILE]
+                     [--match-exclude-case] [--max-depth N] [-x]
+                     [--type {dir,file,both}] [-0] [--export]
+                     [--export-format {yaml,json,jsonl}] [--tag-mode]
+                     [--tag-counts] [--tag-count-order] [-o FILE]
                      [--symlink DIR] [--orphaned]
 
 options:
@@ -1126,6 +1147,8 @@ find Options:
                         current directory is 0
   -x, --one-file-system
                         Do not cross filesystem boundaries
+  --type {dir,file,both}
+                        Filter note targets by type when searching
 
 Display Options:
   Some flags will be ignored and/or are mutually exclusive
@@ -1159,10 +1182,11 @@ Display Options:
 ```text
 usage: notefile export [-h] [--debug] [--note-field field] [--version]
                        [-p PATH] [--exclude EXCLUDE] [--exclude-links]
-                       [--match-exclude-case] [--max-depth N] [-x] [-0]
-                       [--export] [--export-format {yaml,json,jsonl}]
-                       [--tag-mode] [--tag-counts] [--tag-count-order]
-                       [-o FILE] [--symlink DIR]
+                       [--match-exclude-case] [--max-depth N] [-x]
+                       [--type {dir,file,both}] [-0] [--export]
+                       [--export-format {yaml,json,jsonl}] [--tag-mode]
+                       [--tag-counts] [--tag-count-order] [-o FILE]
+                       [--symlink DIR]
                        [path ...]
 
 positional arguments:
@@ -1193,6 +1217,8 @@ find Options:
                         current directory is 0
   -x, --one-file-system
                         Do not cross filesystem boundaries
+  --type {dir,file,both}
+                        Filter note targets by type when searching
 
 Display Options:
   Some flags will be ignored and/or are mutually exclusive
@@ -1226,10 +1252,11 @@ Display Options:
 ```text
 usage: notefile search [-h] [--debug] [--note-field field] [--version]
                        [-p PATH] [--exclude EXCLUDE] [--exclude-links]
-                       [--match-exclude-case] [--max-depth N] [-x] [--all]
-                       [--grep expr] [--fixed-strings] [--full-note]
-                       [--full-word] [--match-expr-case] [--query expr] [-e]
-                       [-t TAG] [--tag-all] [-0] [--export]
+                       [--match-exclude-case] [--max-depth N] [-x]
+                       [--type {dir,file,both}] [--all] [--grep expr]
+                       [--fixed-strings] [--full-note] [--full-word]
+                       [--match-expr-case] [--query expr] [-e] [-t TAG]
+                       [--tag-all] [-0] [--export]
                        [--export-format {yaml,json,jsonl}] [--tag-mode]
                        [--tag-counts] [--tag-count-order] [-o FILE]
                        [--symlink DIR]
@@ -1260,6 +1287,8 @@ find Options:
                         current directory is 0
   -x, --one-file-system
                         Do not cross filesystem boundaries
+  --type {dir,file,both}
+                        Filter note targets by type when searching
 
 grep options:
   Search for string matches
@@ -1321,10 +1350,11 @@ Display Options:
 ```text
 usage: notefile grep [-h] [--debug] [--note-field field] [--version] [-p PATH]
                      [--exclude EXCLUDE] [--exclude-links]
-                     [--match-exclude-case] [--max-depth N] [-x] [--all]
-                     [--grep expr] [--fixed-strings] [--full-note]
-                     [--full-word] [--match-expr-case] [--query expr] [-e]
-                     [-t TAG] [--tag-all] [-0] [--export]
+                     [--match-exclude-case] [--max-depth N] [-x]
+                     [--type {dir,file,both}] [--all] [--grep expr]
+                     [--fixed-strings] [--full-note] [--full-word]
+                     [--match-expr-case] [--query expr] [-e] [-t TAG]
+                     [--tag-all] [-0] [--export]
                      [--export-format {yaml,json,jsonl}] [--tag-mode]
                      [--tag-counts] [--tag-count-order] [-o FILE]
                      [--symlink DIR]
@@ -1359,6 +1389,8 @@ find Options:
                         current directory is 0
   -x, --one-file-system
                         Do not cross filesystem boundaries
+  --type {dir,file,both}
+                        Filter note targets by type when searching
 
 grep options:
   Search for string matches
@@ -1420,10 +1452,11 @@ Display Options:
 ```text
 usage: notefile query [-h] [--debug] [--note-field field] [--version]
                       [-p PATH] [--exclude EXCLUDE] [--exclude-links]
-                      [--match-exclude-case] [--max-depth N] [-x] [--all]
-                      [--grep expr] [--fixed-strings] [--full-note]
-                      [--full-word] [--match-expr-case] [--query expr] [-e]
-                      [-t TAG] [--tag-all] [-0] [--export]
+                      [--match-exclude-case] [--max-depth N] [-x]
+                      [--type {dir,file,both}] [--all] [--grep expr]
+                      [--fixed-strings] [--full-note] [--full-word]
+                      [--match-expr-case] [--query expr] [-e] [-t TAG]
+                      [--tag-all] [-0] [--export]
                       [--export-format {yaml,json,jsonl}] [--tag-mode]
                       [--tag-counts] [--tag-count-order] [-o FILE]
                       [--symlink DIR]
@@ -1458,6 +1491,8 @@ find Options:
                         current directory is 0
   -x, --one-file-system
                         Do not cross filesystem boundaries
+  --type {dir,file,both}
+                        Filter note targets by type when searching
 
 grep options:
   Search for string matches
@@ -1524,6 +1559,8 @@ The following variables are defined:
     text    Raw contents (YAML/JSON) of the note.
     filename Path to the file being noted.
     notefile_path Path to the notefile sidecar.
+    isdir   True if the note target is a directory.
+    isfile  True if the note target is a file.
 
 And it includes the following functions:
 
@@ -1609,10 +1646,11 @@ NOTEFILE_SAFE_QUERY=false. Or use the Note.unsafe_query(...) APIs.
 ```text
 usage: notefile tags [-h] [--debug] [--note-field field] [--version] [-p PATH]
                      [--exclude EXCLUDE] [--exclude-links]
-                     [--match-exclude-case] [--max-depth N] [-x] [--all]
-                     [--grep expr] [--fixed-strings] [--full-note]
-                     [--full-word] [--match-expr-case] [--query expr] [-e]
-                     [-t TAG] [--tag-all] [-0] [--export]
+                     [--match-exclude-case] [--max-depth N] [-x]
+                     [--type {dir,file,both}] [--all] [--grep expr]
+                     [--fixed-strings] [--full-note] [--full-word]
+                     [--match-expr-case] [--query expr] [-e] [-t TAG]
+                     [--tag-all] [-0] [--export]
                      [--export-format {yaml,json,jsonl}] [--tag-mode]
                      [--tag-counts] [--tag-count-order] [-o FILE]
                      [--symlink DIR]
@@ -1647,6 +1685,8 @@ find Options:
                         current directory is 0
   -x, --one-file-system
                         Do not cross filesystem boundaries
+  --type {dir,file,both}
+                        Filter note targets by type when searching
 
 grep options:
   Search for string matches

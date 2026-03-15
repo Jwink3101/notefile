@@ -2,8 +2,8 @@
 # -*- coding: utf-8 -*-
 
 import os
-import sys
 import subprocess
+import sys
 
 os.chdir(os.path.dirname(__file__))
 

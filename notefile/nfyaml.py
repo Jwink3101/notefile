@@ -1,6 +1,6 @@
-from . import debug
-
 import io
+
+from . import debug
 
 #### Set up YAML
 # ruamel_yaml is does a nice job with formatting but it is slow to load YAML.
@@ -22,9 +22,11 @@ yaml = ruamel_yaml.YAML()
 
 
 def pss(item):
-    """
-    Convert strings with '\n' to PreservedScalarString
-    and recurse into dicts and lists (and tuples which are converted to lists).
+    """Convert multiline strings into YAML literal scalars recursively.
+
+    Lists and tuples are traversed element-by-element, with tuples converted to
+    lists for YAML emission. Dictionaries are copied before their values are
+    transformed.
     """
     if isinstance(item, (list, tuple)):
         return [pss(i) for i in item]  # Convert tuples to lists for parsing
@@ -46,24 +48,26 @@ try:
 
     debug("loaded pyyaml")
     try:
-        from yaml import CLoader as Loader
+        from yaml import CSafeLoader as SafeLoader
 
-        debug("got CLoader")
+        debug("got CSafeLoader")
     except ImportError:
-        debug("no CLoader")
-        from yaml import Loader
+        debug("no CSafeLoader")
+        from yaml import SafeLoader
 
     def load_yaml(txt):
-        return pyyaml.load(txt, Loader=Loader)
+        return pyyaml.load(txt, Loader=SafeLoader)
 
 except ImportError:
     debug("no pyyaml. Fallback to ruamel_yaml to load")
+    yaml_safe = ruamel_yaml.YAML(typ="safe")
 
     def load_yaml(txt):
-        return yaml.load(txt)
+        return yaml_safe.load(txt)
 
 
 def yamltxt(data):
+    """Serialize a Python object to YAML text using the configured dumper."""
     with io.StringIO() as stream:
         yaml.dump(pss(data), stream)
         return stream.getvalue()

@@ -4,10 +4,11 @@
 Synchronize macOS Finder tags with Notefile both ways
 """
 import argparse
-import subprocess
-import os, sys
-import sqlite3
 import datetime
+import os
+import sqlite3
+import subprocess
+import sys
 
 import notefile
 

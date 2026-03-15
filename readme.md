@@ -27,6 +27,10 @@ The format is YAML and should not be changed. However, this code does not assume
 
 Any other data can be added and will be preserved across all actions.
 
+Notefile primarily grew around files, but it can also attach notes to directories. Directory notes follow the same sidecar model, but the sidecar is placed in the parent directory rather than inside the target directory. For example, a note for `somepath/subdir/` would live at `somepath/subdir.notes.yaml` (or the corresponding hidden/subdir-mode variant).
+
+Directory support is newer and less refined than file support. It is intended to be useful, but the coupling between a directory and its note is weaker than the file case and the repair heuristics are correspondingly less exact.
+
 ## JSON vs YAML
 
 Notefile can write the notes as nicely-formatted YAML or as JSON (which is technically still YAML as YAML is a superset of JSON). JSON is that it is *much* faster to read than YAML but comes at cost of being hard to edit manually.
@@ -105,6 +109,15 @@ The `repair` function can repair either (but *not* both) types of issues. To rep
 
 To repair an orphaned notefile, it will search in and below the current directory for the file. It will first compare file sizes and then compare sha256 values. If more than one possible file is the original, it will *not* repair it and instead provide a warning.
 
+Directory notes work similarly, but not identically. Directory metadata and orphan repair are intentionally shallow:
+
+* directory notes do **not** hash file contents
+* directory notes do **not** recurse through the full tree
+* directory notes track only the immediate children returned by `os.listdir()`
+* orphan repair for directories uses the count of immediate subdirectories, the count of immediate non-note files, and a shallow hash of the sorted immediate child names
+
+This makes directory notes much cheaper to track, but also means their repair matching is less exact than for files. File notes remain the more robust and more mature case.
+
 ## File Hashes
 
 By default, the SHA256 hash is computed. It is *highly* suggested that this be allowed since it greatly increases the integrity of the link between the basefile and the notefile sidecar. However, `--no-hash` can be passed to many of the functions and it will disable hashing.
@@ -112,6 +125,8 @@ By default, the SHA256 hash is computed. It is *highly* suggested that this be a
 Note that when using `--no-hash`, the file may still be rehashed in subsequent runs without  `--no-hash`, depending on the opperation.
 
 When repairing an orphaned notefile, candidate files are first compared by filesize and then by SHA256. While not foolproof, this *greatly* reduces the number of SHA256 computations to be performed; especially on larger files where it becomes increasingly unlikely to be the exact same size.
+
+Directory notes use a different kind of hash. Instead of hashing file contents, they use a shallow hash of the sorted immediate child names in the directory. This is used only as a lightweight directory identity signal and should not be thought of as equivalent to a file content hash.
 
 ## Hidden and Subdir Notefiles
 
@@ -123,6 +138,15 @@ Notes can be hidden and/or in a subdirectory. Consider `file.txt`. When a note i
 | `--visible --subdir`    | `_notefiles/file.txt.notes.yaml` |         |
 | `--hidden --no-subdir`  | `.file.txt.notes.yaml`           |         |
 | `--hidden --subdir`     | `.notefiles/file.txt.notes.yaml` |         |
+
+For a directory target, the same rule applies except the note is stored alongside the directory in its parent directory. For example, the note for `somepath/subdir/` would be one of:
+
+| Flags                   | Note Destination                            |
+|-------------------------|---------------------------------------------|
+| `--visible --no-subdir` | `somepath/subdir.notes.yaml`                |
+| `--visible --subdir`    | `somepath/_notefiles/subdir.notes.yaml`     |
+| `--hidden --no-subdir`  | `somepath/.subdir.notes.yaml`               |
+| `--hidden --subdir`     | `somepath/.notefiles/subdir.notes.yaml`     |
 
 
 The default is `--visible` and `--no-subdir` but both can be controlled with environmental variables:
@@ -170,6 +194,7 @@ Alternatively, the `export` command can be used.
 These will likely be addressed (roughly in order of priority)
 
 - Behavior with hidden files themselves is not consistent. A warning will be thrown
+- Directory support is newer and less refined than file support, especially around repair heuristics and edge cases
 
 ## Additional Workflows
 
@@ -190,3 +215,9 @@ Note that notefile does support setting alternative note fields (but not tags) s
 ## Changelog
 
 See [Changelog](changelog.md)
+
+## AI/LLM/Coding Agent Disclosure
+
+Almost all of the original code was developed by hand by the author. Around version 0.9.0 (which is also when switched to numeric versioning) OpenAI Codex was used to improve flow, catch bugs, and patch the code.
+
+Major features of safe queries (0.9.0) and directory notes (0.10.0) were developed heavily with Codex with human reviews and confirmation of test cases.

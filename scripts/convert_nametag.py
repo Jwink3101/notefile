@@ -2,10 +2,10 @@
 Convert from filename_[tag1,tag2].ext format to notefile
 """
 
-import sys
 import os
 import re
 import shutil
+import sys
 
 # sys.path.append(os.path.abspath('..'))
 import notefile

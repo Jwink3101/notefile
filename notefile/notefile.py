@@ -1,36 +1,97 @@
+import copy
+import functools
+import io
+import json
+import os
+import shlex
+import shutil
+import sys
+import warnings
+from pathlib import Path
+
 from . import (
-    HIDDEN,
-    SUBDIR,
-    NOTEFIELD,
-    NOHASH,
-    NOTESEXT,
-    debug,
-    warn,
-    __version__,
+    DISABLE_QUERY,
     DT,
     FORMAT,
-    DISABLE_QUERY,
+    HIDDEN,
+    NOHASH,
+    NOTEFIELD,
+    NOTESEXT,
     SAFE_QUERY,
+    SUBDIR,
+    __version__,
+    debug,
+    find,
+    warn,
 )
-from .nfyaml import pss, load_yaml, ruamel_yaml, yaml, yamltxt
-from .utils import now_string, Bunch, sha256, tmpfileinpath, flattenlist, normalize_tags
-from .safe_eval import safe_eval, SafeEvalError
-from . import find
+from .nfyaml import load_yaml, pss, ruamel_yaml, yaml, yamltxt
+from .safe_eval import SafeEvalError, safe_eval
+from .utils import Bunch, flattenlist, normalize_tags, now_string, sha256, tmpfileinpath
 
-from pathlib import Path
-import shlex
-import sys, os, io
-import json
-import copy
-import shutil
-import functools
-import warnings
-
-METADATA = frozenset(("filesize", "mtime", "sha256", "last-updated", "notefile version"))
+TARGET_TYPE_FIELD = "target-type"
+DIR_SUBDIRS_FIELD = "dir-subdirs"
+DIR_FILES_FIELD = "dir-files"
+DIR_HASH_FIELD = "dir-hash"
+METADATA = frozenset(
+    (
+        "filesize",
+        "mtime",
+        "sha256",
+        "last-updated",
+        "notefile version",
+        TARGET_TYPE_FIELD,
+        DIR_SUBDIRS_FIELD,
+        DIR_FILES_FIELD,
+        DIR_HASH_FIELD,
+    )
+)
 
 _TESTEDIT = False  # Only used in testing
 
 DEFERRED_HASH = "**NOT YET COMPUTED**"
+
+
+def _reject_special_target_path(filename):
+    """Reject `.` and `..` as note targets."""
+    path = os.path.normpath(str(filename))
+    if os.path.basename(path) in {".", ".."}:
+        raise ValueError("Cannot create notes for '.' or '..'")
+
+
+def _target_exists(path):
+    """Return true when a path exists or is a symlink, even if broken."""
+    return os.path.exists(path) or os.path.islink(path)
+
+
+def _join_for_hash(items):
+    """Join path entries into the byte sequence used for directory hashing."""
+    return "\n".join(items).encode("utf8")
+
+
+def directory_info(path):
+    """Collect shallow metadata for directory-target notes.
+
+    The hash and counts track only immediate children, matching `os.listdir()`.
+    """
+    entries = sorted(os.listdir(path))
+    subdirs = 0
+    files = 0
+    for entry in entries:
+        full = os.path.join(path, entry)
+        if os.path.isdir(full):
+            subdirs += 1
+        elif not entry.endswith(NOTESEXT):
+            files += 1
+
+    import hashlib
+
+    return dict(
+        **{
+            DIR_SUBDIRS_FIELD: subdirs,
+            DIR_FILES_FIELD: files,
+            DIR_HASH_FIELD: hashlib.sha256(_join_for_hash(entries)).hexdigest(),
+        },
+    )
 
 
 class Notefile:
@@ -120,6 +181,27 @@ class Notefile:
         hashfile=True,
         note_field=NOTEFIELD,
     ):
+        """Create a note wrapper around a target file or directory.
+
+        Parameters
+        ----------
+        filename:
+            Target path or an existing notefile path.
+        hidden:
+            Preferred hidden-note layout for new notes.
+        subdir:
+            Preferred subdirectory-note layout for new notes.
+        format:
+            Serialization format to use when writing (`yaml` or `json`).
+        rewrite_format:
+            Rewrite existing notes into `format` on the next write.
+        link:
+            Symlink handling mode: `both`, `source`, or `symlink`.
+        hashfile:
+            Track SHA-256 for file targets.
+        note_field:
+            Field name used for the primary note body.
+        """
         ## Notation:
         #   _0 names re the original file for a link (or when 'symlink' mode).
         #   When not a link, it doesn't matter!
@@ -129,6 +211,10 @@ class Notefile:
         # _0 is specified format. NOT actual format which will get reset
         self.format = self.format0 = format.lower()
         self.rewrite_format = rewrite_format
+        self._requested_dir = str(filename).endswith(os.sep) and not str(filename).endswith(
+            NOTESEXT
+        )
+        _reject_special_target_path(filename)
         self.names = self.names0 = get_filenames(filename)
 
         if os.path.basename(self.names0.filename).startswith("."):
@@ -175,17 +261,88 @@ class Notefile:
         self.filename = self.names.filename
         self.filename0 = self.names0.filename
 
-        # Check if orphhaned on original file (broken links are still NOT orphaned)
+        self.target_type0 = self._detect_target_type(self.names0.filename)
+        self.target_type = self._detect_target_type(self.names.filename)
+        self.isdir0 = self.target_type0 == "dir"
+        self.isfile0 = self.target_type0 == "file"
+        self.isdir = self.target_type == "dir"
+        self.isfile = self.target_type == "file"
+
+        # Check if orphaned on original target (broken links are still NOT orphaned)
         self.orphaned = not exists_or_link(self.names0.filename)
 
         self.txt = None
         self._data = None
         self._write_count = 0
 
+    def _detect_target_type(self, filename):
+        """Infer whether a target path should be treated as a file or directory."""
+        if os.path.isdir(filename):
+            return "dir"
+        if not _target_exists(filename) and self._requested_dir:
+            return "dir"
+        return "file"
+
+    def _persisted_target_type(self):
+        """Return the target type stored in note metadata, if present."""
+        if getattr(self, "_data", None):
+            data_type = self._data.get(TARGET_TYPE_FIELD)
+            if data_type in {"file", "dir"}:
+                return data_type
+        return None
+
+    def _warn_target_type_mismatch(self, persisted, actual, filename):
+        """Warn when stored target metadata disagrees with the filesystem."""
+        warn(
+            f"Note target-type {persisted!r} does not match filesystem target type "
+            f"{actual!r} for {filename!r}. Using filesystem target type"
+        )
+
+    def effective_target_type(self):
+        """Resolve the best available target type for the source and active target."""
+        persisted = self._persisted_target_type()
+
+        if _target_exists(self.names0.filename):
+            actual0 = self._detect_target_type(self.names0.filename)
+            if persisted and persisted != actual0:
+                self._warn_target_type_mismatch(persisted, actual0, self.names0.filename)
+            return actual0, actual0
+
+        actual = self._detect_target_type(self.names.filename) if _target_exists(self.names.filename) else None
+        if actual:
+            if persisted and persisted != actual:
+                self._warn_target_type_mismatch(persisted, actual, self.names.filename)
+            return persisted or actual, actual
+
+        if persisted:
+            return persisted, persisted
+        if self._requested_dir:
+            return "dir", "dir"
+        return None, None
+
+    def _refresh_target_type_flags(self):
+        """Refresh `isdir` and `isfile` flags from current target-type state."""
+        self.target_type0, self.target_type = self.effective_target_type()
+        self.isdir0 = self.target_type0 == "dir"
+        self.isfile0 = self.target_type0 == "file"
+        self.isdir = self.target_type == "dir"
+        self.isfile = self.target_type == "file"
+
+    def _target_metadata(self):
+        """Build initial metadata for a new note target."""
+        if self.isdir:
+            data = directory_info(self.names.filename)
+            data[TARGET_TYPE_FIELD] = "dir"
+            return data
+
+        stat = os.stat(self.names.filename)
+        data = {"filesize": stat.st_size, "mtime": stat.st_mtime, TARGET_TYPE_FIELD: "file"}
+        if self.hashfile:
+            data["sha256"] = DEFERRED_HASH
+        return data
+
     def read(self):
-        """
-        Read the note and store the data.
-        """
+        """Read the note file, normalize its data, and cache the original state."""
         if self.exists:
             debug("loading {}".format(self.destnote))
             try:
@@ -204,13 +361,7 @@ class Notefile:
             debug("New notefile")
             self._data = {}
             try:
-                stat = os.stat(self.names.filename)
-
-                self._data["filesize"] = stat.st_size
-                self._data["mtime"] = stat.st_mtime
-                if self.hashfile:
-                    # self._data["sha256"] = sha256(self.names.filename)
-                    self._data["sha256"] = DEFERRED_HASH
+                self._data.update(self._target_metadata())
                 self.txt = self.writes()
             except Exception as E:
                 if os.path.islink(self.names0.filename):
@@ -219,6 +370,17 @@ class Notefile:
                     )
                     self._data["filesize"] = -1
                     self._data["mtime"] = -1
+                    self._data[TARGET_TYPE_FIELD] = "file"
+                elif self.isdir and not _target_exists(self.names.filename):
+                    self._data.update(
+                        {
+                            TARGET_TYPE_FIELD: "dir",
+                            DIR_SUBDIRS_FIELD: -1,
+                            DIR_FILES_FIELD: -1,
+                            DIR_HASH_FIELD: "",
+                        }
+                    )
+                    self.txt = self.writes()
                 else:
                     raise  # Not sure what causes this
 
@@ -240,6 +402,7 @@ class Notefile:
         if self.note_field not in self._data:
             self._data[self.note_field] = ""
         self._data = Bunch(**self._data)
+        self._refresh_target_type_flags()
 
         # Make a copy for compare later. Use deep copy in case mutable
         # objects are modified
@@ -249,6 +412,7 @@ class Notefile:
 
     @property
     def data(self):
+        """Access the note data, loading it lazily on first use."""
         if not self._data:
             debug("Automatic read()")
             self.read()
@@ -256,14 +420,25 @@ class Notefile:
 
     @data.setter
     def data(self, data):
+        """Replace the cached note data object."""
         debug("data setter")
         self._data = data
 
     def writes(self, format=None, compute_sha256=False):
-        """
-        Return a string of the notes.
+        """Serialize the current note state to YAML or JSON text.
 
-        If format is None, will use default. Otherwise, it can be set with a format
+        Parameters
+        ----------
+        format:
+            Override the output format for this serialization call. When omitted,
+            the current file format is preserved unless `rewrite_format` is set.
+        compute_sha256:
+            Compute and persist a deferred file hash before serializing.
+
+        Notes
+        -----
+        The serialized output also normalizes tags, updates `last-updated`, and
+        records the current notefile version.
         """
         if self.note_field in self.data and isinstance(self.data[self.note_field], str):
             self.data[self.note_field] = self.data[self.note_field].strip()
@@ -272,7 +447,9 @@ class Notefile:
         tags = set(t.strip() for t in tags if t.strip())
         self.data["tags"] = sorted(tags)
 
-        if compute_sha256 and self.data.get("sha256", "") == DEFERRED_HASH:
+        self.data[TARGET_TYPE_FIELD] = "dir" if self.isdir else "file"
+
+        if compute_sha256 and self.isfile and self.data.get("sha256", "") == DEFERRED_HASH:
             self.data["sha256"] = sha256(self.names.filename)
 
         data = pss(self.data)  # Will recurse into lists and dicts too
@@ -303,13 +480,18 @@ class Notefile:
     dumps = writes
 
     def write(self, force=False):
-        """
-        Write the data and also (re)set
+        """Write the note to disk atomically.
 
-        Inputs:
-        -------
-        force [False]
-            Make it write even if it hasn't been modified
+        Parameters
+        ----------
+        force:
+            Write even when the note does not appear modified.
+
+        Notes
+        -----
+        The write is performed atomically via a temporary sibling file. If the
+        note is unchanged and `force` is false, link-side notefiles may still be
+        rebuilt.
         """
 
         if not force and not self.ismod():
@@ -337,36 +519,27 @@ class Notefile:
     def replaceto(
         self, dst, fields=None, allfields=False, noteopts=None, newonly=False, append=False
     ):
-        """
-        Replace the `fields` of dst with those of current note.
+        """Copy selected note fields to another target.
 
-        Options:
-        --------
-        dst
-            Destination note.
-
-        fields [None]
-            If None, will *just* be the `self.notefield`. If *anything* is specified will
-            ONLY be those. For example, setting `fields='tags'` will only update tags. To
-            update notes too, do `fields=('tags','notes')`
-
-            Will NOT raise a warning if field is not in the source
-
-        allfields [False]
-            Ignore the above and do all fields. This is effectively `copyto()` with
-            allowing it to overwrite existing notes.
-
-        noteopts [None]
-            Options for the destination note if it is new
-
-        newonly [False]
-            If True, dst must NOT have a note
-
-        append [False]
-            If True, update/append rather than replace the contents in each field.
-            With the exception of `tags`, the field values must either be text-based
-            or the dest must not have anything in the field
-
+        Parameters
+        ----------
+        dst:
+            Destination target path.
+        fields:
+            Field name or collection of field names to copy. Defaults to the main
+            note field. Specifying `fields` restricts the copy to only those
+            fields.
+        allfields:
+            Copy every non-metadata field from the source note, overriding
+            `fields`.
+        noteopts:
+            Constructor options for the destination `Notefile`.
+        newonly:
+            Require that the destination does not already have a note.
+        append:
+            Merge into existing destination values instead of replacing them.
+            Tag fields are unioned; other fields must be string-like when both
+            source and destination contain values.
         """
         if noteopts is None:
             noteopts = {}
@@ -420,9 +593,7 @@ class Notefile:
     copyto = functools.partialmethod(replaceto, newonly=True, allfields=True)
 
     def ismod(self):
-        """
-        Compare data0 (when read()) to data (before write())
-        """
+        """Return whether the note has diverged from the last-read state."""
         # Will do a dictionary compare at the end so pop() certain keys before
         # we get to that. Since we're removing then, make a copy
         if not hasattr(self, "data0"):
@@ -434,9 +605,10 @@ class Notefile:
             old.pop(key, None)
             new.pop(key, None)
 
-        # In the future, allow for no mtime test
-        if abs(old.pop("mtime", 0) - new.pop("mtime", 99999999)) >= DT:
+        if self.isfile and abs(old.pop("mtime", 0) - new.pop("mtime", 99999999)) >= DT:
             return True  # The file has been modified. Always do this
+        old.pop("mtime", None)
+        new.pop("mtime", None)
 
         # Make tags comparison based on sets
         old["tags"] = normalize_tags(old.get("tags", []), sort=False)
@@ -445,9 +617,7 @@ class Notefile:
         return not old == new
 
     def make_links(self):
-        """
-        Build the links if the note is a link.
-        """
+        """Rebuild symlink-side notefiles when operating in `both` link mode."""
         # Handle both-type links by linking to the note
         if self.islink and self.link == "both":
             linknote = self.destnote0  # Original path for the note
@@ -460,8 +630,24 @@ class Notefile:
             os.symlink(linkpath, linknote)
 
     def interactive_edit(self, full=False, manual=False, tags_only=False):
-        """Launch the editor. Does *NOT* write()"""
-        import subprocess, shlex
+        """Open the note in an editor without saving automatically.
+
+        Parameters
+        ----------
+        full:
+            Edit the full YAML document instead of only the main note body.
+        manual:
+            Pause for manual editing of the temporary file instead of launching
+            an editor command.
+        tags_only:
+            Edit only the tag list.
+
+        Notes
+        -----
+        This method updates in-memory data only and does not call `write()`.
+        """
+        import shlex
+        import subprocess
 
         editor_names = ["EDITOR", "GIT_EDITOR", "SVN_EDITOR", "LOCAL_EDITOR"]
         for editor_name in editor_names:
@@ -536,7 +722,7 @@ class Notefile:
         return self  # for convenience
 
     def add_note(self, note, replace=False):
-        """Add (or replace) a note. Does *NOT* write()"""
+        """Append or replace the main note text without writing to disk."""
         if note is None:
             note = ""
 
@@ -551,17 +737,14 @@ class Notefile:
         return self  # for convenience
 
     def modify_tags(self, add=tuple(), remove=tuple()):
-        """
-        Add or remove tags. Does *NOT* write().
+        """Add and remove normalized tags without writing to disk.
 
-        Inputs:
-        -------
-        add [empty tuple]
-            Iterable or str of tags to add
-
-        remove [empty tuple]
-            Iterable or str of tags to remove
-
+        Parameters
+        ----------
+        add:
+            Iterable or string of tags to add.
+        remove:
+            Iterable or string of tags to remove.
         """
         tags = self.data.get("tags", [])
         tags = normalize_tags(tags, sort=False)  # set of tags
@@ -574,23 +757,22 @@ class Notefile:
         return self  # for convenience
 
     def change_visibility_subdir(self, *, mode=None, subdir=None, dry_run=False):
-        """
-        Change the visibility to 'hide' or 'show'
+        """Move the note between visible/hidden and flat/subdir layouts.
 
-        Inputs:
+        Parameters
+        ----------
+        mode:
+            `'hide'`, `'show'`, or `None` to preserve the current visibility.
+        subdir:
+            `True`, `False`, or `None` to preserve the current subdir setting.
+        dry_run:
+            When true, report whether a move would occur without making it.
+
+        Returns
         -------
-        mode [None]
-            Specify 'hide' or 'show' to set it or None to keep as is.
-
-        subdir [None]
-            Specify True or False to set it or None to keep it as is.
-
-        dry_run [False]
-            If True, do not make the change
-
-        Returns:
-        --------
-        True if mode changed or False
+        bool
+            `True` when a move would occur or did occur, and `False` when the
+            note was already in the requested layout or the move was blocked.
         """
         if mode is None:
             mode = "hide" if self.is_hidden else "show"
@@ -630,7 +812,7 @@ class Notefile:
         return True
 
     def cat(self, tags=False, full=False):
-        """cat the notes to a string"""
+        """Return note content as plain text, tag text, or full serialized text."""
         if full:
             return self.writes()
 
@@ -645,6 +827,7 @@ class Notefile:
         return txt
 
     def isempty(self):
+        """Return true when all non-metadata note fields are empty."""
         for key in set(self.data) - METADATA:
             if self.data[key]:
                 return False
@@ -652,21 +835,34 @@ class Notefile:
         return True
 
     def repair_metadata(self, dry_run=False, force=False):
-        """
-        Repair (if Needed) the notefile metadata.
+        """Refresh tracked metadata for the target if it has drifted.
 
-        If force, will check (mtime,size) and reset as needed.
-        Otherwise, will first check (mtime,size). If they are wrong, will update
-        them and the sha256 if self.hashfile
+        Parameters
+        ----------
+        dry_run:
+            Report whether a repair is needed without mutating the note.
+        force:
+            Recompute tracked metadata even when the stored values still match.
 
-        dry_run will *not* update anything
-
-        does *NOT* write!
+        Notes
+        -----
+        This method updates in-memory metadata only and does not call
+        `write()`.
         """
         # This is designed to be called before reading, etc for orphaned
         if not os.path.exists(self.names.filename):
             warn(f"File {repr(self.names.filename)} is orphaned or link is broken")
             return
+
+        if self.isdir:
+            current = directory_info(self.names.filename)
+            if force or any(self.data.get(key, None) != val for key, val in current.items()):
+                if dry_run:
+                    return True
+                self.data.update(current)
+                self.data[TARGET_TYPE_FIELD] = "dir"
+                return True
+            return False
 
         stat = os.stat(self.names.filename)
 
@@ -703,15 +899,44 @@ class Notefile:
         search_one_file_system=False,
         search_exclude_links=False,
     ):
-        """
-        Repair orphaned (file moved).
+        """Relocate an orphaned note by searching for a matching target.
 
-        Always searches by filesize but can also look for matches by mtime, filehash,
-        and/or name (i.e. leaf node).
+        File targets always match on size first, then optionally on modification
+        time, file hash, and basename. Directory targets delegate to
+        `_repair_orphaned_dir()`.
 
-        return the new dest or None
+        Returns
+        -------
+        str | None
+            The new note path when a unique match is found, otherwise `None`.
+
+        Notes
+        -----
+        File targets always match size first. Optional filters then refine by
+        mtime, file hash, and basename.
         """
         from .find import find
+
+        if self.exists and self._data is None:
+            self.read()
+
+        self._refresh_target_type_flags()
+        if self.target_type0 is None:
+            warn(f"Cannot determine target type for orphaned note {self.destnote0!r}")
+            return
+
+        if self.isdir:
+            return self._repair_orphaned_dir(
+                mtime=mtime,
+                name=name,
+                dry_run=dry_run,
+                search_path=search_path,
+                search_excludes=search_excludes,
+                search_matchcase=search_matchcase,
+                search_maxdepth=search_maxdepth,
+                search_one_file_system=search_one_file_system,
+                search_exclude_links=search_exclude_links,
+            )
 
         if filehash and len(self.data.get("sha256", "")) != 64:  # not a computed hash
             warn(f"Cannot repair {self.names.filename} based on hash since it's missing")
@@ -771,6 +996,74 @@ class Notefile:
 
         return newnote
 
+    def _repair_orphaned_dir(
+        self,
+        *,
+        mtime=True,
+        name=False,
+        dry_run=False,
+        search_path=".",
+        search_excludes=None,
+        search_matchcase=False,
+        search_maxdepth=None,
+        search_one_file_system=False,
+        search_exclude_links=False,
+    ):
+        """Repair an orphaned directory note by matching shallow directory metadata."""
+        from .find import find
+
+        if len(self.data.get(DIR_HASH_FIELD, "")) != 64:
+            warn(f"Cannot repair {self.names.filename} based on directory hash since it's missing")
+            return
+
+        dirs = find(
+            path=search_path,
+            excludes=search_excludes,
+            matchcase=search_matchcase,
+            maxdepth=search_maxdepth,
+            one_file_system=search_one_file_system,
+            exclude_links=search_exclude_links,
+            filemode=True,
+            targetmode="dir",
+        )
+
+        basename = os.path.basename(self.names0.filename)
+        candidates = []
+        for dirpath in dirs:
+            if name and basename != os.path.basename(dirpath):
+                continue
+            try:
+                info = directory_info(dirpath)
+            except (FileNotFoundError, NotADirectoryError, PermissionError):
+                continue
+
+            if info[DIR_SUBDIRS_FIELD] != self.data.get(DIR_SUBDIRS_FIELD, -1):
+                continue
+            if info[DIR_FILES_FIELD] != self.data.get(DIR_FILES_FIELD, -1):
+                continue
+            if info[DIR_HASH_FIELD] != self.data.get(DIR_HASH_FIELD):
+                continue
+            candidates.append(dirpath)
+
+        if len(candidates) > 1:
+            wtxt = f"{len(candidates)} candidates found for '{self.destnote0}'. Not repairing"
+            wtxt += "\n   ".join([""] + candidates)
+            warn(wtxt)
+            return
+        if len(candidates) == 0:
+            warn(f"No match for '{self.destnote0}'")
+            return
+
+        newdir = candidates[0]
+        names = get_filenames(newdir)
+        newnote, *_ = hidden_chooser(names, hidden=self.is_hidden, subdir=self.is_subdir)
+        if os.path.exists(newnote):
+            warn(f"Notefile exists. Not Moving!\n   SRC:{self.destnote0}\n   DST:{newnote}")
+            return
+        if not dry_run:
+            shutil.move(self.destnote0, newnote)
+        return newnote
+
     def grep(
         self,
         *expr,
@@ -780,31 +1073,28 @@ class Notefile:
         fixed_strings=False,
         match_any=True,
     ):
-        """
-        Search the content of notes for expr
+        """Search note content with regex or fixed-string matching.
 
-        Inputs:
+        Parameters
+        ----------
+        *expr:
+            One or more patterns. Nested iterables are flattened.
+        matchcase:
+            Match patterns case-sensitively.
+        full_note:
+            Search the full serialized note text instead of only the main note
+            field.
+        full_word:
+            Wrap each pattern in word-boundary assertions.
+        fixed_strings:
+            Escape each pattern before compiling it as a regex.
+        match_any:
+            Return true when any pattern matches. When false, require all of them.
+
+        Returns
         -------
-        *expr ['']
-            Expression to search. Can be regex. Also can pass a tuple or list. All
-            arguments are flattened (list of strings) and combined
-
-        matchcase [False]
-            Whether or not to consider case in the expression
-
-        full_note [False]
-            Whether to search the entire note text or just the "notes" section
-
-        fixed_strings [False]
-            Match the string exactly. i.e. does a re.escape() on the pattern
-
-        full_word [False]
-            If True, matches the full word. Basically add \\b to each pattern
-
-        match_any [True]
-            Whether to match any expr
-
-        Returns: Bool
+        bool
+            Whether the note content matches according to the configured mode.
         """
         import re
 
@@ -850,31 +1140,23 @@ class Notefile:
         return query(qtext)
 
     def unsafe_query(self, *expr, allow_exception=False, match_any=True, **kwargs):
-        """
-        Perform python queries on notes:
+        """Evaluate legacy Python queries against the note.
 
-        Inputs:
-        -------
-        expr ['']
-            Query expression(s). See query_help() for details. Also can pass a tuple
-            or list. All arguments are flattened (list of strings) and combined
+        Parameters
+        ----------
+        *expr:
+            One or more query expressions. Nested iterables are flattened.
+        allow_exception:
+            Convert query failures into warnings and a false result.
+        match_any:
+            Return true when any expression matches. When false, require all.
+        **kwargs:
+            Additional grep options exposed to query helpers such as `grep()`.
 
-        allow_exception [False]
-            If True, raises a warning instead of an exception
-
-        match_any [True]
-            Whether to match any expr. Also passed to grep
-
-        **kwargs
-            Passed to grep. Notably:
-                matchcase,full_note,full_word,fixed_strings
-
-        Returns:
-            boolean of whether or not it matched
-
-        Note:
-            Safe queries are the default. Unsafe queries can be enabled with
-            NOTEFILE_SAFE_QUERY=false.
+        Notes
+        -----
+        This path uses `exec()` and is intentionally deprecated. Prefer
+        `safe_query()` unless full Python execution is explicitly required.
         """
         if DISABLE_QUERY:
             raise ValueError("Query is disabled")
@@ -885,8 +1167,8 @@ class Notefile:
             stacklevel=2,
         )
 
-        from functools import partial
         import re
+        from functools import partial
 
         expr = list(flattenlist(expr))  # will make  a list of all strings
 
@@ -900,6 +1182,8 @@ class Notefile:
             "text": getattr(self, "txt", ""),
             "filename": self.names0.filename,
             "notefile_path": self.destnote,
+            "isdir": self.isdir0,
+            "isfile": self.isfile0,
         }
 
         ns["grep"] = functools.partial(self.grep, match_any=match_any, **kwargs)
@@ -946,37 +1230,29 @@ class Notefile:
         return not match_any
 
     def safe_query(self, *expr, allow_exception=False, match_any=True, **kwargs):
-        """
-        Perform safe queries on notes using a restricted parser (no eval/exec).
+        """Evaluate safe query expressions against the note.
 
-        Inputs:
+        Parameters
+        ----------
+        *expr:
+            One or more query expressions. Nested iterables are flattened.
+        allow_exception:
+            Convert query failures into warnings and a false result.
+        match_any:
+            Return true when any expression matches. When false, require all.
+        **kwargs:
+            Additional grep options exposed to query helpers such as `grep()`.
+
+        Returns
         -------
-        expr ['']
-            Query expression(s). See query_help() for details. Also can pass a tuple
-            or list. All arguments are flattened (list of strings) and combined
-
-        allow_exception [False]
-            If True, raises a warning instead of an exception
-
-        match_any [True]
-            Whether to match any expr. Also passed to grep
-
-        **kwargs
-            Passed to grep. Notably:
-                matchcase,full_note,full_word,fixed_strings
-
-        Returns:
-            boolean of whether or not it matched
-
-        Note:
-            Safe queries are the default. Unsafe queries can be enabled with
-            NOTEFILE_SAFE_QUERY=false.
+        bool
+            Whether the note matches according to the requested query mode.
         """
         if DISABLE_QUERY:
             raise ValueError("Query is disabled")
 
-        from functools import partial
         import re
+        from functools import partial
 
         expr = list(flattenlist(expr))  # will make  a list of all strings
 
@@ -989,6 +1265,8 @@ class Notefile:
             "text": getattr(self, "txt", ""),
             "filename": self.names0.filename,
             "notefile_path": self.destnote,
+            "isdir": self.isdir0,
+            "isfile": self.isfile0,
         }
 
         ns["grep"] = functools.partial(self.grep, match_any=match_any, **kwargs)
@@ -1026,6 +1304,15 @@ class Notefile:
                     r = False
                 else:
                     raise QueryError(etxt)
+            except Exception as E:
+                etxt = 'Query runtime error: {}. Note: "{}"'.format(
+                    E.__class__.__name__, self.names0.filename
+                )
+                if allow_exception:
+                    warn("Query Error: {}".format(etxt))
+                    r = False
+                else:
+                    raise QueryError(etxt)
 
             # Short circuit
             if not match_any:
@@ -1041,9 +1328,7 @@ class Notefile:
     query = safe_query
 
     def _isbroken_broken_from_hide(self):
-        """
-        Returns whether a link note is broken from being hidden
-        """
+        """Return whether a link-side note is broken due to a hide/show move."""
         if self.link != "both" or not self.islink:
             return False
 
@@ -1058,10 +1343,7 @@ class Notefile:
         return True
 
     def _read_from_broken_link_from_hide(self):
-        """
-        Tries to read from a broken link due to hidden but does NOT repair!
-        (reading shouldn't modify content)
-        """
+        """Read note text through alternate link locations without repairing links."""
         for destnote in get_filenames(self.destnote)[1:]:
             if exists_or_link(destnote):
                 break
@@ -1077,6 +1359,7 @@ class Notefile:
             return fobj.read()
 
     def __str__(self):
+        """Return a concise representation that includes the original target path."""
         return f"Notefile({repr(self.names0.filename)})"
 
     __repr__ = __str__
@@ -1091,15 +1374,14 @@ class MultipleNotesError(ValueError):
 
 
 def get_filenames(filename):
-    """
-    Normalize filenames for NOTESEXT
+    """Return the canonical note-path variants for a target path.
 
-    If given a hidden notefile, assumes the base name is
-    NOT hidden.
-
-    returns:
-        notenames NamedTuple
+    The result includes visible, hidden, and subdirectory note locations. When
+    given a hidden notefile path, the base target name is treated as not hidden.
     """
+    filename = str(filename)
+    if not filename.endswith(NOTESEXT):
+        filename = os.path.normpath(filename)
     base, name = os.path.split(filename)
 
     if name.endswith(NOTESEXT):  # Given a notefile path
@@ -1132,15 +1414,12 @@ def get_filenames(filename):
 
 
 def hidden_chooser(names, *, hidden, subdir):
-    """
-    Simple util but I keep needing it.
+    """Choose the active notefile path for a target.
 
-    Searches for an existing notefile searching in order of `hidden`.
-
-    Retuns:
-        notefilepath,<whether or not it exists>,is_hidden,is_subdir
-
-    where the latter two are based on the settings if not found
+    Existing note locations take precedence over the requested layout. The
+    return value is `(path, exists, is_hidden, is_subdir)`, where the layout
+    flags reflect either the discovered note or the requested destination when
+    no note exists yet.
     """
     # Set the order to test based on hidden and subdir
     # but note that hidden is considered priority over subdir
@@ -1179,7 +1458,5 @@ def hidden_chooser(names, *, hidden, subdir):
 
 
 def exists_or_link(filename):
-    """
-    exists will return false if a broken link. This will NOT
-    """
-    return os.path.isfile(filename) or os.path.islink(filename)
+    """Return true for existing paths and broken symlinks alike."""
+    return _target_exists(filename)

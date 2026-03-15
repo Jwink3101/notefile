@@ -29,3 +29,8 @@ include = ["notefile*"]
 line-length = 100
 target-version = ['py38']
 include = '\.pyi?$'
+
+[tool.isort]
+profile = "black"
+line_length = 100
+py_version = 38

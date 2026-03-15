@@ -1,7 +1,8 @@
-__version__ = "0.9.0"
+__version__ = "0.10.0"
 __author__ = "Justin Winokur"
 
-import sys, os
+import os
+import sys
 
 if sys.version_info < (3, 8):
     # Limited by argarse's extend action
@@ -26,12 +27,14 @@ DT = 1  # mtime change
 
 
 def debug(*args, **kwargs):
+    """Print a debug message when `NOTEFILE_DEBUG` is enabled."""
     if DEBUG:
         kwargs["file"] = sys.stderr
         print("DEBUG:", *args, **kwargs)
 
 
 def warn(*args, **kwargs):
+    """Print a warning message to standard error."""
     kwargs["file"] = sys.stderr
     print("WARNING:", *args, **kwargs)
 
@@ -41,6 +44,20 @@ from .notefile import Notefile, get_filenames
 
 
 def query_help(print_help=True, safe=None):
+    """Return or print the query-language help text.
+
+    Parameters
+    ----------
+    print_help:
+        When true, print the generated help text to stdout.
+    safe:
+        Override whether the safe-query or unsafe-query help variant is used.
+
+    Returns
+    -------
+    str
+        The rendered help text.
+    """
     if safe is None:
         safe = SAFE_QUERY
 
@@ -59,6 +76,8 @@ The following variables are defined:
     text    Raw contents (YAML/JSON) of the note.
     filename Path to the file being noted.
     notefile_path Path to the notefile sidecar.
+    isdir   True if the note target is a directory.
+    isfile  True if the note target is a file.
 
 And it includes the following functions:
 
@@ -152,6 +171,8 @@ UNTRUSTED INPUT). The following variables are defined:
     text    Raw contents (YAML/JSON) of the note.
     filename Path to the file being noted.
     notefile_path Path to the notefile sidecar.
+    isdir   True if the note target is a directory.
+    isfile  True if the note target is a file.
 
 And it includes the following functions:
 

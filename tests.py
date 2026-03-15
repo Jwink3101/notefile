@@ -11,23 +11,25 @@ one (e.g. search), it is not restest for search and find.
 
 """
 
-import os, io, sys
-import shutil
-import shlex
-import hashlib
-import glob
-import itertools
 import copy
-from pathlib import Path
-import time
+import glob
+import hashlib
+import io
+import itertools
 import json
-import warnings
-import unicodedata
+import os
 import pickle
+import shlex
+import shutil
+import sys
+import time
+import unicodedata
+import warnings
+from pathlib import Path
 
 import notefile  # this *should* import the local version even if it is installed
 import notefile.cli
-from notefile.safe_eval import safe_eval, SafeEvalError
+from notefile.safe_eval import SafeEvalError, safe_eval
 
 Notefile = notefile.Notefile
 
@@ -37,7 +39,9 @@ notefile.DEBUG = False
 
 import pytest
 
-TESTDIR = Path("testdirs").resolve()
+TESTDIR = Path(os.environ.get("NOTEFILE_TESTDIR", "testdirs")).absolute()
+if TESTDIR.is_symlink():
+    TESTDIR = Path("testdirs-local").absolute()
 TESTDIR.mkdir(parents=True, exist_ok=True)
 with (TESTDIR / ".ignore").open("wt") as f:
     pass
@@ -1233,6 +1237,45 @@ def test_safe_eval_features_and_errors():
         )
 
 
+def test_safe_query_runtime_exception_is_sanitized():
+    os.chdir(TESTDIR)
+    dirpath = TESTDIR / "safe_query_runtime_error"
+    cleanmkdir(dirpath)
+    os.chdir(dirpath)
+
+    writefile("file1.txt", "file1")
+    note1 = Notefile("file1.txt")
+    note1.data.notes = "alpha"
+    note1.write()
+    note1 = Notefile("file1.txt").read()
+
+    with pytest.raises(notefile.notefile.QueryError) as exc:
+        note1.safe_query("len(text, base=10)")
+    assert "Query runtime error: TypeError" in str(exc.value)
+    assert "base=10" not in str(exc.value)
+
+    assert note1.safe_query("len(text, base=10)", allow_exception=True) is False
+
+    os.chdir(TESTDIR)
+
+
+def test_load_yaml_rejects_python_object_tags():
+    os.chdir(TESTDIR)
+    dirpath = TESTDIR / "safe_yaml_loader"
+    cleanmkdir(dirpath)
+    os.chdir(dirpath)
+
+    marker = dirpath / "yaml_loader_marker.txt"
+    payload = "!!python/object/apply:os.system ['echo pwned > yaml_loader_marker.txt']"
+
+    with pytest.raises(Exception):
+        notefile.nfyaml.load_yaml(payload)
+
+    assert not marker.exists()
+
+    os.chdir(TESTDIR)
+
+
 def test_unsafe_query_paths():
     os.chdir(TESTDIR)
     dirpath = TESTDIR / "unsafe_query"
@@ -1467,6 +1510,114 @@ def test_notepath():
     oH, _ = call("note-path file3.txt ss/nofile.no -H", capture=True)
     assert oV == "file3.txt.notes.yaml\nss/nofile.no.notes.yaml\n"
     assert oH == ".file3.txt.notes.yaml\nss/.nofile.no.notes.yaml\n"
+
+    Path("somedir").mkdir()
+    oD, _ = call("note-path somedir/", capture=True)
+    assert oD == "somedir.notes.yaml\n"
+
+    oMD, _ = call("note-path missingdir/", capture=True)
+    assert oMD == "missingdir.notes.yaml\n"
+
+    os.chdir(TESTDIR)
+
+
+def test_directory_notes():
+    os.chdir(TESTDIR)
+    dirpath = TESTDIR / "directory-notes"
+    cleanmkdir(dirpath)
+    os.chdir(dirpath)
+
+    Path("proj/sub").mkdir(parents=True)
+    writefile("proj/file.txt", "hello")
+    writefile("proj/.hidden", "secret")
+
+    call('mod -t folder -n "project note" proj/')
+    note = Notefile("proj/").read()
+    assert note.isdir
+    assert note.data["target-type"] == "dir"
+    assert "mtime" not in note.data
+    assert note.data["dir-subdirs"] == 1
+    assert note.data["dir-files"] == 2
+    assert len(note.data["dir-hash"]) == 64
+
+    assert Path("proj.notes.yaml").exists()
+
+    o, _ = call("find", capture=True)
+    assert o == "proj/\n"
+
+    o, _ = call("find --type dir", capture=True)
+    assert o == "proj/\n"
+
+    o, _ = call("find --type file", capture=True)
+    assert o == ""
+
+    o, _ = call("query isdir", capture=True)
+    assert o == "proj/\n"
+
+    o, _ = call("query isfile", capture=True)
+    assert o == ""
+
+    o, _ = call("cat proj/", capture=True)
+    assert o == "project note\n"
+
+    call('mod -n "orphan dir" missingdir/')
+    missing = Notefile("missingdir/").read()
+    assert missing.orphaned
+    assert missing.isdir
+    assert missing.data["target-type"] == "dir"
+
+    writefile("proj/new.txt", "new")
+    assert note.repair_metadata()
+    note.write()
+    note = Notefile("proj/").read()
+    assert "mtime" not in note.data
+    assert note.data["dir-files"] == 3
+
+    shutil.move("proj", "renamed")
+    api_note = Notefile("proj.notes.yaml").read()
+    assert api_note.repair_orphaned() == "renamed.notes.yaml"
+    shutil.move("renamed.notes.yaml", "proj.notes.yaml")
+    o, _ = call("repair-orphaned proj.notes.yaml --path .", capture=True)
+    assert o == "proj.notes.yaml --> renamed.notes.yaml\n"
+    assert Path("renamed.notes.yaml").exists()
+    repaired = Notefile("renamed/").read()
+    assert repaired.isdir
+
+    with pytest.raises(SysExitError):
+        call("mod -n bad ./")
+
+    os.chdir(TESTDIR)
+
+
+def test_target_type_repair_guardrails():
+    os.chdir(TESTDIR)
+    dirpath = TESTDIR / "target-type-guardrails"
+    cleanmkdir(dirpath)
+    os.chdir(dirpath)
+
+    Path("proj").mkdir()
+    call('mod -n "dir note" proj/')
+    shutil.move("proj", "renamed")
+
+    Path("proj.notes.yaml").write_text(
+        "notes: dir note\n"
+        "tags: []\n"
+        "dir-subdirs: 0\n"
+        "dir-files: 0\n"
+        "dir-hash: deadbeef\n"
+    )
+
+    _, e = call("repair-orphaned proj.notes.yaml --path .", capture=True)
+    assert "Cannot determine target type for orphaned note" in e
+
+    writefile("wrong.txt", "x")
+    call('mod -n "file note" wrong.txt')
+    wrong_path = Path("wrong.txt.notes.yaml")
+    wrong_txt = wrong_path.read_text()
+    wrong_path.write_text(wrong_txt.replace("target-type: file", "target-type: dir"))
+
+    _, e = call("cat wrong.txt", capture=True)
+    assert "does not match filesystem target type" in e
 
     os.chdir(TESTDIR)
 

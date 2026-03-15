@@ -21,6 +21,12 @@
 - Prefer `snake_case` for functions/variables and `PascalCase` for classes.
 - Keep CLI argument names and short flags consistent with existing commands in `notefile/cli.py`.
 
+## Docstring Conventions
+- Add docstrings to public functions, classes, and methods across the library package.
+- Prefer Markdown-friendly NumPy-style structure with short summary lines plus `Parameters`, `Returns`, `Yields`, or `Notes` sections when useful.
+- Keep internal helper docstrings shorter, but still explicit enough to explain purpose and side effects.
+- Update docstrings when behavior changes so they remain useful for both human readers and coding agents.
+
 ## Testing Guidelines
 - Tests are written with pytest and live in `tests.py`.
 - New behavior should include a corresponding test in `tests.py`; follow existing naming like `test_mod()`.

@@ -2,6 +2,28 @@
 
 (**_newest_** on *top*)
 
+
+## 0.10.0 (2026-03-15)
+
+- Added first-class directory note support.
+    - Directory notes use the same sidecar model as files, with the note stored alongside the target directory in its parent directory.
+    - Added persisted `target-type` metadata for both file and directory notes.
+    - Added shallow directory tracking metadata:
+        - `dir-subdirs`
+        - `dir-files`
+        - `dir-hash`
+    - Added directory `repair-metadata` and `repair-orphaned` support.
+    - Directory repair now uses shallow directory identity rather than file hashing.
+- Added `--type {dir,file,both}` for search-oriented commands.
+- Added `isdir` and `isfile` query booleans.
+- Human-readable CLI output now shows directory targets with a trailing `/`.
+- Added support for `python -m notefile`.
+
+Note:
+
+- Directory tracking is intentionally shallow: it uses only immediate child names and counts, not recursive structure or file contents.
+- Directory support is newer and less refined than file support, especially for repair heuristics and edge cases.
+
 ## 0.9.0
 
 - Move to numeric versioning over date

@@ -2,10 +2,11 @@
 Main module-level utilities
 """
 
-from .notefile import Notefile
-from . import NOTESEXT
+import os
+import sys
 
-import os, sys
+from . import NOTESEXT
+from .notefile import Notefile
 
 
 def find(
@@ -20,51 +21,47 @@ def find(
     noteopts=None,
     **kwargs,
 ):
-    """
-    find notes recurisvly starting in `path`
+    """Yield notes or raw paths discovered under one or more roots.
 
-    Options:
-    --------
-    path ['.']
-        Where to look. Can be a list/tuple too and will uniquely join them.
-        Directories will recurse and follow exclusions. Files will ALWAYS return
+    Parameters
+    ----------
+    path:
+        Starting path or collection of paths. Directories are searched
+        recursively and honor exclusions. Explicit files are yielded directly
+        and are not recursively expanded.
+    excludes:
+        Glob patterns to skip. Directory matches are checked with a trailing `/`.
+    matchcase:
+        Match exclude patterns case-sensitively.
+    maxdepth:
+        Maximum recursion depth where the starting directory is depth `0`.
+    one_file_system:
+        Prevent recursion across filesystem boundaries.
+    exclude_links:
+        Skip symlinked notes or symlinked filesystem entries.
+    include_orphaned:
+        Include orphaned notes whose targets no longer exist.
+    empty:
+        Filter by empty-note status. `None` disables this filter.
+    noteopts:
+        Keyword arguments passed to `Notefile` for yielded notes.
 
-    excludes []
-        Specify excludes in glob-style. Will be checked against
-        both filenames and directories. Will also be checked against
-        directorys with "/" appended
+    Other Parameters
+    ----------------
+    filemode:
+        Internal flag that yields raw file paths instead of `Notefile` objects.
+    targetmode:
+        Internal target-type filter used by CLI repair flows.
 
-    matchcase [False]
-        Whether or not to match the case of the exclude file
-
-    maxdepth [None]
-        Specify a maximum depth. The current directory is 0
-
-    one_file_system [False]
-        If True, do not cross filesystem boundaries.
-
-    exclude_links [ False ]
-        If True, will *not* return symlinked notes
-
-    include_orphaned [ False ]
-        If True, will ALSO return orphaned notes.
-        Otherwise, they are excluded
-
-    empty [None]
-        None: Return all (also optimized)
-        True: Only return empty notes
-        False: Only return non-empty notes
-
-    noteopts [{}]
-        Options for the notefile created and returned
-
-    Yields:
-    -------
-    note
-        Notefile object
-
+    Yields
+    ------
+    Notefile | str
+        Matching notes, or raw paths when `filemode=True`. The `empty` filter
+        distinguishes empty versus non-empty notes when note objects are being
+        yielded.
     """
     filemode = kwargs.pop("filemode", False)  # Hidden argument
+    targetmode = kwargs.pop("targetmode", "file")
     if kwargs:
         raise ValueError(f"Unrecognized arguments: {list(kwargs)}")
 
@@ -85,6 +82,7 @@ def find(
                 empty=empty,
                 noteopts=noteopts,
                 filemode=filemode,
+                targetmode=targetmode,
             ):
                 name = r if filemode else r.names0.filename
                 if name not in seen:
@@ -92,7 +90,7 @@ def find(
                 seen.add(name)
         return
 
-    from .utils import exclude_in_place, _dot_sort
+    from .utils import _dot_sort, exclude_in_place
 
     if noteopts is None:
         noteopts = {}
@@ -105,6 +103,10 @@ def find(
 
     dev0 = os.stat(path).st_dev
     for root, dirs, files in os.walk(path):
+        if filemode and targetmode in {"dir", "both"}:
+            if not exclude_links or not os.path.islink(root):
+                yield root
+
         # Do regular excludes of files
         exclude_in_place(
             files,
@@ -149,6 +151,8 @@ def find(
             ffile = os.path.join(root, file)
             isnote = file.lower().endswith(NOTESEXT)
             if filemode:
+                if targetmode == "dir":
+                    continue
                 if isnote or (exclude_links and os.path.islink(ffile)):
                     continue
                 yield ffile
@@ -160,6 +164,11 @@ def find(
             nf = Notefile(ffile, **noteopts)
             if exclude_links and nf.islink:
                 continue
+            if targetmode != "both":
+                if targetmode == "dir" and not nf.isdir0:
+                    continue
+                if targetmode == "file" and not nf.isfile0:
+                    continue
 
             if nf.orphaned and not include_orphaned:
                 continue

@@ -1,19 +1,32 @@
-import os, sys
 import argparse
 import json
+import os
+import sys
+
+from . import FORMAT, HIDDEN, NOTEFIELD, SAFE_QUERY, SUBDIR, __version__, debug, utils
+from .nfyaml import pss, ruamel_yaml, yaml
+from .notefile import Notefile
 
 # 100 --------------------------------------------------------------------------------------------->
 
-from .nfyaml import yaml, pss, ruamel_yaml
-from . import utils, debug, __version__, NOTEFIELD, HIDDEN, SUBDIR, FORMAT, SAFE_QUERY
-from .notefile import Notefile
-
 
 def cli(argv=None):
+    """Run the `notefile` command-line interface.
+
+    Parameters
+    ----------
+    argv:
+        Optional argument vector. When omitted, arguments are read from
+        `sys.argv[1:]`.
+    """
     from . import query_help
 
     if not argv:
         argv = sys.argv[1:]
+
+    prog = os.path.basename(sys.argv[0])
+    if prog == "__main__.py":
+        prog = "notefile"
 
     # Hacked commands
     if argv and argv[0] == "help":
@@ -77,6 +90,13 @@ def cli(argv=None):
     )
     find_parent_group.add_argument(
         "-x", "--one-file-system", action="store_true", help="Do not cross filesystem boundaries"
+    )
+    find_parent_group.add_argument(
+        "--type",
+        choices=["dir", "file", "both"],
+        default="both",
+        dest="target_type",
+        help="Filter note targets by type when searching",
     )
 
     disp_parent = argparse.ArgumentParser(add_help=False)
@@ -418,7 +438,7 @@ def cli(argv=None):
         help="Do not cross filesystem boundaries when searching for a file",
     )
 
-    parser = argparse.ArgumentParser(description="Notefile", parents=[global_parent])
+    parser = argparse.ArgumentParser(prog=prog, description="Notefile", parents=[global_parent])
     #### Subparsers
 
     subpar = parser.add_subparsers(
@@ -793,7 +813,7 @@ if int(nproc) > 1:
 else:
 
     def noteread(notes):
-        """Just call read. But may get parallel in the future"""
+        """Read each note from an iterator sequentially."""
         for note in notes:
             yield note.read()
 
@@ -803,6 +823,7 @@ else:
 
 class BaseCLI:
     def find(self, **kwargs):
+        """Yield notes using the common CLI search arguments."""
         args = self.args
         from . import find
 
@@ -816,11 +837,13 @@ class BaseCLI:
             one_file_system=args.one_file_system,
             exclude_links=args.exclude_links,
             noteopts=noteopts,
+            targetmode=args.target_type,
             **kwargs,
         )
 
     @property
     def noteopts(self):
+        """Return `Notefile` constructor options derived from CLI flags."""
         args = self.args
         return dict(
             hidden=args.hidden,
@@ -834,6 +857,7 @@ class BaseCLI:
 
     @property
     def outbuffer(self):
+        """Return the binary output stream for the current command."""
         if not hasattr(self, "_outbuffer"):
             if self.args.output:
                 self._outbuffer = open(self.args.output, "wb")
@@ -841,11 +865,32 @@ class BaseCLI:
                 self._outbuffer = sys.stdout.buffer
         return self._outbuffer
 
+    def write_output(self, data):
+        """Write bytes or text-like data to the configured output stream."""
+        try:
+            self.outbuffer.write(data)
+        except TypeError:
+            if isinstance(data, bytes):
+                self.outbuffer.write(data.decode("utf8"))
+            else:
+                raise
+
 
 class DisplayMIXIN:
     """For displaying notes"""
 
+    @staticmethod
+    def display_name(note):
+        """Return the display name for a note, including `/` for directories."""
+        if note.orphaned and note.exists and getattr(note, "_data", None) is None:
+            note.read()
+        name = note.names0.filename
+        if note.isdir0 and not name.endswith("/"):
+            return name + "/"
+        return name
+
     def display_dispatch(self, notes):
+        """Route output to standard display, tag display, or export mode."""
         if self.args.export:
             self.export(notes)
         elif self.args.tag_mode:
@@ -858,7 +903,7 @@ class DisplayMIXIN:
         sep = b"\x00" if self.args.print0 else b"\n"
         for note in notes:
             try:
-                self.outbuffer.write(note.names0.filename.encode() + sep)
+                self.write_output(self.display_name(note).encode() + sep)
             except:
                 print(f"{note.names0.filename = }")
                 raise
@@ -878,7 +923,7 @@ class DisplayMIXIN:
 
         for note in notes:
             for tag in note.data.tags:
-                tags[tag].append(note.names0.filename)
+                tags[tag].append(self.display_name(note))
 
         if not tags:
             return
@@ -907,6 +952,7 @@ class DisplayMIXIN:
                     utils.symlink_file(note, dirdest)
 
     def export(self, notes):
+        """Write notes in the selected export format."""
         res = {"__comment": None}
         res["description"] = "notefile export"
         res["time"] = utils.now_string()
@@ -926,23 +972,24 @@ class DisplayMIXIN:
             else:
                 res["__comment"] = "YAML formatted notefile export"
                 dump = json.dumps(res, indent=1, ensure_ascii=False)
-                self.outbuffer.write(dump.encode("utf8"))  # Needs to be bytes so two step
+                self.write_output(dump.encode("utf8"))  # Needs to be bytes so two step
         else:
             res["__comment"] = "json lines formatted notefile export"
 
             meta = json.dumps(res, ensure_ascii=False)
-            self.outbuffer.write(meta.encode("utf8") + b"\n")
+            self.write_output(meta.encode("utf8") + b"\n")
 
             for note in notes:
                 row = {"__filename": note.names0.filename}
                 row.update(note.data)
                 row = json.dumps(row, ensure_ascii=False)
-                self.outbuffer.write(row.encode("utf8") + b"\n")
+                self.write_output(row.encode("utf8") + b"\n")
                 self.outbuffer.flush()
 
 
 class SearchCLI(DisplayMIXIN, BaseCLI):
     def __init__(self, args):
+        """Execute a read-only search-style command."""
         self.args = args
 
         orphaned = getattr(self.args, "orphaned", False)
@@ -965,9 +1012,7 @@ class SearchCLI(DisplayMIXIN, BaseCLI):
         self.display_dispatch(notes)
 
     def test(self, note):
-        """
-        Test the note based on the conditions
-        """
+        """Return whether a note matches the active grep/query/tag filters."""
         args = self.args
 
         grepopts = dict(
@@ -1012,6 +1057,7 @@ class SearchCLI(DisplayMIXIN, BaseCLI):
 
 class SingleMod(BaseCLI):
     def __init__(self, args):
+        """Execute single-note modification commands such as edit or mod."""
         self.args = args
 
         if self.args.command == "edit":
@@ -1026,6 +1072,7 @@ class SingleMod(BaseCLI):
         self.editmod()
 
     def editmod(self):
+        """Apply note edits to each explicitly requested file."""
         args = self.args
         for file in args.file:
             note = Notefile(file, **self.noteopts)
@@ -1043,6 +1090,7 @@ class SingleMod(BaseCLI):
 
 class CopyReplace(BaseCLI):
     def __init__(self, args):
+        """Copy or replace note content from one source to one or more targets."""
         self.args = args
         src = Notefile(args.SRC, **self.noteopts)
 
@@ -1059,6 +1107,7 @@ class CopyReplace(BaseCLI):
 
 class ChangeTag(DisplayMIXIN, BaseCLI):
     def __init__(self, args):
+        """Rename or replace matching tags across a search result."""
         self.args = args
 
         self.old = args.old.lower().strip()
@@ -1076,6 +1125,7 @@ class ChangeTag(DisplayMIXIN, BaseCLI):
         self.display_dispatch(notes)
 
     def change(self, note):
+        """Apply the configured tag rename to one note when needed."""
         tags = set(t.lower() for t in note.data["tags"])
         if self.old in tags:
             if self.args.dry_run:
@@ -1085,6 +1135,7 @@ class ChangeTag(DisplayMIXIN, BaseCLI):
 
 class VisChangeCLI(DisplayMIXIN, BaseCLI):
     def __init__(self, args):
+        """Change note visibility or subdirectory layout across search results."""
         self.args = args
         if args.dry_run:
             self.outbuffer.write(b"# DRY RUN\n")
@@ -1103,12 +1154,14 @@ class VisChangeCLI(DisplayMIXIN, BaseCLI):
     # Because we do not need to otherwise read the notes
     # need to do it here. It's a waste but oh well!
     def display_tags(self, notes):
+        """Read notes before delegating to tag display."""
         notes = noteread(notes)
         return super().display_tags(notes)
 
 
 class FormatChangeCLI(DisplayMIXIN, BaseCLI):
     def __init__(self, args):
+        """Rewrite notes into a different on-disk serialization format."""
         self.args = args
 
         if args.dry_run:
@@ -1127,12 +1180,14 @@ class FormatChangeCLI(DisplayMIXIN, BaseCLI):
     # It's a waste but oh well! (Could be done in the display but this can be
     # vectorized in the future)
     def display_tags(self, notes):
+        """Read notes before delegating to tag display."""
         notes = noteread(notes)
         return super().display_tags(notes)
 
 
 class RepairCLI(BaseCLI):
     def __init__(self, args):
+        """Execute metadata-repair and orphan-repair commands."""
         self.args = args
         if args.command in {"repair", "repair-metadata"}:
             self.repair_metadata()
@@ -1140,6 +1195,7 @@ class RepairCLI(BaseCLI):
             self.repair_orphaned()
 
     def repair_metadata(self):
+        """Refresh tracked metadata for every matching non-orphaned note."""
         args = self.args
 
         notes = self.find(noteopts=self.noteopts, include_orphaned=False)
@@ -1152,6 +1208,7 @@ class RepairCLI(BaseCLI):
                 print(f'repaired{" (DRY-RUN)" if args.dry_run else ""}: {note.names0.filename}')
 
     def repair_orphaned(self):
+        """Attempt to relocate every orphaned note in the search result."""
         args = self.args
         notes = self.find(noteopts=self.noteopts, include_orphaned=True)
         notes = (note for note in notes if note.orphaned)
@@ -1163,13 +1220,13 @@ class RepairCLI(BaseCLI):
         filehash = "hash" in match
         name = "name" in match
 
-        p = "(DRY RUN) " if args.dry_run else ""
+        prefix = "(DRY RUN) " if args.dry_run else ""
 
         if not args.search_path:
-            for p in args.path:
-                if not p:
+            for path in args.path:
+                if not path:
                     continue
-                args.search_path.append(p if os.path.isdir(p) else os.path.dirname(p))
+                args.search_path.append(path if os.path.isdir(path) else os.path.dirname(path))
 
         for note in notes:
             r = note.repair_orphaned(
@@ -1185,11 +1242,12 @@ class RepairCLI(BaseCLI):
                 search_exclude_links=args.search_exclude_links,
             )
             if r:
-                print(f"{p}{note.destnote0} --> {r}")
+                print(f"{prefix}{note.destnote0} --> {r}")
 
 
 class NotePathCLI(BaseCLI):
     def __init__(self, args):
+        """Print the resolved notefile path for each requested target path."""
         self.args = args
         for path in args.path:
             print(Notefile(path, **self.noteopts).destnote0, flush=True)

@@ -37,8 +37,8 @@ Future extensions (guarded):
 """
 
 import ast
-import types
 import operator
+import types
 
 
 class SafeEvalError(ValueError):
@@ -137,6 +137,7 @@ _SAFE_DICT_ATTRS = {
 
 class SafeEvaluator:
     def __init__(self, names, allowed_callables=None, allowed_modules=None):
+        """Build a restricted evaluator for notefile query expressions."""
         self._names = names if names is not None else {}
         self._allowed_callables = set(allowed_callables or [])
         self._allowed_modules = set(allowed_modules or [])
@@ -177,6 +178,7 @@ class SafeEvaluator:
         return last_value
 
     def _assign_target(self, target, value):
+        """Assign a statement target inside the evaluator namespace."""
         if isinstance(target, ast.Name):
             self._names[target.id] = value
             return
@@ -191,6 +193,7 @@ class SafeEvaluator:
         self._raise(target, "Unsupported assignment target")
 
     def _eval_expr(self, node, local_vars):
+        """Evaluate a supported AST expression node."""
         if isinstance(node, ast.Constant):
             return node.value
         if isinstance(node, ast.Name):
@@ -274,6 +277,7 @@ class SafeEvaluator:
         self._raise(node, "Unsupported expression")
 
     def _eval_slice(self, node, local_vars):
+        """Evaluate an index or slice node for subscription."""
         if isinstance(node, ast.Slice):
             return slice(
                 self._eval_expr(node.lower, local_vars) if node.lower else None,
@@ -283,6 +287,7 @@ class SafeEvaluator:
         return self._eval_expr(node, local_vars)
 
     def _eval_call(self, node, local_vars):
+        """Evaluate an allowed function or method call."""
         func = None
         if isinstance(node.func, ast.Name):
             func = self._eval_expr(node.func, local_vars)
@@ -320,6 +325,7 @@ class SafeEvaluator:
         return func(*args, **kwargs)
 
     def _eval_attribute(self, node, local_vars):
+        """Resolve a permitted attribute access."""
         value = self._eval_expr(node.value, local_vars)
         if node.attr.startswith("_"):
             self._raise(node, "Private attribute access is not allowed")
@@ -336,6 +342,7 @@ class SafeEvaluator:
         self._raise(node, "Attribute access is restricted")
 
     def _eval_generator(self, node, local_vars):
+        """Return a generator for a validated generator expression."""
         def generator():
             for scope in self._comprehension_scopes(node.generators, dict(local_vars)):
                 yield self._eval_expr(node.elt, scope)
@@ -343,6 +350,7 @@ class SafeEvaluator:
         return generator()
 
     def _eval_dictcomp(self, node, local_vars):
+        """Evaluate a dictionary comprehension."""
         result = {}
         for scope in self._comprehension_scopes(node.generators, dict(local_vars)):
             key = self._eval_expr(node.key, scope)
@@ -351,6 +359,7 @@ class SafeEvaluator:
         return result
 
     def _comprehension_scopes(self, generators, local_vars):
+        """Yield scope dictionaries for each comprehension iteration."""
         if not generators:
             yield local_vars
             return
@@ -364,6 +373,7 @@ class SafeEvaluator:
                 yield from self._comprehension_scopes(generators[1:], scope)
 
     def _assign_comprehension_target(self, target, value, scope):
+        """Bind a comprehension target within a temporary scope."""
         if isinstance(target, ast.Name):
             scope[target.id] = value
             return
@@ -378,6 +388,7 @@ class SafeEvaluator:
         self._raise(target, "Unsupported comprehension target")
 
     def _callable_from_allowed_module(self, func):
+        """Check whether a callable originates from an allowed module."""
         mod = getattr(func, "__module__", None)
         name = getattr(func, "__name__", "")
         if not mod or not name:
@@ -387,17 +398,31 @@ class SafeEvaluator:
         return mod in self._allowed_module_names
 
     def _raise(self, node, message):
+        """Raise `SafeEvalError` with source-line context."""
         lineno = getattr(node, "lineno", 1)
         line = self._lines[lineno - 1].strip() if self._lines else ""
         raise SafeEvalError(f"Line {lineno} `{line}`: {message}")
 
 
 def safe_eval(code, names, allowed_callables=None, allowed_modules=None):
-    """
-    Convenience wrapper around SafeEvaluator.eval().
+    """Evaluate a query string with the restricted AST interpreter.
 
-    `names` is the evaluation namespace. Only functions in `allowed_callables`
-    and modules in `allowed_modules` can be called/accessed.
+    Parameters
+    ----------
+    code:
+        Query source to evaluate.
+    names:
+        Namespace exposed to the query.
+    allowed_callables:
+        Explicit function objects that the query may call.
+    allowed_modules:
+        Module objects whose public attributes may be accessed.
+
+    Notes
+    -----
+    This is a convenience wrapper around `SafeEvaluator.eval()`. Calls and
+    attribute access are limited to the explicitly allowed functions and
+    modules.
     """
     evaluator = SafeEvaluator(
         names, allowed_callables=allowed_callables, allowed_modules=allowed_modules

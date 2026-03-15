@@ -13,10 +13,10 @@ Note: Link behavior is inconsistent and therefore all links are disabled
 """
 
 import argparse
-import sys
+import itertools
 import os
 import subprocess
-import itertools
+import sys
 
 import notefile
 

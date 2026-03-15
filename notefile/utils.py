@@ -1,16 +1,17 @@
-import os, sys
+import os
+import sys
 
-from . import debug, DT, warn
+from . import DT, debug, warn
 
 
 def now_string(Z=False):
-    """
-    Return an RFC3339 Time string
+    """Return the current time as an RFC 3339 timestamp.
 
-    Options:
-    --------
-    UTC [False]
-        Give the time with UTC
+    Parameters
+    ----------
+    Z:
+        When true, emit the timestamp in UTC with a trailing `Z`. Otherwise,
+        include the local timezone offset.
     """
     from datetime import datetime, timezone
 
@@ -31,33 +32,39 @@ class Bunch(dict):
     """
 
     def __init__(self, **kwargs):
+        """Initialize the mapping from keyword arguments."""
         super(Bunch, self).__init__(kwargs)
 
     def __setattr__(self, key, value):
+        """Mirror attribute assignment into dictionary storage."""
         self[key] = value
 
     def __dir__(self):
+        """Expose stored keys for tab completion and introspection."""
         return self.keys()
 
     def __getattr__(self, key):
+        """Resolve unknown attributes from the dictionary contents."""
         try:
             return self[key]
         except KeyError:
             raise AttributeError(key)
 
     def __repr__(self):
+        """Return a constructor-like representation for debugging."""
         s = super(Bunch, self).__repr__()
         return "Bunch(**{})".format(s)
 
 
 def sha256(filepath, blocksize=2**20):
-    """
-    Return the sha256 hash of a file.
+    """Hash a file with SHA-256.
 
-    `blocksize` adjusts how much of the file is read into memory at a time.
-    This is useful for large files.
-        2**20: 1 mb
-        2**12: 4 kb
+    Parameters
+    ----------
+    filepath:
+        File to read.
+    blocksize:
+        Number of bytes to stream per read. Useful for large files.
     """
     import hashlib
 
@@ -71,13 +78,16 @@ def sha256(filepath, blocksize=2**20):
 
 
 def tmpfileinpath(dirpath):
+    """Return a random temporary filename alongside `dirpath`."""
     if not os.path.isdir(dirpath):
         dirpath = os.path.dirname(dirpath)
     return os.path.join(dirpath, ".notefile." + randstr(15))
 
 
 def randstr(N=10):
-    import math, string  # lazy
+    """Return a cryptographically random alphanumeric string."""
+    import math  # lazy
+    import string
 
     letters = string.ascii_letters + string.digits
     Nl = len(letters)
@@ -88,30 +98,34 @@ def randstr(N=10):
 
 
 def exclude_in_place(
-    mylist, excludes, isdir=False, matchcase=False, remove_noteext=True, keep_notes_only=None
+    mylist,
+    excludes,
+    isdir=False,
+    matchcase=False,
+    remove_noteext=True,
+    keep_notes_only=None,
 ):
-    """
-    Helper tool to apply exclusions IN PLACE in mylist
+    """Filter a list of names in place using glob-style exclusions.
 
-    Options:
-    --------
-    isdir [False]
-        Whether to also test for directories explicitly (trailing / on dirs)
-
+    Parameters
+    ----------
+    mylist:
+        Mutable list of filenames or directory names to edit.
+    excludes:
+        Glob patterns to remove from the list.
+    isdir:
+        When true, also test each item as a directory name with a trailing `/`.
     matchcase:
-        Match case on exclusions
-
-    remove_noteext [False]
-        test and compare without NOTESEXT. Also assumes the main file
-        does not have a . if the note is hidden
-
-    keep_notes_only [None] {None,True,False}
-        None: No Filters
-        True: Removes *NON* notes
-        False: Removes Notes
-
+        Match exclude patterns case-sensitively.
+    remove_noteext:
+        Compare notefile names without the `.notes.yaml` suffix. Hidden note
+        names are also compared without the leading dot.
+    keep_notes_only:
+        `True` keeps only note files, `False` removes note files, and `None`
+        disables that extra filter.
     """
     import fnmatch  # Lazy
+
     from . import NOTESEXT
 
     if excludes is None:
@@ -147,6 +161,7 @@ def exclude_in_place(
 
 
 def _dot_sort(file):
+    """Sort helper that ignores a leading dot."""
     file = file.lower()
     if file.startswith("."):
         return file[1:]
@@ -154,9 +169,10 @@ def _dot_sort(file):
 
 
 def symlink_file(src, dstdir):
-    """
-    Create a relative symlink from src to the dstdir. Note that the dest is
-    a directory
+    """Create a relative symlink to `src` inside `dstdir`.
+
+    The destination is treated as a directory. If the destination name already
+    exists, a numeric suffix is appended until a free path is found.
     """
     dst = dst0 = os.path.join(dstdir, os.path.basename(src))
 
@@ -182,7 +198,7 @@ def symlink_file(src, dstdir):
 
 
 def flattenlist(*args):
-    """Flatten out a list of lists matching strings (or non-iterable)"""
+    """Yield a recursive flattening of nested iterables while preserving strings."""
     for arg in args:
         if isinstance(arg, str):
             yield arg
@@ -194,12 +210,15 @@ def flattenlist(*args):
 
 
 def normalize_tags(tags, sort=True):
-    """
-    Normalize a list or string of tags. Tags will be split at commas (no escaping),
-    made lower case, and stripped of white space.
+    """Normalize tags into a deduplicated collection.
 
-    If sort=True (default), will return a sorted list. If False,
-    will return a set
+    Parameters
+    ----------
+    tags:
+        String or iterable of strings. Comma-separated tags are split without
+        escaping, converted to lowercase, and stripped of surrounding whitespace.
+    sort:
+        When true, return a sorted list. Otherwise return a set.
     """
     if isinstance(tags, str):
         tags = [tags]
