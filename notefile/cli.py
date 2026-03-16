@@ -46,7 +46,9 @@ def cli(argv=None):
         default=NOTEFIELD,
         metavar="field",
         help="""Specify the field in the notes to read/write. Defaults to 'notes' 
-                or $NOTEFILE_NOTEFIELD environment variable""",
+                or $NOTEFILE_NOTEFIELD environment variable. With `mod`, 
+                `--note-field FIELD --note TEXT` is equivalent to 
+                `--field-note FIELD TEXT`""",
     )
     global_parent_group.add_argument(
         "--version", action="version", version="%(prog)s-" + __version__
@@ -310,7 +312,8 @@ def cli(argv=None):
         "-e",
         "--edit",
         action="store_true",
-        help="Launch $EDITOR to interactivly edit the notes for a file",
+        help="""Launch $EDITOR to interactivly edit the active --note-field only.
+                Use --full to edit multiple fields in the full YAML note""",
     )
     editmod_parent_edit.add_argument(
         "-f",
@@ -349,7 +352,21 @@ def cli(argv=None):
         default=[],
         help="""Notes to add (or replace). Each argument is its own line. Specify 
                 `--note ""` to add empty line. Notes will come _after_ stdin if 
-                applicable. Will use --note-field settings""",
+                applicable. Will use --note-field settings, so 
+                `--note-field summary --note "text"` matches 
+                `--field-note summary "text"`""",
+    )
+    editmod_parent_mod.add_argument(
+        "--field-note",
+        action="append",
+        nargs=2,
+        default=[],
+        metavar=("FIELD", "TEXT"),
+        help="""Add or replace note text in FIELD. Repeat as needed. Each TEXT
+                argument behaves like one `--note` entry for that field, including
+                appending to existing text unless --replace is set. For the main
+                field, `--field-note notes TEXT` matches `--note TEXT` when
+                `--note-field notes` is in effect""",
     )
 
     # TODO Add --json
@@ -1063,9 +1080,10 @@ class SingleMod(BaseCLI):
         if self.args.command == "edit":
             self.args.edit = True
 
-        if not (args.edit or args.tag or args.remove or args.note or args.stdin):
+        if not (args.edit or args.tag or args.remove or args.note or args.stdin or args.field_note):
             raise ValueError(
-                "Must specify at least one of --edit, --tag, --remove, --note, --stdin"
+                "Must specify at least one of --edit, --tag, --remove, --note, "
+                "--field-note, --stdin"
             )
         addnote = [sys.stdin.read().strip()] if args.stdin else []
         args.addnote = "\n".join(addnote + args.note)
@@ -1078,7 +1096,10 @@ class SingleMod(BaseCLI):
             note = Notefile(file, **self.noteopts)
 
             note.modify_tags(add=args.tag, remove=args.remove)
-            note.add_note(args.addnote, replace=args.replace)  # also does strip()
+            if args.stdin or args.note:
+                note.add_note(args.addnote, replace=args.replace)  # also does strip()
+            for field, field_note in args.field_note:
+                note.add_note(field_note, replace=args.replace, field=field)
             if args.edit:
                 note.interactive_edit(full=args.full, manual=args.manual, tags_only=args.tags_only)
 

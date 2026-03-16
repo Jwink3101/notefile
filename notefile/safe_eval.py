@@ -343,6 +343,7 @@ class SafeEvaluator:
 
     def _eval_generator(self, node, local_vars):
         """Return a generator for a validated generator expression."""
+
         def generator():
             for scope in self._comprehension_scopes(node.generators, dict(local_vars)):
                 yield self._eval_expr(node.elt, scope)

@@ -16,7 +16,9 @@ options:
 Global Options:
   --debug             Debug mode
   --note-field field  Specify the field in the notes to read/write. Defaults
-                      to 'notes' or $NOTEFILE_NOTEFIELD environment variable
+                      to 'notes' or $NOTEFILE_NOTEFIELD environment variable.
+                      With `mod`, `--note-field FIELD --note TEXT` is
+                      equivalent to `--field-note FIELD TEXT`
   --version           show program's version number and exit
 
 Commands:
@@ -59,7 +61,8 @@ Commands:
 
 ```text
 usage: notefile mod [-h] [-e] [-f] [-m] [--tags-only] [-r TAG] [-t TAG] [-R]
-                    [-n NOTE] [-s] [--link {source,symlink,both}] [-H] [-V]
+                    [-n NOTE] [--field-note FIELD TEXT] [-s]
+                    [--link {source,symlink,both}] [-H] [-V]
                     [-S | --subdir | --no-subdir] [--no-hash] [--no-refresh]
                     [--format {json,yaml}] [--rewrite-format] [--debug]
                     [--note-field field] [--version]
@@ -74,8 +77,9 @@ options:
 Interactive Edit:
   Edit notes with a text editor. Other modifications come first
 
-  -e, --edit            Launch $EDITOR to interactivly edit the notes for a
-                        file
+  -e, --edit            Launch $EDITOR to interactivly edit the active --note-
+                        field only. Use --full to edit multiple fields in the
+                        full YAML note
   -f, --full            Edit the full YAML file. Will always edit in YAML mode
                         even if notes are stored in JSON
   -m, --manual          Instead of $EDITOR, print the path and then wait for
@@ -92,7 +96,15 @@ Modify Notes:
   -n NOTE, --note NOTE  Notes to add (or replace). Each argument is its own
                         line. Specify `--note ""` to add empty line. Notes
                         will come _after_ stdin if applicable. Will use
-                        --note-field settings
+                        --note-field settings, so `--note-field summary --note
+                        "text"` matches `--field-note summary "text"`
+  --field-note FIELD TEXT
+                        Add or replace note text in FIELD. Repeat as needed.
+                        Each TEXT argument behaves like one `--note` entry for
+                        that field, including appending to existing text
+                        unless --replace is set. For the main field, `--field-
+                        note notes TEXT` matches `--note TEXT` when `--note-
+                        field notes` is in effect
   -s, --stdin           Read note from stdin. Prepended to any --note
                         arguments
 
@@ -131,7 +143,9 @@ Create/Modify Options:
 Global Options:
   --debug               Debug mode
   --note-field field    Specify the field in the notes to read/write. Defaults
-                        to 'notes' or $NOTEFILE_NOTEFIELD environment variable
+                        to 'notes' or $NOTEFILE_NOTEFIELD environment
+                        variable. With `mod`, `--note-field FIELD --note TEXT`
+                        is equivalent to `--field-note FIELD TEXT`
   --version             show program's version number and exit
 
 ```
@@ -141,7 +155,8 @@ Global Options:
 
 ```text
 usage: notefile edit [-h] [-e] [-f] [-m] [--tags-only] [-r TAG] [-t TAG] [-R]
-                     [-n NOTE] [-s] [--link {source,symlink,both}] [-H] [-V]
+                     [-n NOTE] [--field-note FIELD TEXT] [-s]
+                     [--link {source,symlink,both}] [-H] [-V]
                      [-S | --subdir | --no-subdir] [--no-hash] [--no-refresh]
                      [--format {json,yaml}] [--rewrite-format] [--debug]
                      [--note-field field] [--version]
@@ -156,8 +171,9 @@ options:
 Interactive Edit:
   Edit notes with a text editor. Other modifications come first
 
-  -e, --edit            Launch $EDITOR to interactivly edit the notes for a
-                        file
+  -e, --edit            Launch $EDITOR to interactivly edit the active --note-
+                        field only. Use --full to edit multiple fields in the
+                        full YAML note
   -f, --full            Edit the full YAML file. Will always edit in YAML mode
                         even if notes are stored in JSON
   -m, --manual          Instead of $EDITOR, print the path and then wait for
@@ -174,7 +190,15 @@ Modify Notes:
   -n NOTE, --note NOTE  Notes to add (or replace). Each argument is its own
                         line. Specify `--note ""` to add empty line. Notes
                         will come _after_ stdin if applicable. Will use
-                        --note-field settings
+                        --note-field settings, so `--note-field summary --note
+                        "text"` matches `--field-note summary "text"`
+  --field-note FIELD TEXT
+                        Add or replace note text in FIELD. Repeat as needed.
+                        Each TEXT argument behaves like one `--note` entry for
+                        that field, including appending to existing text
+                        unless --replace is set. For the main field, `--field-
+                        note notes TEXT` matches `--note TEXT` when `--note-
+                        field notes` is in effect
   -s, --stdin           Read note from stdin. Prepended to any --note
                         arguments
 
@@ -213,7 +237,9 @@ Create/Modify Options:
 Global Options:
   --debug               Debug mode
   --note-field field    Specify the field in the notes to read/write. Defaults
-                        to 'notes' or $NOTEFILE_NOTEFIELD environment variable
+                        to 'notes' or $NOTEFILE_NOTEFIELD environment
+                        variable. With `mod`, `--note-field FIELD --note TEXT`
+                        is equivalent to `--field-note FIELD TEXT`
   --version             show program's version number and exit
 
 ```
@@ -270,7 +296,9 @@ Create/Modify Options:
 Global Options:
   --debug               Debug mode
   --note-field field    Specify the field in the notes to read/write. Defaults
-                        to 'notes' or $NOTEFILE_NOTEFIELD environment variable
+                        to 'notes' or $NOTEFILE_NOTEFIELD environment
+                        variable. With `mod`, `--note-field FIELD --note TEXT`
+                        is equivalent to `--field-note FIELD TEXT`
   --version             show program's version number and exit
 
 ```
@@ -340,7 +368,9 @@ Create/Modify Options:
 Global Options:
   --debug               Debug mode
   --note-field field    Specify the field in the notes to read/write. Defaults
-                        to 'notes' or $NOTEFILE_NOTEFIELD environment variable
+                        to 'notes' or $NOTEFILE_NOTEFIELD environment
+                        variable. With `mod`, `--note-field FIELD --note TEXT`
+                        is equivalent to `--field-note FIELD TEXT`
   --version             show program's version number and exit
 
 ```
@@ -372,7 +402,9 @@ options:
 Global Options:
   --debug               Debug mode
   --note-field field    Specify the field in the notes to read/write. Defaults
-                        to 'notes' or $NOTEFILE_NOTEFIELD environment variable
+                        to 'notes' or $NOTEFILE_NOTEFIELD environment
+                        variable. With `mod`, `--note-field FIELD --note TEXT`
+                        is equivalent to `--field-note FIELD TEXT`
   --version             show program's version number and exit
 
 find Options:
@@ -482,7 +514,9 @@ options:
 Global Options:
   --debug               Debug mode
   --note-field field    Specify the field in the notes to read/write. Defaults
-                        to 'notes' or $NOTEFILE_NOTEFIELD environment variable
+                        to 'notes' or $NOTEFILE_NOTEFIELD environment
+                        variable. With `mod`, `--note-field FIELD --note TEXT`
+                        is equivalent to `--field-note FIELD TEXT`
   --version             show program's version number and exit
 
 find Options:
@@ -559,7 +593,9 @@ options:
 Global Options:
   --debug               Debug mode
   --note-field field    Specify the field in the notes to read/write. Defaults
-                        to 'notes' or $NOTEFILE_NOTEFIELD environment variable
+                        to 'notes' or $NOTEFILE_NOTEFIELD environment
+                        variable. With `mod`, `--note-field FIELD --note TEXT`
+                        is equivalent to `--field-note FIELD TEXT`
   --version             show program's version number and exit
 
 find Options:
@@ -636,7 +672,9 @@ options:
 Global Options:
   --debug               Debug mode
   --note-field field    Specify the field in the notes to read/write. Defaults
-                        to 'notes' or $NOTEFILE_NOTEFIELD environment variable
+                        to 'notes' or $NOTEFILE_NOTEFIELD environment
+                        variable. With `mod`, `--note-field FIELD --note TEXT`
+                        is equivalent to `--field-note FIELD TEXT`
   --version             show program's version number and exit
 
 find Options:
@@ -708,7 +746,9 @@ options:
 Global Options:
   --debug               Debug mode
   --note-field field    Specify the field in the notes to read/write. Defaults
-                        to 'notes' or $NOTEFILE_NOTEFIELD environment variable
+                        to 'notes' or $NOTEFILE_NOTEFIELD environment
+                        variable. With `mod`, `--note-field FIELD --note TEXT`
+                        is equivalent to `--field-note FIELD TEXT`
   --version             show program's version number and exit
 
 find Options:
@@ -783,7 +823,9 @@ options:
 Global Options:
   --debug               Debug mode
   --note-field field    Specify the field in the notes to read/write. Defaults
-                        to 'notes' or $NOTEFILE_NOTEFIELD environment variable
+                        to 'notes' or $NOTEFILE_NOTEFIELD environment
+                        variable. With `mod`, `--note-field FIELD --note TEXT`
+                        is equivalent to `--field-note FIELD TEXT`
   --version             show program's version number and exit
 
 find Options:
@@ -901,7 +943,9 @@ options:
 Global Options:
   --debug               Debug mode
   --note-field field    Specify the field in the notes to read/write. Defaults
-                        to 'notes' or $NOTEFILE_NOTEFIELD environment variable
+                        to 'notes' or $NOTEFILE_NOTEFIELD environment
+                        variable. With `mod`, `--note-field FIELD --note TEXT`
+                        is equivalent to `--field-note FIELD TEXT`
   --version             show program's version number and exit
 
 find Options:
@@ -994,7 +1038,9 @@ options:
 Global Options:
   --debug               Debug mode
   --note-field field    Specify the field in the notes to read/write. Defaults
-                        to 'notes' or $NOTEFILE_NOTEFIELD environment variable
+                        to 'notes' or $NOTEFILE_NOTEFIELD environment
+                        variable. With `mod`, `--note-field FIELD --note TEXT`
+                        is equivalent to `--field-note FIELD TEXT`
   --version             show program's version number and exit
 
 find Options:
@@ -1103,7 +1149,9 @@ options:
 Global Options:
   --debug             Debug mode
   --note-field field  Specify the field in the notes to read/write. Defaults
-                      to 'notes' or $NOTEFILE_NOTEFIELD environment variable
+                      to 'notes' or $NOTEFILE_NOTEFIELD environment variable.
+                      With `mod`, `--note-field FIELD --note TEXT` is
+                      equivalent to `--field-note FIELD TEXT`
   --version           show program's version number and exit
 
 ```
@@ -1128,7 +1176,9 @@ options:
 Global Options:
   --debug               Debug mode
   --note-field field    Specify the field in the notes to read/write. Defaults
-                        to 'notes' or $NOTEFILE_NOTEFIELD environment variable
+                        to 'notes' or $NOTEFILE_NOTEFIELD environment
+                        variable. With `mod`, `--note-field FIELD --note TEXT`
+                        is equivalent to `--field-note FIELD TEXT`
   --version             show program's version number and exit
 
 find Options:
@@ -1198,7 +1248,9 @@ options:
 Global Options:
   --debug               Debug mode
   --note-field field    Specify the field in the notes to read/write. Defaults
-                        to 'notes' or $NOTEFILE_NOTEFIELD environment variable
+                        to 'notes' or $NOTEFILE_NOTEFIELD environment
+                        variable. With `mod`, `--note-field FIELD --note TEXT`
+                        is equivalent to `--field-note FIELD TEXT`
   --version             show program's version number and exit
 
 find Options:
@@ -1268,7 +1320,9 @@ options:
 Global Options:
   --debug               Debug mode
   --note-field field    Specify the field in the notes to read/write. Defaults
-                        to 'notes' or $NOTEFILE_NOTEFIELD environment variable
+                        to 'notes' or $NOTEFILE_NOTEFIELD environment
+                        variable. With `mod`, `--note-field FIELD --note TEXT`
+                        is equivalent to `--field-note FIELD TEXT`
   --version             show program's version number and exit
 
 find Options:
@@ -1370,7 +1424,9 @@ options:
 Global Options:
   --debug               Debug mode
   --note-field field    Specify the field in the notes to read/write. Defaults
-                        to 'notes' or $NOTEFILE_NOTEFIELD environment variable
+                        to 'notes' or $NOTEFILE_NOTEFIELD environment
+                        variable. With `mod`, `--note-field FIELD --note TEXT`
+                        is equivalent to `--field-note FIELD TEXT`
   --version             show program's version number and exit
 
 find Options:
@@ -1472,7 +1528,9 @@ options:
 Global Options:
   --debug               Debug mode
   --note-field field    Specify the field in the notes to read/write. Defaults
-                        to 'notes' or $NOTEFILE_NOTEFIELD environment variable
+                        to 'notes' or $NOTEFILE_NOTEFIELD environment
+                        variable. With `mod`, `--note-field FIELD --note TEXT`
+                        is equivalent to `--field-note FIELD TEXT`
   --version             show program's version number and exit
 
 find Options:
@@ -1666,7 +1724,9 @@ options:
 Global Options:
   --debug               Debug mode
   --note-field field    Specify the field in the notes to read/write. Defaults
-                        to 'notes' or $NOTEFILE_NOTEFIELD environment variable
+                        to 'notes' or $NOTEFILE_NOTEFIELD environment
+                        variable. With `mod`, `--note-field FIELD --note TEXT`
+                        is equivalent to `--field-note FIELD TEXT`
   --version             show program's version number and exit
 
 find Options:
@@ -1790,7 +1850,9 @@ options:
 Global Options:
   --debug               Debug mode
   --note-field field    Specify the field in the notes to read/write. Defaults
-                        to 'notes' or $NOTEFILE_NOTEFIELD environment variable
+                        to 'notes' or $NOTEFILE_NOTEFIELD environment
+                        variable. With `mod`, `--note-field FIELD --note TEXT`
+                        is equivalent to `--field-note FIELD TEXT`
   --version             show program's version number and exit
 
 ```

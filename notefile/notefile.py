@@ -308,7 +308,11 @@ class Notefile:
                 self._warn_target_type_mismatch(persisted, actual0, self.names0.filename)
             return actual0, actual0
 
-        actual = self._detect_target_type(self.names.filename) if _target_exists(self.names.filename) else None
+        actual = (
+            self._detect_target_type(self.names.filename)
+            if _target_exists(self.names.filename)
+            else None
+        )
         if actual:
             if persisted and persisted != actual:
                 self._warn_target_type_mismatch(persisted, actual, self.names.filename)
@@ -721,18 +725,32 @@ class Notefile:
 
         return self  # for convenience
 
-    def add_note(self, note, replace=False):
-        """Append or replace the main note text without writing to disk."""
+    def add_note(self, note, replace=False, field=None):
+        """Append or replace note text in a target field without writing to disk.
+
+        Parameters
+        ----------
+        note:
+            Text to append or replace.
+        replace:
+            When true, overwrite the target field instead of appending.
+        field:
+            Field name to modify. Defaults to the active `note_field`.
+        """
         if note is None:
             note = ""
 
+        field = self.note_field if field is None else field
+        if field not in self.data:
+            self.data[field] = ""
+
         if replace:
-            self.data[self.note_field] = note
+            self.data[field] = note
         else:
-            if not isinstance(self.data[self.note_field], str):
+            if not isinstance(self.data[field], str):
                 raise TypeError("Cannot modify non-string notes. Use with replace")
-            self.data[self.note_field] += "\n" + note
-        self.data[self.note_field] = self.data[self.note_field].strip()
+            self.data[field] += "\n" + note
+        self.data[field] = self.data[field].strip()
 
         return self  # for convenience
 

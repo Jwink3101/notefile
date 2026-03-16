@@ -224,6 +224,24 @@ def test_mod():
     finally:
         notefile.notefile._TESTEDIT = False
 
+    call('mod file1.txt --field-note summary "summary 1"')
+    note1 = Notefile("file1.txt").read()
+    assert note1.data.summary == "summary 1"
+    assert note1.data.notes == "new\nstdin str\nworked?"
+
+    call('mod file1.txt --field-note summary "summary 2"')
+    note1 = Notefile("file1.txt").read()
+    assert note1.data.summary == "summary 1\nsummary 2"
+
+    call('mod file1.txt --replace --field-note summary "summary replaced"')
+    note1 = Notefile("file1.txt").read()
+    assert note1.data.summary == "summary replaced"
+
+    call('mod file1.txt -n "main extra" --field-note summary "summary extra"')
+    note1 = Notefile("file1.txt").read()
+    assert note1.data.notes == "new\nstdin str\nworked?\nmain extra"
+    assert note1.data.summary == "summary replaced\nsummary extra"
+
     os.chdir(TESTDIR)
 
 
@@ -1600,11 +1618,7 @@ def test_target_type_repair_guardrails():
     shutil.move("proj", "renamed")
 
     Path("proj.notes.yaml").write_text(
-        "notes: dir note\n"
-        "tags: []\n"
-        "dir-subdirs: 0\n"
-        "dir-files: 0\n"
-        "dir-hash: deadbeef\n"
+        "notes: dir note\n" "tags: []\n" "dir-subdirs: 0\n" "dir-files: 0\n" "dir-hash: deadbeef\n"
     )
 
     _, e = call("repair-orphaned proj.notes.yaml --path .", capture=True)

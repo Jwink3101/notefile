@@ -2,6 +2,12 @@
 
 (**_newest_** on *top*)
 
+## 0.11.0 (2026-03-15)
+
+- Added repeatable `--field-note FIELD TEXT` to `mod`/`edit`, with the same append/replace behavior as `--note`.
+    - Updated the write path so field-specific edits can be mixed with the main note in one call, without `--replace` clearing the main note unless `--note` was provided.
+    - Clarified CLI help for `--note-field`, `--note`, `--field-note`, and `--edit`/`--full`.
+    - Added tests for create, append, replace, and mixed main-field plus extra-field updates; `pytest tests.py` passes.
 
 ## 0.10.0 (2026-03-15)
 
