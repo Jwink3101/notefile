@@ -1613,16 +1613,21 @@ def test_target_type_repair_guardrails():
     cleanmkdir(dirpath)
     os.chdir(dirpath)
 
+    writefile("legacy.txt", "legacy")
+    call('mod -n "legacy note" legacy.txt')
+    legacy_txt = Path("legacy.txt.notes.yaml").read_text()
+    Path("legacy.txt.notes.yaml").write_text(legacy_txt.replace("target-type: file\n", ""))
+    shutil.move("legacy.txt", "legacy-renamed.txt")
+
+    o, e = call("repair-orphaned legacy.txt.notes.yaml --path .", capture=True)
+    assert o == "legacy.txt.notes.yaml --> legacy-renamed.txt.notes.yaml\n"
+    assert "Cannot determine target type for orphaned note" not in e
+
     Path("proj").mkdir()
     call('mod -n "dir note" proj/')
     shutil.move("proj", "renamed")
-
-    Path("proj.notes.yaml").write_text(
-        "notes: dir note\n" "tags: []\n" "dir-subdirs: 0\n" "dir-files: 0\n" "dir-hash: deadbeef\n"
-    )
-
-    _, e = call("repair-orphaned proj.notes.yaml --path .", capture=True)
-    assert "Cannot determine target type for orphaned note" in e
+    assert Notefile("proj.notes.yaml").read().repair_orphaned() == "renamed.notes.yaml"
+    shutil.move("renamed.notes.yaml", "proj.notes.yaml")
 
     writefile("wrong.txt", "x")
     call('mod -n "file note" wrong.txt')

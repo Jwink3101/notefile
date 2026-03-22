@@ -2,6 +2,10 @@
 
 (**_newest_** on *top*)
 
+## 0.11.1 (2026-03-22)
+
+* Fix for repair of older notes.
+
 ## 0.11.0 (2026-03-15)
 
 - Added repeatable `--field-note FIELD TEXT` to `mod`/`edit`, with the same append/replace behavior as `--note`.

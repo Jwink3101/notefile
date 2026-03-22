@@ -322,7 +322,7 @@ class Notefile:
             return persisted, persisted
         if self._requested_dir:
             return "dir", "dir"
-        return None, None
+        return "file", "file"
 
     def _refresh_target_type_flags(self):
         """Refresh `isdir` and `isfile` flags from current target-type state."""
@@ -939,9 +939,6 @@ class Notefile:
             self.read()
 
         self._refresh_target_type_flags()
-        if self.target_type0 is None:
-            warn(f"Cannot determine target type for orphaned note {self.destnote0!r}")
-            return
 
         if self.isdir:
             return self._repair_orphaned_dir(
