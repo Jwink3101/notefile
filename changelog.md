@@ -2,6 +2,10 @@
 
 (**_newest_** on *top*)
 
+## 0.11.2 (2026-03-23)
+
+- Fix Python 3.14 argparse issue.
+
 ## 0.11.1 (2026-03-22)
 
 * Fix for repair of older notes.

@@ -756,7 +756,7 @@ def cli(argv=None):
                 yet exist)""",
         parents=[
             global_parent,
-            new_parent_group,
+            new_parent,
         ],
     )
     subparsers["note-path"].add_argument(

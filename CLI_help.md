@@ -1818,6 +1818,18 @@ positional arguments:
 
 options:
   -h, --help            show this help message and exit
+
+Global Options:
+  --debug               Debug mode
+  --note-field field    Specify the field in the notes to read/write. Defaults
+                        to 'notes' or $NOTEFILE_NOTEFIELD environment
+                        variable. With `mod`, `--note-field FIELD --note TEXT`
+                        is equivalent to `--field-note FIELD TEXT`
+  --version             show program's version number and exit
+
+Create/Modify Options:
+  Flags for creating and saving notes. Not all flags are always applicable!
+
   --link {source,symlink,both}
                         ['both'] Specify how to handle symlinks. If 'source',
                         will add the notefile to the source only (non-
@@ -1846,13 +1858,5 @@ options:
                         set.
   --rewrite-format      Change to the specified format (see '--format')
                         regardless of current format.
-
-Global Options:
-  --debug               Debug mode
-  --note-field field    Specify the field in the notes to read/write. Defaults
-                        to 'notes' or $NOTEFILE_NOTEFIELD environment
-                        variable. With `mod`, `--note-field FIELD --note TEXT`
-                        is equivalent to `--field-note FIELD TEXT`
-  --version             show program's version number and exit
 
 ```
