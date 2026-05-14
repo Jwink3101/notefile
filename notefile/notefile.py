@@ -520,6 +520,11 @@ class Notefile:
 
     save = dump = write
 
+    @property
+    def was_written(self):
+        """Return whether this note instance has written to disk in its lifetime."""
+        return self._write_count > 0
+
     def replaceto(
         self, dst, fields=None, allfields=False, noteopts=None, newonly=False, append=False
     ):
@@ -600,10 +605,10 @@ class Notefile:
         """Return whether the note has diverged from the last-read state."""
         # Will do a dictionary compare at the end so pop() certain keys before
         # we get to that. Since we're removing then, make a copy
-        if not hasattr(self, "data0"):
+        if not hasattr(self, "_data0"):
             return True
 
-        old, new = (self.data0.copy(), self.data.copy())
+        old, new = (self._data0.copy(), self.data.copy())
 
         for key in ["last-updated", "notefile version"]:
             old.pop(key, None)

@@ -26,12 +26,15 @@ Commands:
 
   command
     mod               Modify notes. Edit interactivly, add or replace notes,
-                      add or remove tags
-    edit              Shortcut for 'notefile mod --edit'
+                      add or remove tags. Prints each target whose note was
+                      written
+    edit              Shortcut for 'notefile mod --edit'. Prints each target
+                      whose note was written
     copy              Copy the notes from SRC to DST(s). DST must not have any
-                      notes
+                      notes. Prints each destination whose note was written
     replace           Replace/Update some or all of the content in SRC to
-                      notes in DST
+                      notes in DST. Prints each destination whose note was
+                      written
     change-tag        Change one tag to another (or multiple) and display the
                       results
     vis               Change the visibility of file(s)/dir(s)

@@ -2,6 +2,10 @@
 
 (**_newest_** on *top*)
 
+## 0.11.3 (2026-05-13)
+
+* Added printing the modified note on the CLI
+
 ## 0.11.2 (2026-03-23)
 
 - Fix Python 3.14 argparse issue.

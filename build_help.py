@@ -58,12 +58,10 @@ for command in commands:
     help_text = subprocess.check_output(cmd).decode()
     help_text = help_text.replace("usage: cli.py", "usage: notefile")
 
-    helpmd.append(
-        f"""
+    helpmd.append(f"""
 ```text
 {help_text}
-```"""
-    )
+```""")
 
 with open("CLI_help.md", "wt") as f:
     f.write("\n\n".join(helpmd))

@@ -5,8 +5,8 @@ Tests for notefile.
 
 Tests are run as if from the CLI but run in Python for the sake of test coverage
 
-Generally, with the new design, there is reuse of capabilities given by argument 
-groups. So these test commands and argument groups. Once an argument group is tested in 
+Generally, with the new design, there is reuse of capabilities given by argument
+groups. So these test commands and argument groups. Once an argument group is tested in
 one (e.g. search), it is not restest for search and find.
 
 """
@@ -168,10 +168,18 @@ def test_mod():
 
     writefile("file1.txt", "file1.")
 
-    call('mod -t tag1 -t tag2 -n"note1" file1.txt')
+    o, _ = call('mod -t tag1 -t tag2 -n"note1" file1.txt', capture=True)
+    assert o == "file1.txt\n"
     note1 = Notefile("file1.txt").read()
     assert note1.data.notes == "note1"
     assert set(note1.data.tags) == {"tag1", "tag2"}
+
+    o, _ = call("mod --no-refresh -t tag2 file1.txt", capture=True)
+    assert o == ""
+
+    writefile("file1.txt", "metadata refresh", append=True)
+    o, _ = call("mod -t tag2 file1.txt", capture=True)
+    assert o == "file1.txt\n"
 
     call('mod -t tag3 -r tag1 -n"more" file1.txt')
     note1 = Notefile("file1.txt").read()
@@ -224,6 +232,10 @@ def test_mod():
     finally:
         notefile.notefile._TESTEDIT = False
 
+    writefile("file2.txt", "file2.")
+    o, _ = call("mod -t tag8 file1.txt file1.txt file2.txt file1.txt", capture=True)
+    assert o == "file1.txt\nfile2.txt\n"
+
     call('mod file1.txt --field-note summary "summary 1"')
     note1 = Notefile("file1.txt").read()
     assert note1.data.summary == "summary 1"
@@ -241,6 +253,32 @@ def test_mod():
     note1 = Notefile("file1.txt").read()
     assert note1.data.notes == "new\nstdin str\nworked?\nmain extra"
     assert note1.data.summary == "summary replaced\nsummary extra"
+
+    os.chdir(TESTDIR)
+
+
+def test_edit_output():
+    os.chdir(TESTDIR)
+    dirpath = TESTDIR / "edit-output"
+    cleanmkdir(dirpath)
+    os.chdir(dirpath)
+
+    writefile("file1.txt", "file1.")
+    call('mod -n "seed" file1.txt')
+
+    editor0 = os.environ.get("EDITOR")
+    try:
+        os.environ["EDITOR"] = "true"
+        notefile.notefile._TESTEDIT = "edited note"
+        o, _ = call("edit file1.txt", capture=True)
+        assert o == "file1.txt\n"
+        assert Notefile("file1.txt").read().data.notes == "edited note"
+    finally:
+        notefile.notefile._TESTEDIT = False
+        if editor0 is None:
+            del os.environ["EDITOR"]
+        else:
+            os.environ["EDITOR"] = editor0
 
     os.chdir(TESTDIR)
 
@@ -395,7 +433,8 @@ def test_copy():
     writefile("file3.txt", "file3...")
 
     call('mod -t tag1 -n"this note" file1.txt')
-    call("copy -H file1.txt file2.txt file3.txt")  # also test -H again
+    o, _ = call("copy -H file1.txt file2.txt file3.txt", capture=True)  # also test -H again
+    assert o == "file2.txt\nfile3.txt\n"
 
     note1 = Notefile("file1.txt").read()
     note2 = Notefile("file2.txt").read()
@@ -430,9 +469,12 @@ def test_replace():
     call('mod -t tag3 -t tagshared -n"note FiLe 3" file3.txt')
     call('mod -t tag4 -t tagshared -n"NOTE FiLe 4" file4.txt')
 
-    call("replace file1.txt file2.txt")
-    call("replace file1.txt file3.txt --field tags")
-    call("replace file1.txt file4.txt --all-fields")
+    o, _ = call("replace file1.txt file2.txt", capture=True)
+    assert o == "file2.txt\n"
+    o, _ = call("replace file1.txt file3.txt --field tags", capture=True)
+    assert o == "file3.txt\n"
+    o, _ = call("replace file1.txt file4.txt --all-fields", capture=True)
+    assert o == "file4.txt\n"
 
     note1 = Notefile("file1.txt").read()
     note2 = Notefile("file2.txt").read()
@@ -451,8 +493,10 @@ def test_replace():
     ## Appends
     writefile("file5.txt", "file5.....")
 
-    call("replace file1.txt file5.txt")
-    call("replace file3.txt file5.txt --append")
+    o, _ = call("replace file1.txt file5.txt", capture=True)
+    assert o == "file5.txt\n"
+    o, _ = call("replace file3.txt file5.txt --append", capture=True)
+    assert o == "file5.txt\n"
     note5 = Notefile("file5.txt").read()
 
     assert note5.data.notes == "note file 1\nnote FiLe 3"  # appended notes

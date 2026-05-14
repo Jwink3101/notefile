@@ -469,20 +469,26 @@ def cli(argv=None):
     subparsers["mod"] = subpar.add_parser(
         "mod",
         parents=[editmod_parent, new_parent, global_parent],
-        help="Modify notes. Edit interactivly, add or replace notes, add or remove tags",
+        help=(
+            "Modify notes. Edit interactivly, add or replace notes, add or remove tags. "
+            "Prints each target whose note was written"
+        ),
     )
     subparsers["mod"].add_argument("file", help="Specify file(s)", nargs="+")
 
     subparsers["edit"] = subpar.add_parser(
         "edit",
         parents=[editmod_parent, new_parent, global_parent],
-        help="Shortcut for '%(prog)s mod --edit'",
+        help="Shortcut for '%(prog)s mod --edit'. Prints each target whose note was written",
     )
     subparsers["edit"].add_argument("file", help="Specify file(s)", nargs="+")
 
     subparsers["copy"] = subpar.add_parser(
         "copy",
-        help="Copy the notes from SRC to DST(s). DST must not have any notes",
+        help=(
+            "Copy the notes from SRC to DST(s). DST must not have any notes. "
+            "Prints each destination whose note was written"
+        ),
         parents=[
             new_parent,
             global_parent,
@@ -495,7 +501,10 @@ def cli(argv=None):
 
     subparsers["replace"] = subpar.add_parser(
         "replace",
-        help="Replace/Update some or all of the content in SRC to notes in DST",
+        help=(
+            "Replace/Update some or all of the content in SRC to notes in DST. "
+            "Prints each destination whose note was written"
+        ),
         parents=[
             new_parent,
             global_parent,
@@ -839,6 +848,16 @@ else:
 
 
 class BaseCLI:
+    @staticmethod
+    def display_name(note):
+        """Return the display name for a note, including `/` for directories."""
+        if note.orphaned and note.exists and getattr(note, "_data", None) is None:
+            note.read()
+        name = note.names0.filename
+        if note.isdir0 and not name.endswith("/"):
+            return name + "/"
+        return name
+
     def find(self, **kwargs):
         """Yield notes using the common CLI search arguments."""
         args = self.args
@@ -876,7 +895,7 @@ class BaseCLI:
     def outbuffer(self):
         """Return the binary output stream for the current command."""
         if not hasattr(self, "_outbuffer"):
-            if self.args.output:
+            if getattr(self.args, "output", None):
                 self._outbuffer = open(self.args.output, "wb")
             else:
                 self._outbuffer = sys.stdout.buffer
@@ -892,19 +911,28 @@ class BaseCLI:
             else:
                 raise
 
+    def emit_notes(self, notes, *, dedupe=False, print0=False, symlink=None, seen=None):
+        """Emit note target paths using the basic shared reporting convention."""
+        sep = b"\x00" if print0 else b"\n"
+        if seen is None:
+            seen = set()
+
+        for note in notes:
+            name = self.display_name(note)
+            if dedupe and name in seen:
+                continue
+            seen.add(name)
+            self.write_output(name.encode() + sep)
+            self.outbuffer.flush()
+
+            if symlink:
+                utils.symlink_file(note.names0.filename, symlink)
+
+        return seen
+
 
 class DisplayMIXIN:
     """For displaying notes"""
-
-    @staticmethod
-    def display_name(note):
-        """Return the display name for a note, including `/` for directories."""
-        if note.orphaned and note.exists and getattr(note, "_data", None) is None:
-            note.read()
-        name = note.names0.filename
-        if note.isdir0 and not name.endswith("/"):
-            return name + "/"
-        return name
 
     def display_dispatch(self, notes):
         """Route output to standard display, tag display, or export mode."""
@@ -917,17 +945,7 @@ class DisplayMIXIN:
 
     def display(self, notes):
         """Display for non-tag modes. This will display as returned"""
-        sep = b"\x00" if self.args.print0 else b"\n"
-        for note in notes:
-            try:
-                self.write_output(self.display_name(note).encode() + sep)
-            except:
-                print(f"{note.names0.filename = }")
-                raise
-            self.outbuffer.flush()
-
-            if self.args.symlink:
-                utils.symlink_file(note.names0.filename, self.args.symlink)
+        self.emit_notes(notes, print0=self.args.print0, symlink=self.args.symlink)
 
     def display_tags(self, notes):
         """
@@ -1092,6 +1110,7 @@ class SingleMod(BaseCLI):
     def editmod(self):
         """Apply note edits to each explicitly requested file."""
         args = self.args
+        seen = set()
         for file in args.file:
             note = Notefile(file, **self.noteopts)
 
@@ -1107,6 +1126,8 @@ class SingleMod(BaseCLI):
                 note.repair_metadata(force=False)
 
             note.write()
+            if note.was_written:
+                self.emit_notes([note], dedupe=True, seen=seen)
 
 
 class CopyReplace(BaseCLI):
@@ -1122,8 +1143,11 @@ class CopyReplace(BaseCLI):
                 fields=args.field, allfields=args.all_fields, newonly=False, append=args.append
             )
 
+        seen = set()
         for dst in args.DST:
-            src.replaceto(dst, noteopts=self.noteopts, **opts)
+            note = src.replaceto(dst, noteopts=self.noteopts, **opts)
+            if note.was_written:
+                self.emit_notes([note], dedupe=True, seen=seen)
 
 
 class ChangeTag(DisplayMIXIN, BaseCLI):

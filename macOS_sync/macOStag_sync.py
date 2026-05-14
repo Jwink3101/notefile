@@ -3,6 +3,7 @@
 """
 Synchronize macOS Finder tags with Notefile both ways
 """
+
 import argparse
 import datetime
 import os
@@ -86,21 +87,17 @@ def get_db():
 
 db = get_db()
 with db:
-    db.execute(
-        """
+    db.execute("""
         CREATE TABLE IF NOT EXISTS status(
             fullpath STRING,
             tag STRING,           -- always use notefile's as canonical
             UNIQUE(fullpath, tag) -- See reference
-        )"""
-    )
-    db.execute(
-        """
+        )""")
+    db.execute("""
         CREATE TABLE IF NOT EXISTS meta(
             key STRING PRIMARY KEY,
             value STRING)
-        """
-    )
+        """)
 
     db.execute(
         """
