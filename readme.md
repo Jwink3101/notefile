@@ -41,13 +41,27 @@ The extension will **always** be `.yaml` as YAML is a superset of JSON and any Y
 
 ### Install
 
+Install from PyPI:
+
+    $ python -m pip install pynotefile
+
+Optional PyYAML backend (LibYAML speedup when available):
+
+    $ python -m pip install "pynotefile[pyyaml]"
+
+This installs the `notefile` command and keeps the Python import name as `notefile`:
+
+```python
+import notefile
+```
+
 Install right from github:
 
     $ python -m pip install git+https://github.com/Jwink3101/notefile.git
 
 Optional PyYAML backend (LibYAML speedup when available):
 
-    $ python -m pip install "git+https://github.com/Jwink3101/notefile.git#egg=notefile[pyyaml]"
+    $ python -m pip install "git+https://github.com/Jwink3101/notefile.git#egg=pynotefile[pyyaml]"
 
 ### Requirements
 
@@ -71,7 +85,7 @@ Then to install pyyaml,
 
 Or via the optional extra:
 
-    $ python -m pip install "notefile[pyyaml]"
+    $ python -m pip install "pynotefile[pyyaml]"
 
 In my (limited) experience, pyyaml comes with Anaconda but not miniconda
 

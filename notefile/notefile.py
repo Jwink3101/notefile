@@ -5,6 +5,7 @@ import json
 import os
 import shlex
 import shutil
+import stat
 import sys
 import warnings
 from pathlib import Path
@@ -222,9 +223,11 @@ class Notefile:
 
         # Store the original paths. Will be reset later if link
         #         self.destnote0, *_ = hidden_chooser(self.names, hidden=hidden, subdir=subdir)
-        self.destnote0, self.exists0, self.is_hidden0, self.is_subdir0 = hidden_chooser(
-            self.names, hidden=hidden, subdir=subdir
-        )
+        # Cache the first note-location probe. For ordinary files, the active
+        # target does not change below, and find() constructs many Notefile
+        # objects without reading note contents.
+        initial_note_location = hidden_chooser(self.names, hidden=hidden, subdir=subdir)
+        self.destnote0, self.exists0, self.is_hidden0, self.is_subdir0 = initial_note_location
 
         ## Handle links. If both or source, reset to the referent if the link
         # mode cannot be deduced. If it can, use that!
@@ -253,23 +256,34 @@ class Notefile:
 
         # Get the actual notefile path (destnote) regardless of hidden settings
         # And whether it exists
-        self.destnote, self.exists, self.is_hidden, self.is_subdir = hidden_chooser(
-            self.names, hidden=hidden, subdir=subdir
-        )
+        # Reuse the first probe unless symlink handling changed the active target.
+        if self.names == self.names0:
+            self.destnote, self.exists, self.is_hidden, self.is_subdir = initial_note_location
+        else:
+            self.destnote, self.exists, self.is_hidden, self.is_subdir = hidden_chooser(
+                self.names, hidden=hidden, subdir=subdir
+            )
         self.hidden, self.subdir = hidden, subdir  # Settings may not be reality
 
         self.filename = self.names.filename
         self.filename0 = self.names0.filename
 
-        self.target_type0 = self._detect_target_type(self.names0.filename)
-        self.target_type = self._detect_target_type(self.names.filename)
+        self.target_type0, target_exists0 = self._detect_target_type_and_exists(
+            self.names0.filename
+        )
+        # Same target path means the target type and original-target existence
+        # checks can share the stat result collected above.
+        if self.names.filename == self.names0.filename:
+            self.target_type = self.target_type0
+        else:
+            self.target_type, _ = self._detect_target_type_and_exists(self.names.filename)
         self.isdir0 = self.target_type0 == "dir"
         self.isfile0 = self.target_type0 == "file"
         self.isdir = self.target_type == "dir"
         self.isfile = self.target_type == "file"
 
         # Check if orphaned on original target (broken links are still NOT orphaned)
-        self.orphaned = not exists_or_link(self.names0.filename)
+        self.orphaned = not target_exists0
 
         self.txt = None
         self._data = None
@@ -282,6 +296,20 @@ class Notefile:
         if not _target_exists(filename) and self._requested_dir:
             return "dir"
         return "file"
+
+    def _detect_target_type_and_exists(self, filename):
+        """Infer target type and existence using one filesystem stat when possible."""
+        try:
+            st = os.stat(filename)
+        except OSError:
+            if os.path.islink(filename):
+                return "file", True
+            if self._requested_dir:
+                return "dir", False
+            return "file", False
+
+        target_type = "dir" if stat.S_ISDIR(st.st_mode) else "file"
+        return target_type, True
 
     def _persisted_target_type(self):
         """Return the target type stored in note metadata, if present."""
