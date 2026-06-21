@@ -761,16 +761,18 @@ def cli(argv=None):
     # Path
     subparsers["note-path"] = subpar.add_parser(
         "note-path",
-        help="""Return the path to the notefile (or potential file if the note doesn't
-                yet exist)""",
+        help="Return the existing notefile path for a target",
         parents=[
             global_parent,
             new_parent,
         ],
     )
     subparsers["note-path"].add_argument(
-        "path", nargs="+", help="Specify path(s). Will print in order"
+        "--candidate",
+        action="store_true",
+        help="Print the candidate notefile path even when the note does not exist",
     )
+    subparsers["note-path"].add_argument("path", help="Specify the target path")
 
     args = parser.parse_args(argv)
 
@@ -1292,7 +1294,10 @@ class RepairCLI(BaseCLI):
 
 class NotePathCLI(BaseCLI):
     def __init__(self, args):
-        """Print the resolved notefile path for each requested target path."""
+        """Print the existing or candidate notefile path for one target path."""
         self.args = args
-        for path in args.path:
-            print(Notefile(path, **self.noteopts).destnote0, flush=True)
+        note = Notefile(args.path, **self.noteopts)
+        if args.candidate or note.exists:
+            print(note.destnote0, flush=True)
+        elif not note.exists:
+            sys.exit(1)

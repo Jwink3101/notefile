@@ -15,28 +15,19 @@ options:
 
 Global Options:
   --debug             Debug mode
-  --note-field field  Specify the field in the notes to read/write. Defaults
-                      to 'notes' or $NOTEFILE_NOTEFIELD environment variable.
-                      With `mod`, `--note-field FIELD --note TEXT` is
-                      equivalent to `--field-note FIELD TEXT`
+  --note-field field  Specify the field in the notes to read/write. Defaults to 'notes' or $NOTEFILE_NOTEFIELD environment variable. With `mod`,
+                      `--note-field FIELD --note TEXT` is equivalent to `--field-note FIELD TEXT`
   --version           show program's version number and exit
 
 Commands:
   Run `notefile <command> -h` for help
 
   command
-    mod               Modify notes. Edit interactivly, add or replace notes,
-                      add or remove tags. Prints each target whose note was
-                      written
-    edit              Shortcut for 'notefile mod --edit'. Prints each target
-                      whose note was written
-    copy              Copy the notes from SRC to DST(s). DST must not have any
-                      notes. Prints each destination whose note was written
-    replace           Replace/Update some or all of the content in SRC to
-                      notes in DST. Prints each destination whose note was
-                      written
-    change-tag        Change one tag to another (or multiple) and display the
-                      results
+    mod               Modify notes. Edit interactivly, add or replace notes, add or remove tags. Prints each target whose note was written
+    edit              Shortcut for 'notefile mod --edit'. Prints each target whose note was written
+    copy              Copy the notes from SRC to DST(s). DST must not have any notes. Prints each destination whose note was written
+    replace           Replace/Update some or all of the content in SRC to notes in DST. Prints each destination whose note was written
+    change-tag        Change one tag to another (or multiple) and display the results
     vis               Change the visibility of file(s)/dir(s)
     show              Shortcut for 'notefile vis show'
     hide              Shortcut for 'notefile vis hide'
@@ -46,16 +37,13 @@ Commands:
     repair-orphaned   Repair notefile(s): orphaned
     cat               Print the note
     find              Find and list all notes
-    export            Shortcut for 'notefile find --export'. Note, can use
-                      'notefile search --export <search flags>' if needed with
-                      search queries.
+    export            Shortcut for 'notefile find --export'. Note, can use 'notefile search --export <search flags>' if needed with search
+                      queries.
     search            Find and list all notes with criteria
     grep              Shortcut for 'notefile search --grep'
-    query             Shortcut for 'notefile search --query'. Also has
-                      additional details on queries
+    query             Shortcut for 'notefile search --query'. Also has additional details on queries
     tags              Shortcut for 'notefile search --tag-mode --tag'
-    note-path         Return the path to the notefile (or potential file if
-                      the note doesn't yet exist)
+    note-path         Return the existing notefile path for a target
 
 ```
 
@@ -63,12 +51,9 @@ Commands:
 
 
 ```text
-usage: notefile mod [-h] [-e] [-f] [-m] [--tags-only] [-r TAG] [-t TAG] [-R]
-                    [-n NOTE] [--field-note FIELD TEXT] [-s]
-                    [--link {source,symlink,both}] [-H] [-V]
-                    [-S | --subdir | --no-subdir] [--no-hash] [--no-refresh]
-                    [--format {json,yaml}] [--rewrite-format] [--debug]
-                    [--note-field field] [--version]
+usage: notefile mod [-h] [-e] [-f] [-m] [--tags-only] [-r TAG] [-t TAG] [-R] [-n NOTE] [--field-note FIELD TEXT] [-s]
+                    [--link {source,symlink,both}] [-H] [-V] [-S | --subdir | --no-subdir] [--no-hash] [--no-refresh] [--format {json,yaml}]
+                    [--rewrite-format] [--debug] [--note-field field] [--version]
                     file [file ...]
 
 positional arguments:
@@ -80,75 +65,49 @@ options:
 Interactive Edit:
   Edit notes with a text editor. Other modifications come first
 
-  -e, --edit            Launch $EDITOR to interactivly edit the active --note-
-                        field only. Use --full to edit multiple fields in the
-                        full YAML note
-  -f, --full            Edit the full YAML file. Will always edit in YAML mode
-                        even if notes are stored in JSON
-  -m, --manual          Instead of $EDITOR, print the path and then wait for
-                        user-input to continue
+  -e, --edit            Launch $EDITOR to interactivly edit the active --note-field only. Use --full to edit multiple fields in the full YAML note
+  -f, --full            Edit the full YAML file. Will always edit in YAML mode even if notes are stored in JSON
+  -m, --manual          Instead of $EDITOR, print the path and then wait for user-input to continue
   --tags-only           Just edit tags, not both
 
 Modify Notes:
   Add or replace notes. Add or remove tags
 
-  -r TAG, --remove TAG  Specify tags to remove
-  -t TAG, --tag TAG, -a TAG, --add TAG
+  -r, --remove TAG      Specify tags to remove
+  -t, --tag, -a, --add TAG
                         Specify tags to add
   -R, --replace         Replace rather than append the new note
-  -n NOTE, --note NOTE  Notes to add (or replace). Each argument is its own
-                        line. Specify `--note ""` to add empty line. Notes
-                        will come _after_ stdin if applicable. Will use
-                        --note-field settings, so `--note-field summary --note
-                        "text"` matches `--field-note summary "text"`
+  -n, --note NOTE       Notes to add (or replace). Each argument is its own line. Specify `--note ""` to add empty line. Notes will come _after_
+                        stdin if applicable. Will use --note-field settings, so `--note-field summary --note "text"` matches `--field-note summary
+                        "text"`
   --field-note FIELD TEXT
-                        Add or replace note text in FIELD. Repeat as needed.
-                        Each TEXT argument behaves like one `--note` entry for
-                        that field, including appending to existing text
-                        unless --replace is set. For the main field, `--field-
-                        note notes TEXT` matches `--note TEXT` when `--note-
-                        field notes` is in effect
-  -s, --stdin           Read note from stdin. Prepended to any --note
-                        arguments
+                        Add or replace note text in FIELD. Repeat as needed. Each TEXT argument behaves like one `--note` entry for that field,
+                        including appending to existing text unless --replace is set. For the main field, `--field-note notes TEXT` matches
+                        `--note TEXT` when `--note-field notes` is in effect
+  -s, --stdin           Read note from stdin. Prepended to any --note arguments
 
 Create/Modify Options:
   Flags for creating and saving notes. Not all flags are always applicable!
 
   --link {source,symlink,both}
-                        ['both'] Specify how to handle symlinks. If 'source',
-                        will add the notefile to the source only (non-
-                        recursively). If 'symlink', will add the notefile to
-                        *just* the symlink file. If 'both', will add the
-                        notefile the source (non-recursivly) and then symlink
-                        to that notefile.
-  -H, --hidden          Make new notes hidden. NOT default unless set with
-                        $NOTEFILE_HIDDEN environment variable
-  -V, --visible         Make new notes visible. Default unless set with
-                        $NOTEFILE_HIDDEN environment variable
+                        ['both'] Specify how to handle symlinks. If 'source', will add the notefile to the source only (non-recursively). If
+                        'symlink', will add the notefile to *just* the symlink file. If 'both', will add the notefile the source (non-recursivly)
+                        and then symlink to that notefile.
+  -H, --hidden          Make new notes hidden. NOT default unless set with $NOTEFILE_HIDDEN environment variable
+  -V, --visible         Make new notes visible. Default unless set with $NOTEFILE_HIDDEN environment variable
   -S, --subdir, --no-subdir
-                        Make new notes in a subdir. NOT default unless set
-                        with $NOTEFILE_SUBDIR environment variable. When using
-                        --subdir with --hidden, will store in '.notefiles' and
-                        when using --subdir with --visible, will store in
-                        '_notefiles'. Default False
-  --no-hash             Do *not* compute the SHA256 of the file. Will not be
-                        able to repair orphaned notes
-  --no-refresh          Do not refresh/repair file metadata when a notefile is
-                        modified
-  --format {json,yaml}  Note format for writing NEW notes. Will not change the
-                        format for existing notes unless --rewrite-format is
-                        set. Default is 'yaml' unless set with
-                        $NOTEFILE_FORMAT environment variable. Currently not
-                        set.
-  --rewrite-format      Change to the specified format (see '--format')
-                        regardless of current format.
+                        Make new notes in a subdir. NOT default unless set with $NOTEFILE_SUBDIR environment variable. When using --subdir with
+                        --hidden, will store in '.notefiles' and when using --subdir with --visible, will store in '_notefiles'. Default False
+  --no-hash             Do *not* compute the SHA256 of the file. Will not be able to repair orphaned notes
+  --no-refresh          Do not refresh/repair file metadata when a notefile is modified
+  --format {json,yaml}  Note format for writing NEW notes. Will not change the format for existing notes unless --rewrite-format is set. Default
+                        is 'yaml' unless set with $NOTEFILE_FORMAT environment variable. Currently not set.
+  --rewrite-format      Change to the specified format (see '--format') regardless of current format.
 
 Global Options:
   --debug               Debug mode
-  --note-field field    Specify the field in the notes to read/write. Defaults
-                        to 'notes' or $NOTEFILE_NOTEFIELD environment
-                        variable. With `mod`, `--note-field FIELD --note TEXT`
-                        is equivalent to `--field-note FIELD TEXT`
+  --note-field field    Specify the field in the notes to read/write. Defaults to 'notes' or $NOTEFILE_NOTEFIELD environment variable. With `mod`,
+                        `--note-field FIELD --note TEXT` is equivalent to `--field-note FIELD TEXT`
   --version             show program's version number and exit
 
 ```
@@ -157,12 +116,9 @@ Global Options:
 
 
 ```text
-usage: notefile edit [-h] [-e] [-f] [-m] [--tags-only] [-r TAG] [-t TAG] [-R]
-                     [-n NOTE] [--field-note FIELD TEXT] [-s]
-                     [--link {source,symlink,both}] [-H] [-V]
-                     [-S | --subdir | --no-subdir] [--no-hash] [--no-refresh]
-                     [--format {json,yaml}] [--rewrite-format] [--debug]
-                     [--note-field field] [--version]
+usage: notefile edit [-h] [-e] [-f] [-m] [--tags-only] [-r TAG] [-t TAG] [-R] [-n NOTE] [--field-note FIELD TEXT] [-s]
+                     [--link {source,symlink,both}] [-H] [-V] [-S | --subdir | --no-subdir] [--no-hash] [--no-refresh] [--format {json,yaml}]
+                     [--rewrite-format] [--debug] [--note-field field] [--version]
                      file [file ...]
 
 positional arguments:
@@ -174,75 +130,49 @@ options:
 Interactive Edit:
   Edit notes with a text editor. Other modifications come first
 
-  -e, --edit            Launch $EDITOR to interactivly edit the active --note-
-                        field only. Use --full to edit multiple fields in the
-                        full YAML note
-  -f, --full            Edit the full YAML file. Will always edit in YAML mode
-                        even if notes are stored in JSON
-  -m, --manual          Instead of $EDITOR, print the path and then wait for
-                        user-input to continue
+  -e, --edit            Launch $EDITOR to interactivly edit the active --note-field only. Use --full to edit multiple fields in the full YAML note
+  -f, --full            Edit the full YAML file. Will always edit in YAML mode even if notes are stored in JSON
+  -m, --manual          Instead of $EDITOR, print the path and then wait for user-input to continue
   --tags-only           Just edit tags, not both
 
 Modify Notes:
   Add or replace notes. Add or remove tags
 
-  -r TAG, --remove TAG  Specify tags to remove
-  -t TAG, --tag TAG, -a TAG, --add TAG
+  -r, --remove TAG      Specify tags to remove
+  -t, --tag, -a, --add TAG
                         Specify tags to add
   -R, --replace         Replace rather than append the new note
-  -n NOTE, --note NOTE  Notes to add (or replace). Each argument is its own
-                        line. Specify `--note ""` to add empty line. Notes
-                        will come _after_ stdin if applicable. Will use
-                        --note-field settings, so `--note-field summary --note
-                        "text"` matches `--field-note summary "text"`
+  -n, --note NOTE       Notes to add (or replace). Each argument is its own line. Specify `--note ""` to add empty line. Notes will come _after_
+                        stdin if applicable. Will use --note-field settings, so `--note-field summary --note "text"` matches `--field-note summary
+                        "text"`
   --field-note FIELD TEXT
-                        Add or replace note text in FIELD. Repeat as needed.
-                        Each TEXT argument behaves like one `--note` entry for
-                        that field, including appending to existing text
-                        unless --replace is set. For the main field, `--field-
-                        note notes TEXT` matches `--note TEXT` when `--note-
-                        field notes` is in effect
-  -s, --stdin           Read note from stdin. Prepended to any --note
-                        arguments
+                        Add or replace note text in FIELD. Repeat as needed. Each TEXT argument behaves like one `--note` entry for that field,
+                        including appending to existing text unless --replace is set. For the main field, `--field-note notes TEXT` matches
+                        `--note TEXT` when `--note-field notes` is in effect
+  -s, --stdin           Read note from stdin. Prepended to any --note arguments
 
 Create/Modify Options:
   Flags for creating and saving notes. Not all flags are always applicable!
 
   --link {source,symlink,both}
-                        ['both'] Specify how to handle symlinks. If 'source',
-                        will add the notefile to the source only (non-
-                        recursively). If 'symlink', will add the notefile to
-                        *just* the symlink file. If 'both', will add the
-                        notefile the source (non-recursivly) and then symlink
-                        to that notefile.
-  -H, --hidden          Make new notes hidden. NOT default unless set with
-                        $NOTEFILE_HIDDEN environment variable
-  -V, --visible         Make new notes visible. Default unless set with
-                        $NOTEFILE_HIDDEN environment variable
+                        ['both'] Specify how to handle symlinks. If 'source', will add the notefile to the source only (non-recursively). If
+                        'symlink', will add the notefile to *just* the symlink file. If 'both', will add the notefile the source (non-recursivly)
+                        and then symlink to that notefile.
+  -H, --hidden          Make new notes hidden. NOT default unless set with $NOTEFILE_HIDDEN environment variable
+  -V, --visible         Make new notes visible. Default unless set with $NOTEFILE_HIDDEN environment variable
   -S, --subdir, --no-subdir
-                        Make new notes in a subdir. NOT default unless set
-                        with $NOTEFILE_SUBDIR environment variable. When using
-                        --subdir with --hidden, will store in '.notefiles' and
-                        when using --subdir with --visible, will store in
-                        '_notefiles'. Default False
-  --no-hash             Do *not* compute the SHA256 of the file. Will not be
-                        able to repair orphaned notes
-  --no-refresh          Do not refresh/repair file metadata when a notefile is
-                        modified
-  --format {json,yaml}  Note format for writing NEW notes. Will not change the
-                        format for existing notes unless --rewrite-format is
-                        set. Default is 'yaml' unless set with
-                        $NOTEFILE_FORMAT environment variable. Currently not
-                        set.
-  --rewrite-format      Change to the specified format (see '--format')
-                        regardless of current format.
+                        Make new notes in a subdir. NOT default unless set with $NOTEFILE_SUBDIR environment variable. When using --subdir with
+                        --hidden, will store in '.notefiles' and when using --subdir with --visible, will store in '_notefiles'. Default False
+  --no-hash             Do *not* compute the SHA256 of the file. Will not be able to repair orphaned notes
+  --no-refresh          Do not refresh/repair file metadata when a notefile is modified
+  --format {json,yaml}  Note format for writing NEW notes. Will not change the format for existing notes unless --rewrite-format is set. Default
+                        is 'yaml' unless set with $NOTEFILE_FORMAT environment variable. Currently not set.
+  --rewrite-format      Change to the specified format (see '--format') regardless of current format.
 
 Global Options:
   --debug               Debug mode
-  --note-field field    Specify the field in the notes to read/write. Defaults
-                        to 'notes' or $NOTEFILE_NOTEFIELD environment
-                        variable. With `mod`, `--note-field FIELD --note TEXT`
-                        is equivalent to `--field-note FIELD TEXT`
+  --note-field field    Specify the field in the notes to read/write. Defaults to 'notes' or $NOTEFILE_NOTEFIELD environment variable. With `mod`,
+                        `--note-field FIELD --note TEXT` is equivalent to `--field-note FIELD TEXT`
   --version             show program's version number and exit
 
 ```
@@ -251,10 +181,8 @@ Global Options:
 
 
 ```text
-usage: notefile copy [-h] [--link {source,symlink,both}] [-H] [-V]
-                     [-S | --subdir | --no-subdir] [--no-hash] [--no-refresh]
-                     [--format {json,yaml}] [--rewrite-format] [--debug]
-                     [--note-field field] [--version]
+usage: notefile copy [-h] [--link {source,symlink,both}] [-H] [-V] [-S | --subdir | --no-subdir] [--no-hash] [--no-refresh] [--format {json,yaml}]
+                     [--rewrite-format] [--debug] [--note-field field] [--version]
                      SRC DST [DST ...]
 
 positional arguments:
@@ -268,40 +196,24 @@ Create/Modify Options:
   Flags for creating and saving notes. Not all flags are always applicable!
 
   --link {source,symlink,both}
-                        ['both'] Specify how to handle symlinks. If 'source',
-                        will add the notefile to the source only (non-
-                        recursively). If 'symlink', will add the notefile to
-                        *just* the symlink file. If 'both', will add the
-                        notefile the source (non-recursivly) and then symlink
-                        to that notefile.
-  -H, --hidden          Make new notes hidden. NOT default unless set with
-                        $NOTEFILE_HIDDEN environment variable
-  -V, --visible         Make new notes visible. Default unless set with
-                        $NOTEFILE_HIDDEN environment variable
+                        ['both'] Specify how to handle symlinks. If 'source', will add the notefile to the source only (non-recursively). If
+                        'symlink', will add the notefile to *just* the symlink file. If 'both', will add the notefile the source (non-recursivly)
+                        and then symlink to that notefile.
+  -H, --hidden          Make new notes hidden. NOT default unless set with $NOTEFILE_HIDDEN environment variable
+  -V, --visible         Make new notes visible. Default unless set with $NOTEFILE_HIDDEN environment variable
   -S, --subdir, --no-subdir
-                        Make new notes in a subdir. NOT default unless set
-                        with $NOTEFILE_SUBDIR environment variable. When using
-                        --subdir with --hidden, will store in '.notefiles' and
-                        when using --subdir with --visible, will store in
-                        '_notefiles'. Default False
-  --no-hash             Do *not* compute the SHA256 of the file. Will not be
-                        able to repair orphaned notes
-  --no-refresh          Do not refresh/repair file metadata when a notefile is
-                        modified
-  --format {json,yaml}  Note format for writing NEW notes. Will not change the
-                        format for existing notes unless --rewrite-format is
-                        set. Default is 'yaml' unless set with
-                        $NOTEFILE_FORMAT environment variable. Currently not
-                        set.
-  --rewrite-format      Change to the specified format (see '--format')
-                        regardless of current format.
+                        Make new notes in a subdir. NOT default unless set with $NOTEFILE_SUBDIR environment variable. When using --subdir with
+                        --hidden, will store in '.notefiles' and when using --subdir with --visible, will store in '_notefiles'. Default False
+  --no-hash             Do *not* compute the SHA256 of the file. Will not be able to repair orphaned notes
+  --no-refresh          Do not refresh/repair file metadata when a notefile is modified
+  --format {json,yaml}  Note format for writing NEW notes. Will not change the format for existing notes unless --rewrite-format is set. Default
+                        is 'yaml' unless set with $NOTEFILE_FORMAT environment variable. Currently not set.
+  --rewrite-format      Change to the specified format (see '--format') regardless of current format.
 
 Global Options:
   --debug               Debug mode
-  --note-field field    Specify the field in the notes to read/write. Defaults
-                        to 'notes' or $NOTEFILE_NOTEFIELD environment
-                        variable. With `mod`, `--note-field FIELD --note TEXT`
-                        is equivalent to `--field-note FIELD TEXT`
+  --note-field field    Specify the field in the notes to read/write. Defaults to 'notes' or $NOTEFILE_NOTEFIELD environment variable. With `mod`,
+                        `--note-field FIELD --note TEXT` is equivalent to `--field-note FIELD TEXT`
   --version             show program's version number and exit
 
 ```
@@ -310,11 +222,9 @@ Global Options:
 
 
 ```text
-usage: notefile replace [-h] [--link {source,symlink,both}] [-H] [-V]
-                        [-S | --subdir | --no-subdir] [--no-hash]
-                        [--no-refresh] [--format {json,yaml}]
-                        [--rewrite-format] [--debug] [--note-field field]
-                        [--version] [--field FIELD] [--all-fields] [--append]
+usage: notefile replace [-h] [--link {source,symlink,both}] [-H] [-V] [-S | --subdir | --no-subdir] [--no-hash] [--no-refresh]
+                        [--format {json,yaml}] [--rewrite-format] [--debug] [--note-field field] [--version] [--field FIELD] [--all-fields]
+                        [--append]
                         SRC DST [DST ...]
 
 positional arguments:
@@ -323,57 +233,35 @@ positional arguments:
 
 options:
   -h, --help            show this help message and exit
-  --field FIELD         Specify fields to replace/update. If NONE are
-                        specified, will use --note-field. If ANY flag is set,
-                        will only do them. For example, `--field tags` will
-                        *only* replace/update tags. To do tags and notes, do
-                        `--field tags --field notes`. Will NOT raise any alert
-                        if field is not in the source
-  --all-fields          Ignore --fields and do all fields. This is effectively
-                        `copy` with allowing it to overwrite existing notes
-  --append              Update/append rather than replace the contents in each
-                        field. With the exception of `tags`, the field values
-                        must either be text-based or the dest must not have
-                        anything in the field
+  --field FIELD         Specify fields to replace/update. If NONE are specified, will use --note-field. If ANY flag is set, will only do them. For
+                        example, `--field tags` will *only* replace/update tags. To do tags and notes, do `--field tags --field notes`. Will NOT
+                        raise any alert if field is not in the source
+  --all-fields          Ignore --fields and do all fields. This is effectively `copy` with allowing it to overwrite existing notes
+  --append              Update/append rather than replace the contents in each field. With the exception of `tags`, the field values must either
+                        be text-based or the dest must not have anything in the field
 
 Create/Modify Options:
   Flags for creating and saving notes. Not all flags are always applicable!
 
   --link {source,symlink,both}
-                        ['both'] Specify how to handle symlinks. If 'source',
-                        will add the notefile to the source only (non-
-                        recursively). If 'symlink', will add the notefile to
-                        *just* the symlink file. If 'both', will add the
-                        notefile the source (non-recursivly) and then symlink
-                        to that notefile.
-  -H, --hidden          Make new notes hidden. NOT default unless set with
-                        $NOTEFILE_HIDDEN environment variable
-  -V, --visible         Make new notes visible. Default unless set with
-                        $NOTEFILE_HIDDEN environment variable
+                        ['both'] Specify how to handle symlinks. If 'source', will add the notefile to the source only (non-recursively). If
+                        'symlink', will add the notefile to *just* the symlink file. If 'both', will add the notefile the source (non-recursivly)
+                        and then symlink to that notefile.
+  -H, --hidden          Make new notes hidden. NOT default unless set with $NOTEFILE_HIDDEN environment variable
+  -V, --visible         Make new notes visible. Default unless set with $NOTEFILE_HIDDEN environment variable
   -S, --subdir, --no-subdir
-                        Make new notes in a subdir. NOT default unless set
-                        with $NOTEFILE_SUBDIR environment variable. When using
-                        --subdir with --hidden, will store in '.notefiles' and
-                        when using --subdir with --visible, will store in
-                        '_notefiles'. Default False
-  --no-hash             Do *not* compute the SHA256 of the file. Will not be
-                        able to repair orphaned notes
-  --no-refresh          Do not refresh/repair file metadata when a notefile is
-                        modified
-  --format {json,yaml}  Note format for writing NEW notes. Will not change the
-                        format for existing notes unless --rewrite-format is
-                        set. Default is 'yaml' unless set with
-                        $NOTEFILE_FORMAT environment variable. Currently not
-                        set.
-  --rewrite-format      Change to the specified format (see '--format')
-                        regardless of current format.
+                        Make new notes in a subdir. NOT default unless set with $NOTEFILE_SUBDIR environment variable. When using --subdir with
+                        --hidden, will store in '.notefiles' and when using --subdir with --visible, will store in '_notefiles'. Default False
+  --no-hash             Do *not* compute the SHA256 of the file. Will not be able to repair orphaned notes
+  --no-refresh          Do not refresh/repair file metadata when a notefile is modified
+  --format {json,yaml}  Note format for writing NEW notes. Will not change the format for existing notes unless --rewrite-format is set. Default
+                        is 'yaml' unless set with $NOTEFILE_FORMAT environment variable. Currently not set.
+  --rewrite-format      Change to the specified format (see '--format') regardless of current format.
 
 Global Options:
   --debug               Debug mode
-  --note-field field    Specify the field in the notes to read/write. Defaults
-                        to 'notes' or $NOTEFILE_NOTEFIELD environment
-                        variable. With `mod`, `--note-field FIELD --note TEXT`
-                        is equivalent to `--field-note FIELD TEXT`
+  --note-field field    Specify the field in the notes to read/write. Defaults to 'notes' or $NOTEFILE_NOTEFIELD environment variable. With `mod`,
+                        `--note-field FIELD --note TEXT` is equivalent to `--field-note FIELD TEXT`
   --version             show program's version number and exit
 
 ```
@@ -382,16 +270,10 @@ Global Options:
 
 
 ```text
-usage: notefile change-tag [-h] [--debug] [--note-field field] [--version]
-                           [-p PATH] [--exclude EXCLUDE] [--exclude-links]
-                           [--match-exclude-case] [--max-depth N] [-x]
-                           [--type {dir,file,both}] [-0] [--export]
-                           [--export-format {yaml,json,jsonl}] [--tag-mode]
-                           [--tag-counts] [--tag-count-order] [-o FILE]
-                           [--symlink DIR] [--link {source,symlink,both}] [-H]
-                           [-V] [-S | --subdir | --no-subdir] [--no-hash]
-                           [--no-refresh] [--format {json,yaml}]
-                           [--rewrite-format] [-n]
+usage: notefile change-tag [-h] [--debug] [--note-field field] [--version] [-p PATH] [--exclude EXCLUDE] [--exclude-links] [--match-exclude-case]
+                           [--max-depth N] [-x] [--type {dir,file,both}] [-0] [--export] [--export-format {yaml,json,jsonl}] [--tag-mode]
+                           [--tag-counts] [--tag-count-order] [-o FILE] [--symlink DIR] [--link {source,symlink,both}] [-H] [-V]
+                           [-S | --subdir | --no-subdir] [--no-hash] [--no-refresh] [--format {json,yaml}] [--rewrite-format] [-n]
                            old new [new ...]
 
 positional arguments:
@@ -404,26 +286,20 @@ options:
 
 Global Options:
   --debug               Debug mode
-  --note-field field    Specify the field in the notes to read/write. Defaults
-                        to 'notes' or $NOTEFILE_NOTEFIELD environment
-                        variable. With `mod`, `--note-field FIELD --note TEXT`
-                        is equivalent to `--field-note FIELD TEXT`
+  --note-field field    Specify the field in the notes to read/write. Defaults to 'notes' or $NOTEFILE_NOTEFIELD environment variable. With `mod`,
+                        `--note-field FIELD --note TEXT` is equivalent to `--field-note FIELD TEXT`
   --version             show program's version number and exit
 
 find Options:
   Flags for finding notes
 
-  -p PATH, --path PATH  Specify path(s). Can specify multiple. Directories
-                        will recurse and follow exclusions, etc. Specified
-                        files will not. If not specified, will be '.'. If any
-                        path is specified, will ONLY use those paths.
-  --exclude EXCLUDE     Specify a glob pattern to exclude when looking for
-                        notes. Directories are also matched with a trailing
-                        '/'. Can specify multiple times.
+  -p, --path PATH       Specify path(s). Can specify multiple. Directories will recurse and follow exclusions, etc. Specified files will not. If
+                        not specified, will be '.'. If any path is specified, will ONLY use those paths.
+  --exclude EXCLUDE     Specify a glob pattern to exclude when looking for notes. Directories are also matched with a trailing '/'. Can specify
+                        multiple times.
   --exclude-links       Do not include symlinked notefiles
   --match-exclude-case  Match case on exclude patterns
-  --max-depth N         Specify the maximum depth to search for notes. The
-                        current directory is 0
+  --max-depth N         Specify the maximum depth to search for notes. The current directory is 0
   -x, --one-file-system
                         Do not cross filesystem boundaries
   --type {dir,file,both}
@@ -432,58 +308,35 @@ find Options:
 Display Options:
   Some flags will be ignored and/or are mutually exclusive
 
-  -0, --print0          Terminate names with a null byte. For use with `xargs
-                        -0` when filenames have space
+  -0, --print0          Terminate names with a null byte. For use with `xargs -0` when filenames have space
   --export              Export notes rather than printing names or tags
   --export-format {yaml,json,jsonl}
-                        [yaml] Export format. For jsonl, will be a list of
-                        dicts with the filename as '__filename' (to avoid
-                        accidentally clobbering a 'filename' key) and a
-                        metadata entry. The other formats are dictionaries
-  --tag-mode            Displays results in terms of *all* tags present in the
-                        results
-  --tag-counts          Displays results with the counts of *all* tags present
-                        in the results. Implies --tag-mode
-  --tag-count-order     Orders the results by number of tags. Implies --tag-
-                        mode
-  -o FILE, --output FILE
-                        Write results to FILE instead of stdout
-  --symlink DIR         Create symlinks in DIR to the found files. If used in
-                        --tag-mode, will also have subdirs with the name (or
-                        filter). If there are name conflicts, will add `.N` to
-                        the filename and print a warning to stderr
+                        [yaml] Export format. For jsonl, will be a list of dicts with the filename as '__filename' (to avoid accidentally
+                        clobbering a 'filename' key) and a metadata entry. The other formats are dictionaries
+  --tag-mode            Displays results in terms of *all* tags present in the results
+  --tag-counts          Displays results with the counts of *all* tags present in the results. Implies --tag-mode
+  --tag-count-order     Orders the results by number of tags. Implies --tag-mode
+  -o, --output FILE     Write results to FILE instead of stdout
+  --symlink DIR         Create symlinks in DIR to the found files. If used in --tag-mode, will also have subdirs with the name (or filter). If
+                        there are name conflicts, will add `.N` to the filename and print a warning to stderr
 
 Create/Modify Options:
   Flags for creating and saving notes. Not all flags are always applicable!
 
   --link {source,symlink,both}
-                        ['both'] Specify how to handle symlinks. If 'source',
-                        will add the notefile to the source only (non-
-                        recursively). If 'symlink', will add the notefile to
-                        *just* the symlink file. If 'both', will add the
-                        notefile the source (non-recursivly) and then symlink
-                        to that notefile.
-  -H, --hidden          Make new notes hidden. NOT default unless set with
-                        $NOTEFILE_HIDDEN environment variable
-  -V, --visible         Make new notes visible. Default unless set with
-                        $NOTEFILE_HIDDEN environment variable
+                        ['both'] Specify how to handle symlinks. If 'source', will add the notefile to the source only (non-recursively). If
+                        'symlink', will add the notefile to *just* the symlink file. If 'both', will add the notefile the source (non-recursivly)
+                        and then symlink to that notefile.
+  -H, --hidden          Make new notes hidden. NOT default unless set with $NOTEFILE_HIDDEN environment variable
+  -V, --visible         Make new notes visible. Default unless set with $NOTEFILE_HIDDEN environment variable
   -S, --subdir, --no-subdir
-                        Make new notes in a subdir. NOT default unless set
-                        with $NOTEFILE_SUBDIR environment variable. When using
-                        --subdir with --hidden, will store in '.notefiles' and
-                        when using --subdir with --visible, will store in
-                        '_notefiles'. Default False
-  --no-hash             Do *not* compute the SHA256 of the file. Will not be
-                        able to repair orphaned notes
-  --no-refresh          Do not refresh/repair file metadata when a notefile is
-                        modified
-  --format {json,yaml}  Note format for writing NEW notes. Will not change the
-                        format for existing notes unless --rewrite-format is
-                        set. Default is 'yaml' unless set with
-                        $NOTEFILE_FORMAT environment variable. Currently not
-                        set.
-  --rewrite-format      Change to the specified format (see '--format')
-                        regardless of current format.
+                        Make new notes in a subdir. NOT default unless set with $NOTEFILE_SUBDIR environment variable. When using --subdir with
+                        --hidden, will store in '.notefiles' and when using --subdir with --visible, will store in '_notefiles'. Default False
+  --no-hash             Do *not* compute the SHA256 of the file. Will not be able to repair orphaned notes
+  --no-refresh          Do not refresh/repair file metadata when a notefile is modified
+  --format {json,yaml}  Note format for writing NEW notes. Will not change the format for existing notes unless --rewrite-format is set. Default
+                        is 'yaml' unless set with $NOTEFILE_FORMAT environment variable. Currently not set.
+  --rewrite-format      Change to the specified format (see '--format') regardless of current format.
 
 ```
 
@@ -491,13 +344,9 @@ Create/Modify Options:
 
 
 ```text
-usage: notefile vis [-h] [--debug] [--note-field field] [--version] [-p PATH]
-                    [--exclude EXCLUDE] [--exclude-links]
-                    [--match-exclude-case] [--max-depth N] [-x]
-                    [--type {dir,file,both}] [-0] [--export]
-                    [--export-format {yaml,json,jsonl}] [--tag-mode]
-                    [--tag-counts] [--tag-count-order] [-o FILE]
-                    [--symlink DIR] [-n] [-S | --subdir | --no-subdir]
+usage: notefile vis [-h] [--debug] [--note-field field] [--version] [-p PATH] [--exclude EXCLUDE] [--exclude-links] [--match-exclude-case]
+                    [--max-depth N] [-x] [--type {dir,file,both}] [-0] [--export] [--export-format {yaml,json,jsonl}] [--tag-mode] [--tag-counts]
+                    [--tag-count-order] [-o FILE] [--symlink DIR] [-n] [-S | --subdir | --no-subdir]
                     {hide,show} [path ...]
 
 positional arguments:
@@ -508,34 +357,26 @@ options:
   -h, --help            show this help message and exit
   -n, --dry-run         Do not make changes
   -S, --subdir, --no-subdir
-                        Make new notes in a subdir. NOT default unless set
-                        with $NOTEFILE_SUBDIR environment variable. When using
-                        --subdir with --hidden, will store in '.notefiles' and
-                        when using --subdir with --visible, will store in
-                        '_notefiles'. Default is based on original setting
+                        Make new notes in a subdir. NOT default unless set with $NOTEFILE_SUBDIR environment variable. When using --subdir with
+                        --hidden, will store in '.notefiles' and when using --subdir with --visible, will store in '_notefiles'. Default is based
+                        on original setting
 
 Global Options:
   --debug               Debug mode
-  --note-field field    Specify the field in the notes to read/write. Defaults
-                        to 'notes' or $NOTEFILE_NOTEFIELD environment
-                        variable. With `mod`, `--note-field FIELD --note TEXT`
-                        is equivalent to `--field-note FIELD TEXT`
+  --note-field field    Specify the field in the notes to read/write. Defaults to 'notes' or $NOTEFILE_NOTEFIELD environment variable. With `mod`,
+                        `--note-field FIELD --note TEXT` is equivalent to `--field-note FIELD TEXT`
   --version             show program's version number and exit
 
 find Options:
   Flags for finding notes
 
-  -p PATH, --path PATH  Specify path(s). Can specify multiple. Directories
-                        will recurse and follow exclusions, etc. Specified
-                        files will not. If not specified, will be '.'. If any
-                        path is specified, will ONLY use those paths.
-  --exclude EXCLUDE     Specify a glob pattern to exclude when looking for
-                        notes. Directories are also matched with a trailing
-                        '/'. Can specify multiple times.
+  -p, --path PATH       Specify path(s). Can specify multiple. Directories will recurse and follow exclusions, etc. Specified files will not. If
+                        not specified, will be '.'. If any path is specified, will ONLY use those paths.
+  --exclude EXCLUDE     Specify a glob pattern to exclude when looking for notes. Directories are also matched with a trailing '/'. Can specify
+                        multiple times.
   --exclude-links       Do not include symlinked notefiles
   --match-exclude-case  Match case on exclude patterns
-  --max-depth N         Specify the maximum depth to search for notes. The
-                        current directory is 0
+  --max-depth N         Specify the maximum depth to search for notes. The current directory is 0
   -x, --one-file-system
                         Do not cross filesystem boundaries
   --type {dir,file,both}
@@ -544,26 +385,17 @@ find Options:
 Display Options:
   Some flags will be ignored and/or are mutually exclusive
 
-  -0, --print0          Terminate names with a null byte. For use with `xargs
-                        -0` when filenames have space
+  -0, --print0          Terminate names with a null byte. For use with `xargs -0` when filenames have space
   --export              Export notes rather than printing names or tags
   --export-format {yaml,json,jsonl}
-                        [yaml] Export format. For jsonl, will be a list of
-                        dicts with the filename as '__filename' (to avoid
-                        accidentally clobbering a 'filename' key) and a
-                        metadata entry. The other formats are dictionaries
-  --tag-mode            Displays results in terms of *all* tags present in the
-                        results
-  --tag-counts          Displays results with the counts of *all* tags present
-                        in the results. Implies --tag-mode
-  --tag-count-order     Orders the results by number of tags. Implies --tag-
-                        mode
-  -o FILE, --output FILE
-                        Write results to FILE instead of stdout
-  --symlink DIR         Create symlinks in DIR to the found files. If used in
-                        --tag-mode, will also have subdirs with the name (or
-                        filter). If there are name conflicts, will add `.N` to
-                        the filename and print a warning to stderr
+                        [yaml] Export format. For jsonl, will be a list of dicts with the filename as '__filename' (to avoid accidentally
+                        clobbering a 'filename' key) and a metadata entry. The other formats are dictionaries
+  --tag-mode            Displays results in terms of *all* tags present in the results
+  --tag-counts          Displays results with the counts of *all* tags present in the results. Implies --tag-mode
+  --tag-count-order     Orders the results by number of tags. Implies --tag-mode
+  -o, --output FILE     Write results to FILE instead of stdout
+  --symlink DIR         Create symlinks in DIR to the found files. If used in --tag-mode, will also have subdirs with the name (or filter). If
+                        there are name conflicts, will add `.N` to the filename and print a warning to stderr
 
 ```
 
@@ -571,13 +403,9 @@ Display Options:
 
 
 ```text
-usage: notefile show [-h] [--debug] [--note-field field] [--version] [-p PATH]
-                     [--exclude EXCLUDE] [--exclude-links]
-                     [--match-exclude-case] [--max-depth N] [-x]
-                     [--type {dir,file,both}] [-0] [--export]
-                     [--export-format {yaml,json,jsonl}] [--tag-mode]
-                     [--tag-counts] [--tag-count-order] [-o FILE]
-                     [--symlink DIR] [-n] [-S | --subdir | --no-subdir]
+usage: notefile show [-h] [--debug] [--note-field field] [--version] [-p PATH] [--exclude EXCLUDE] [--exclude-links] [--match-exclude-case]
+                     [--max-depth N] [-x] [--type {dir,file,both}] [-0] [--export] [--export-format {yaml,json,jsonl}] [--tag-mode] [--tag-counts]
+                     [--tag-count-order] [-o FILE] [--symlink DIR] [-n] [-S | --subdir | --no-subdir]
                      [path ...]
 
 positional arguments:
@@ -587,34 +415,26 @@ options:
   -h, --help            show this help message and exit
   -n, --dry-run         Do not make changes
   -S, --subdir, --no-subdir
-                        Make new notes in a subdir. NOT default unless set
-                        with $NOTEFILE_SUBDIR environment variable. When using
-                        --subdir with --hidden, will store in '.notefiles' and
-                        when using --subdir with --visible, will store in
-                        '_notefiles'. Default is based on original setting
+                        Make new notes in a subdir. NOT default unless set with $NOTEFILE_SUBDIR environment variable. When using --subdir with
+                        --hidden, will store in '.notefiles' and when using --subdir with --visible, will store in '_notefiles'. Default is based
+                        on original setting
 
 Global Options:
   --debug               Debug mode
-  --note-field field    Specify the field in the notes to read/write. Defaults
-                        to 'notes' or $NOTEFILE_NOTEFIELD environment
-                        variable. With `mod`, `--note-field FIELD --note TEXT`
-                        is equivalent to `--field-note FIELD TEXT`
+  --note-field field    Specify the field in the notes to read/write. Defaults to 'notes' or $NOTEFILE_NOTEFIELD environment variable. With `mod`,
+                        `--note-field FIELD --note TEXT` is equivalent to `--field-note FIELD TEXT`
   --version             show program's version number and exit
 
 find Options:
   Flags for finding notes
 
-  -p PATH, --path PATH  Specify path(s). Can specify multiple. Directories
-                        will recurse and follow exclusions, etc. Specified
-                        files will not. If not specified, will be '.'. If any
-                        path is specified, will ONLY use those paths.
-  --exclude EXCLUDE     Specify a glob pattern to exclude when looking for
-                        notes. Directories are also matched with a trailing
-                        '/'. Can specify multiple times.
+  -p, --path PATH       Specify path(s). Can specify multiple. Directories will recurse and follow exclusions, etc. Specified files will not. If
+                        not specified, will be '.'. If any path is specified, will ONLY use those paths.
+  --exclude EXCLUDE     Specify a glob pattern to exclude when looking for notes. Directories are also matched with a trailing '/'. Can specify
+                        multiple times.
   --exclude-links       Do not include symlinked notefiles
   --match-exclude-case  Match case on exclude patterns
-  --max-depth N         Specify the maximum depth to search for notes. The
-                        current directory is 0
+  --max-depth N         Specify the maximum depth to search for notes. The current directory is 0
   -x, --one-file-system
                         Do not cross filesystem boundaries
   --type {dir,file,both}
@@ -623,26 +443,17 @@ find Options:
 Display Options:
   Some flags will be ignored and/or are mutually exclusive
 
-  -0, --print0          Terminate names with a null byte. For use with `xargs
-                        -0` when filenames have space
+  -0, --print0          Terminate names with a null byte. For use with `xargs -0` when filenames have space
   --export              Export notes rather than printing names or tags
   --export-format {yaml,json,jsonl}
-                        [yaml] Export format. For jsonl, will be a list of
-                        dicts with the filename as '__filename' (to avoid
-                        accidentally clobbering a 'filename' key) and a
-                        metadata entry. The other formats are dictionaries
-  --tag-mode            Displays results in terms of *all* tags present in the
-                        results
-  --tag-counts          Displays results with the counts of *all* tags present
-                        in the results. Implies --tag-mode
-  --tag-count-order     Orders the results by number of tags. Implies --tag-
-                        mode
-  -o FILE, --output FILE
-                        Write results to FILE instead of stdout
-  --symlink DIR         Create symlinks in DIR to the found files. If used in
-                        --tag-mode, will also have subdirs with the name (or
-                        filter). If there are name conflicts, will add `.N` to
-                        the filename and print a warning to stderr
+                        [yaml] Export format. For jsonl, will be a list of dicts with the filename as '__filename' (to avoid accidentally
+                        clobbering a 'filename' key) and a metadata entry. The other formats are dictionaries
+  --tag-mode            Displays results in terms of *all* tags present in the results
+  --tag-counts          Displays results with the counts of *all* tags present in the results. Implies --tag-mode
+  --tag-count-order     Orders the results by number of tags. Implies --tag-mode
+  -o, --output FILE     Write results to FILE instead of stdout
+  --symlink DIR         Create symlinks in DIR to the found files. If used in --tag-mode, will also have subdirs with the name (or filter). If
+                        there are name conflicts, will add `.N` to the filename and print a warning to stderr
 
 ```
 
@@ -650,13 +461,9 @@ Display Options:
 
 
 ```text
-usage: notefile hide [-h] [--debug] [--note-field field] [--version] [-p PATH]
-                     [--exclude EXCLUDE] [--exclude-links]
-                     [--match-exclude-case] [--max-depth N] [-x]
-                     [--type {dir,file,both}] [-0] [--export]
-                     [--export-format {yaml,json,jsonl}] [--tag-mode]
-                     [--tag-counts] [--tag-count-order] [-o FILE]
-                     [--symlink DIR] [-n] [-S | --subdir | --no-subdir]
+usage: notefile hide [-h] [--debug] [--note-field field] [--version] [-p PATH] [--exclude EXCLUDE] [--exclude-links] [--match-exclude-case]
+                     [--max-depth N] [-x] [--type {dir,file,both}] [-0] [--export] [--export-format {yaml,json,jsonl}] [--tag-mode] [--tag-counts]
+                     [--tag-count-order] [-o FILE] [--symlink DIR] [-n] [-S | --subdir | --no-subdir]
                      [path ...]
 
 positional arguments:
@@ -666,34 +473,26 @@ options:
   -h, --help            show this help message and exit
   -n, --dry-run         Do not make changes
   -S, --subdir, --no-subdir
-                        Make new notes in a subdir. NOT default unless set
-                        with $NOTEFILE_SUBDIR environment variable. When using
-                        --subdir with --hidden, will store in '.notefiles' and
-                        when using --subdir with --visible, will store in
-                        '_notefiles'. Default is based on original setting
+                        Make new notes in a subdir. NOT default unless set with $NOTEFILE_SUBDIR environment variable. When using --subdir with
+                        --hidden, will store in '.notefiles' and when using --subdir with --visible, will store in '_notefiles'. Default is based
+                        on original setting
 
 Global Options:
   --debug               Debug mode
-  --note-field field    Specify the field in the notes to read/write. Defaults
-                        to 'notes' or $NOTEFILE_NOTEFIELD environment
-                        variable. With `mod`, `--note-field FIELD --note TEXT`
-                        is equivalent to `--field-note FIELD TEXT`
+  --note-field field    Specify the field in the notes to read/write. Defaults to 'notes' or $NOTEFILE_NOTEFIELD environment variable. With `mod`,
+                        `--note-field FIELD --note TEXT` is equivalent to `--field-note FIELD TEXT`
   --version             show program's version number and exit
 
 find Options:
   Flags for finding notes
 
-  -p PATH, --path PATH  Specify path(s). Can specify multiple. Directories
-                        will recurse and follow exclusions, etc. Specified
-                        files will not. If not specified, will be '.'. If any
-                        path is specified, will ONLY use those paths.
-  --exclude EXCLUDE     Specify a glob pattern to exclude when looking for
-                        notes. Directories are also matched with a trailing
-                        '/'. Can specify multiple times.
+  -p, --path PATH       Specify path(s). Can specify multiple. Directories will recurse and follow exclusions, etc. Specified files will not. If
+                        not specified, will be '.'. If any path is specified, will ONLY use those paths.
+  --exclude EXCLUDE     Specify a glob pattern to exclude when looking for notes. Directories are also matched with a trailing '/'. Can specify
+                        multiple times.
   --exclude-links       Do not include symlinked notefiles
   --match-exclude-case  Match case on exclude patterns
-  --max-depth N         Specify the maximum depth to search for notes. The
-                        current directory is 0
+  --max-depth N         Specify the maximum depth to search for notes. The current directory is 0
   -x, --one-file-system
                         Do not cross filesystem boundaries
   --type {dir,file,both}
@@ -702,26 +501,17 @@ find Options:
 Display Options:
   Some flags will be ignored and/or are mutually exclusive
 
-  -0, --print0          Terminate names with a null byte. For use with `xargs
-                        -0` when filenames have space
+  -0, --print0          Terminate names with a null byte. For use with `xargs -0` when filenames have space
   --export              Export notes rather than printing names or tags
   --export-format {yaml,json,jsonl}
-                        [yaml] Export format. For jsonl, will be a list of
-                        dicts with the filename as '__filename' (to avoid
-                        accidentally clobbering a 'filename' key) and a
-                        metadata entry. The other formats are dictionaries
-  --tag-mode            Displays results in terms of *all* tags present in the
-                        results
-  --tag-counts          Displays results with the counts of *all* tags present
-                        in the results. Implies --tag-mode
-  --tag-count-order     Orders the results by number of tags. Implies --tag-
-                        mode
-  -o FILE, --output FILE
-                        Write results to FILE instead of stdout
-  --symlink DIR         Create symlinks in DIR to the found files. If used in
-                        --tag-mode, will also have subdirs with the name (or
-                        filter). If there are name conflicts, will add `.N` to
-                        the filename and print a warning to stderr
+                        [yaml] Export format. For jsonl, will be a list of dicts with the filename as '__filename' (to avoid accidentally
+                        clobbering a 'filename' key) and a metadata entry. The other formats are dictionaries
+  --tag-mode            Displays results in terms of *all* tags present in the results
+  --tag-counts          Displays results with the counts of *all* tags present in the results. Implies --tag-mode
+  --tag-count-order     Orders the results by number of tags. Implies --tag-mode
+  -o, --output FILE     Write results to FILE instead of stdout
+  --symlink DIR         Create symlinks in DIR to the found files. If used in --tag-mode, will also have subdirs with the name (or filter). If
+                        there are name conflicts, will add `.N` to the filename and print a warning to stderr
 
 ```
 
@@ -729,13 +519,9 @@ Display Options:
 
 
 ```text
-usage: notefile format [-h] [--debug] [--note-field field] [--version]
-                       [-p PATH] [--exclude EXCLUDE] [--exclude-links]
-                       [--match-exclude-case] [--max-depth N] [-x]
-                       [--type {dir,file,both}] [-0] [--export]
-                       [--export-format {yaml,json,jsonl}] [--tag-mode]
-                       [--tag-counts] [--tag-count-order] [-o FILE]
-                       [--symlink DIR] [-n]
+usage: notefile format [-h] [--debug] [--note-field field] [--version] [-p PATH] [--exclude EXCLUDE] [--exclude-links] [--match-exclude-case]
+                       [--max-depth N] [-x] [--type {dir,file,both}] [-0] [--export] [--export-format {yaml,json,jsonl}] [--tag-mode]
+                       [--tag-counts] [--tag-count-order] [-o FILE] [--symlink DIR] [-n]
                        {yaml,json} [path ...]
 
 positional arguments:
@@ -748,26 +534,20 @@ options:
 
 Global Options:
   --debug               Debug mode
-  --note-field field    Specify the field in the notes to read/write. Defaults
-                        to 'notes' or $NOTEFILE_NOTEFIELD environment
-                        variable. With `mod`, `--note-field FIELD --note TEXT`
-                        is equivalent to `--field-note FIELD TEXT`
+  --note-field field    Specify the field in the notes to read/write. Defaults to 'notes' or $NOTEFILE_NOTEFIELD environment variable. With `mod`,
+                        `--note-field FIELD --note TEXT` is equivalent to `--field-note FIELD TEXT`
   --version             show program's version number and exit
 
 find Options:
   Flags for finding notes
 
-  -p PATH, --path PATH  Specify path(s). Can specify multiple. Directories
-                        will recurse and follow exclusions, etc. Specified
-                        files will not. If not specified, will be '.'. If any
-                        path is specified, will ONLY use those paths.
-  --exclude EXCLUDE     Specify a glob pattern to exclude when looking for
-                        notes. Directories are also matched with a trailing
-                        '/'. Can specify multiple times.
+  -p, --path PATH       Specify path(s). Can specify multiple. Directories will recurse and follow exclusions, etc. Specified files will not. If
+                        not specified, will be '.'. If any path is specified, will ONLY use those paths.
+  --exclude EXCLUDE     Specify a glob pattern to exclude when looking for notes. Directories are also matched with a trailing '/'. Can specify
+                        multiple times.
   --exclude-links       Do not include symlinked notefiles
   --match-exclude-case  Match case on exclude patterns
-  --max-depth N         Specify the maximum depth to search for notes. The
-                        current directory is 0
+  --max-depth N         Specify the maximum depth to search for notes. The current directory is 0
   -x, --one-file-system
                         Do not cross filesystem boundaries
   --type {dir,file,both}
@@ -776,26 +556,17 @@ find Options:
 Display Options:
   Some flags will be ignored and/or are mutually exclusive
 
-  -0, --print0          Terminate names with a null byte. For use with `xargs
-                        -0` when filenames have space
+  -0, --print0          Terminate names with a null byte. For use with `xargs -0` when filenames have space
   --export              Export notes rather than printing names or tags
   --export-format {yaml,json,jsonl}
-                        [yaml] Export format. For jsonl, will be a list of
-                        dicts with the filename as '__filename' (to avoid
-                        accidentally clobbering a 'filename' key) and a
-                        metadata entry. The other formats are dictionaries
-  --tag-mode            Displays results in terms of *all* tags present in the
-                        results
-  --tag-counts          Displays results with the counts of *all* tags present
-                        in the results. Implies --tag-mode
-  --tag-count-order     Orders the results by number of tags. Implies --tag-
-                        mode
-  -o FILE, --output FILE
-                        Write results to FILE instead of stdout
-  --symlink DIR         Create symlinks in DIR to the found files. If used in
-                        --tag-mode, will also have subdirs with the name (or
-                        filter). If there are name conflicts, will add `.N` to
-                        the filename and print a warning to stderr
+                        [yaml] Export format. For jsonl, will be a list of dicts with the filename as '__filename' (to avoid accidentally
+                        clobbering a 'filename' key) and a metadata entry. The other formats are dictionaries
+  --tag-mode            Displays results in terms of *all* tags present in the results
+  --tag-counts          Displays results with the counts of *all* tags present in the results. Implies --tag-mode
+  --tag-count-order     Orders the results by number of tags. Implies --tag-mode
+  -o, --output FILE     Write results to FILE instead of stdout
+  --symlink DIR         Create symlinks in DIR to the found files. If used in --tag-mode, will also have subdirs with the name (or filter). If
+                        there are name conflicts, will add `.N` to the filename and print a warning to stderr
 
 ```
 
@@ -803,18 +574,11 @@ Display Options:
 
 
 ```text
-usage: notefile repair [-h] [--debug] [--note-field field] [--version]
-                       [-p PATH] [--exclude EXCLUDE] [--exclude-links]
-                       [--match-exclude-case] [--max-depth N] [-x]
-                       [--type {dir,file,both}] [--link {source,symlink,both}]
-                       [-H] [-V] [-S | --subdir | --no-subdir] [--no-hash]
-                       [--no-refresh] [--format {json,yaml}]
-                       [--rewrite-format] [--dry-run] [--force-refresh]
-                       [--match {size,mtime,hash,name}]
-                       [--search-path SEARCH_PATH]
-                       [--search-exclude SEARCH_EXCLUDE]
-                       [--search-exclude-links] [--search-match-exclude-case]
-                       [--search-max-depth N] [--search-one-file-system]
+usage: notefile repair [-h] [--debug] [--note-field field] [--version] [-p PATH] [--exclude EXCLUDE] [--exclude-links] [--match-exclude-case]
+                       [--max-depth N] [-x] [--type {dir,file,both}] [--link {source,symlink,both}] [-H] [-V] [-S | --subdir | --no-subdir]
+                       [--no-hash] [--no-refresh] [--format {json,yaml}] [--rewrite-format] [--dry-run] [--force-refresh]
+                       [--match {size,mtime,hash,name}] [--search-path SEARCH_PATH] [--search-exclude SEARCH_EXCLUDE] [--search-exclude-links]
+                       [--search-match-exclude-case] [--search-max-depth N] [--search-one-file-system]
                        [path ...]
 
 positional arguments:
@@ -825,26 +589,20 @@ options:
 
 Global Options:
   --debug               Debug mode
-  --note-field field    Specify the field in the notes to read/write. Defaults
-                        to 'notes' or $NOTEFILE_NOTEFIELD environment
-                        variable. With `mod`, `--note-field FIELD --note TEXT`
-                        is equivalent to `--field-note FIELD TEXT`
+  --note-field field    Specify the field in the notes to read/write. Defaults to 'notes' or $NOTEFILE_NOTEFIELD environment variable. With `mod`,
+                        `--note-field FIELD --note TEXT` is equivalent to `--field-note FIELD TEXT`
   --version             show program's version number and exit
 
 find Options:
   Flags for finding notes
 
-  -p PATH, --path PATH  Specify path(s). Can specify multiple. Directories
-                        will recurse and follow exclusions, etc. Specified
-                        files will not. If not specified, will be '.'. If any
-                        path is specified, will ONLY use those paths.
-  --exclude EXCLUDE     Specify a glob pattern to exclude when looking for
-                        notes. Directories are also matched with a trailing
-                        '/'. Can specify multiple times.
+  -p, --path PATH       Specify path(s). Can specify multiple. Directories will recurse and follow exclusions, etc. Specified files will not. If
+                        not specified, will be '.'. If any path is specified, will ONLY use those paths.
+  --exclude EXCLUDE     Specify a glob pattern to exclude when looking for notes. Directories are also matched with a trailing '/'. Can specify
+                        multiple times.
   --exclude-links       Do not include symlinked notefiles
   --match-exclude-case  Match case on exclude patterns
-  --max-depth N         Specify the maximum depth to search for notes. The
-                        current directory is 0
+  --max-depth N         Specify the maximum depth to search for notes. The current directory is 0
   -x, --one-file-system
                         Do not cross filesystem boundaries
   --type {dir,file,both}
@@ -854,71 +612,45 @@ Create/Modify Options:
   Flags for creating and saving notes. Not all flags are always applicable!
 
   --link {source,symlink,both}
-                        ['both'] Specify how to handle symlinks. If 'source',
-                        will add the notefile to the source only (non-
-                        recursively). If 'symlink', will add the notefile to
-                        *just* the symlink file. If 'both', will add the
-                        notefile the source (non-recursivly) and then symlink
-                        to that notefile.
-  -H, --hidden          Make new notes hidden. NOT default unless set with
-                        $NOTEFILE_HIDDEN environment variable
-  -V, --visible         Make new notes visible. Default unless set with
-                        $NOTEFILE_HIDDEN environment variable
+                        ['both'] Specify how to handle symlinks. If 'source', will add the notefile to the source only (non-recursively). If
+                        'symlink', will add the notefile to *just* the symlink file. If 'both', will add the notefile the source (non-recursivly)
+                        and then symlink to that notefile.
+  -H, --hidden          Make new notes hidden. NOT default unless set with $NOTEFILE_HIDDEN environment variable
+  -V, --visible         Make new notes visible. Default unless set with $NOTEFILE_HIDDEN environment variable
   -S, --subdir, --no-subdir
-                        Make new notes in a subdir. NOT default unless set
-                        with $NOTEFILE_SUBDIR environment variable. When using
-                        --subdir with --hidden, will store in '.notefiles' and
-                        when using --subdir with --visible, will store in
-                        '_notefiles'. Default False
-  --no-hash             Do *not* compute the SHA256 of the file. Will not be
-                        able to repair orphaned notes
-  --no-refresh          Do not refresh/repair file metadata when a notefile is
-                        modified
-  --format {json,yaml}  Note format for writing NEW notes. Will not change the
-                        format for existing notes unless --rewrite-format is
-                        set. Default is 'yaml' unless set with
-                        $NOTEFILE_FORMAT environment variable. Currently not
-                        set.
-  --rewrite-format      Change to the specified format (see '--format')
-                        regardless of current format.
+                        Make new notes in a subdir. NOT default unless set with $NOTEFILE_SUBDIR environment variable. When using --subdir with
+                        --hidden, will store in '.notefiles' and when using --subdir with --visible, will store in '_notefiles'. Default False
+  --no-hash             Do *not* compute the SHA256 of the file. Will not be able to repair orphaned notes
+  --no-refresh          Do not refresh/repair file metadata when a notefile is modified
+  --format {json,yaml}  Note format for writing NEW notes. Will not change the format for existing notes unless --rewrite-format is set. Default
+                        is 'yaml' unless set with $NOTEFILE_FORMAT environment variable. Currently not set.
+  --rewrite-format      Change to the specified format (see '--format') regardless of current format.
 
 Repair Options:
   --dry-run             Do not make any changes
 
 Repair metadata options:
-  --force-refresh       Force notefile repair to refresh all metadata (while
-                        still respecting --no-hash)
+  --force-refresh       Force notefile repair to refresh all metadata (while still respecting --no-hash)
 
 Repair orphaned options:
   --match {size,mtime,hash,name}
-                        Specify how to search for matches. Specify multiple as
-                        needed. 'size' is ALWAYS implied but is the only
-                        attribute if '--match size' is the sole flag. Default
-                        is '--match mtime --match hash' (with '--match size'
-                        implied). Specifying '--match name' means the the
-                        moved file must have the same name (aka leaf). Note:
-                        will ONLY match if there is only a single candidate so
-                        more requirements is also more likely to match. Use
-                        --dry-run if needed to test!
+                        Specify how to search for matches. Specify multiple as needed. 'size' is ALWAYS implied but is the only attribute if '--
+                        match size' is the sole flag. Default is '--match mtime --match hash' (with '--match size' implied). Specifying '--match
+                        name' means the the moved file must have the same name (aka leaf). Note: will ONLY match if there is only a single
+                        candidate so more requirements is also more likely to match. Use --dry-run if needed to test!
   --search-path SEARCH_PATH
-                        Specify path(s). Can specify multiple. Directories
-                        will recurse and follow exclusions, etc. Specified
-                        files will not. If not specified, will be --path (or
-                        parent if a file). If *any* path is specified, will
-                        ONLY use those paths and not --path
+                        Specify path(s). Can specify multiple. Directories will recurse and follow exclusions, etc. Specified files will not. If
+                        not specified, will be --path (or parent if a file). If *any* path is specified, will ONLY use those paths and not --path
   --search-exclude SEARCH_EXCLUDE
-                        Specify a glob pattern to exclude when looking for
-                        files. Directories are also matched with a trailing
-                        '/'. Can specify multiple times.
+                        Specify a glob pattern to exclude when looking for files. Directories are also matched with a trailing '/'. Can specify
+                        multiple times.
   --search-exclude-links
                         Do not include symlinked files
   --search-match-exclude-case
                         Match case on exclude patterns
-  --search-max-depth N  Specify the maximum depth to search for files. The
-                        current directory is 0
+  --search-max-depth N  Specify the maximum depth to search for files. The current directory is 0
   --search-one-file-system
-                        Do not cross filesystem boundaries when searching for
-                        a file
+                        Do not cross filesystem boundaries when searching for a file
 
 ```
 
@@ -926,14 +658,9 @@ Repair orphaned options:
 
 
 ```text
-usage: notefile repair-metadata [-h] [--debug] [--note-field field]
-                                [--version] [-p PATH] [--exclude EXCLUDE]
-                                [--exclude-links] [--match-exclude-case]
-                                [--max-depth N] [-x] [--type {dir,file,both}]
-                                [--link {source,symlink,both}] [-H] [-V]
-                                [-S | --subdir | --no-subdir] [--no-hash]
-                                [--no-refresh] [--format {json,yaml}]
-                                [--rewrite-format] [--dry-run]
+usage: notefile repair-metadata [-h] [--debug] [--note-field field] [--version] [-p PATH] [--exclude EXCLUDE] [--exclude-links]
+                                [--match-exclude-case] [--max-depth N] [-x] [--type {dir,file,both}] [--link {source,symlink,both}] [-H] [-V]
+                                [-S | --subdir | --no-subdir] [--no-hash] [--no-refresh] [--format {json,yaml}] [--rewrite-format] [--dry-run]
                                 [--force-refresh]
                                 [path ...]
 
@@ -945,26 +672,20 @@ options:
 
 Global Options:
   --debug               Debug mode
-  --note-field field    Specify the field in the notes to read/write. Defaults
-                        to 'notes' or $NOTEFILE_NOTEFIELD environment
-                        variable. With `mod`, `--note-field FIELD --note TEXT`
-                        is equivalent to `--field-note FIELD TEXT`
+  --note-field field    Specify the field in the notes to read/write. Defaults to 'notes' or $NOTEFILE_NOTEFIELD environment variable. With `mod`,
+                        `--note-field FIELD --note TEXT` is equivalent to `--field-note FIELD TEXT`
   --version             show program's version number and exit
 
 find Options:
   Flags for finding notes
 
-  -p PATH, --path PATH  Specify path(s). Can specify multiple. Directories
-                        will recurse and follow exclusions, etc. Specified
-                        files will not. If not specified, will be '.'. If any
-                        path is specified, will ONLY use those paths.
-  --exclude EXCLUDE     Specify a glob pattern to exclude when looking for
-                        notes. Directories are also matched with a trailing
-                        '/'. Can specify multiple times.
+  -p, --path PATH       Specify path(s). Can specify multiple. Directories will recurse and follow exclusions, etc. Specified files will not. If
+                        not specified, will be '.'. If any path is specified, will ONLY use those paths.
+  --exclude EXCLUDE     Specify a glob pattern to exclude when looking for notes. Directories are also matched with a trailing '/'. Can specify
+                        multiple times.
   --exclude-links       Do not include symlinked notefiles
   --match-exclude-case  Match case on exclude patterns
-  --max-depth N         Specify the maximum depth to search for notes. The
-                        current directory is 0
+  --max-depth N         Specify the maximum depth to search for notes. The current directory is 0
   -x, --one-file-system
                         Do not cross filesystem boundaries
   --type {dir,file,both}
@@ -974,40 +695,25 @@ Create/Modify Options:
   Flags for creating and saving notes. Not all flags are always applicable!
 
   --link {source,symlink,both}
-                        ['both'] Specify how to handle symlinks. If 'source',
-                        will add the notefile to the source only (non-
-                        recursively). If 'symlink', will add the notefile to
-                        *just* the symlink file. If 'both', will add the
-                        notefile the source (non-recursivly) and then symlink
-                        to that notefile.
-  -H, --hidden          Make new notes hidden. NOT default unless set with
-                        $NOTEFILE_HIDDEN environment variable
-  -V, --visible         Make new notes visible. Default unless set with
-                        $NOTEFILE_HIDDEN environment variable
+                        ['both'] Specify how to handle symlinks. If 'source', will add the notefile to the source only (non-recursively). If
+                        'symlink', will add the notefile to *just* the symlink file. If 'both', will add the notefile the source (non-recursivly)
+                        and then symlink to that notefile.
+  -H, --hidden          Make new notes hidden. NOT default unless set with $NOTEFILE_HIDDEN environment variable
+  -V, --visible         Make new notes visible. Default unless set with $NOTEFILE_HIDDEN environment variable
   -S, --subdir, --no-subdir
-                        Make new notes in a subdir. NOT default unless set
-                        with $NOTEFILE_SUBDIR environment variable. When using
-                        --subdir with --hidden, will store in '.notefiles' and
-                        when using --subdir with --visible, will store in
-                        '_notefiles'. Default False
-  --no-hash             Do *not* compute the SHA256 of the file. Will not be
-                        able to repair orphaned notes
-  --no-refresh          Do not refresh/repair file metadata when a notefile is
-                        modified
-  --format {json,yaml}  Note format for writing NEW notes. Will not change the
-                        format for existing notes unless --rewrite-format is
-                        set. Default is 'yaml' unless set with
-                        $NOTEFILE_FORMAT environment variable. Currently not
-                        set.
-  --rewrite-format      Change to the specified format (see '--format')
-                        regardless of current format.
+                        Make new notes in a subdir. NOT default unless set with $NOTEFILE_SUBDIR environment variable. When using --subdir with
+                        --hidden, will store in '.notefiles' and when using --subdir with --visible, will store in '_notefiles'. Default False
+  --no-hash             Do *not* compute the SHA256 of the file. Will not be able to repair orphaned notes
+  --no-refresh          Do not refresh/repair file metadata when a notefile is modified
+  --format {json,yaml}  Note format for writing NEW notes. Will not change the format for existing notes unless --rewrite-format is set. Default
+                        is 'yaml' unless set with $NOTEFILE_FORMAT environment variable. Currently not set.
+  --rewrite-format      Change to the specified format (see '--format') regardless of current format.
 
 Repair Options:
   --dry-run             Do not make any changes
 
 Repair metadata options:
-  --force-refresh       Force notefile repair-metadata to refresh all metadata
-                        (while still respecting --no-hash)
+  --force-refresh       Force notefile repair-metadata to refresh all metadata (while still respecting --no-hash)
 
 ```
 
@@ -1015,21 +721,11 @@ Repair metadata options:
 
 
 ```text
-usage: notefile repair-orphaned [-h] [--debug] [--note-field field]
-                                [--version] [-p PATH] [--exclude EXCLUDE]
-                                [--exclude-links] [--match-exclude-case]
-                                [--max-depth N] [-x] [--type {dir,file,both}]
-                                [--link {source,symlink,both}] [-H] [-V]
-                                [-S | --subdir | --no-subdir] [--no-hash]
-                                [--no-refresh] [--format {json,yaml}]
-                                [--rewrite-format] [--dry-run]
-                                [--match {size,mtime,hash,name}]
-                                [--search-path SEARCH_PATH]
-                                [--search-exclude SEARCH_EXCLUDE]
-                                [--search-exclude-links]
-                                [--search-match-exclude-case]
-                                [--search-max-depth N]
-                                [--search-one-file-system]
+usage: notefile repair-orphaned [-h] [--debug] [--note-field field] [--version] [-p PATH] [--exclude EXCLUDE] [--exclude-links]
+                                [--match-exclude-case] [--max-depth N] [-x] [--type {dir,file,both}] [--link {source,symlink,both}] [-H] [-V]
+                                [-S | --subdir | --no-subdir] [--no-hash] [--no-refresh] [--format {json,yaml}] [--rewrite-format] [--dry-run]
+                                [--match {size,mtime,hash,name}] [--search-path SEARCH_PATH] [--search-exclude SEARCH_EXCLUDE]
+                                [--search-exclude-links] [--search-match-exclude-case] [--search-max-depth N] [--search-one-file-system]
                                 [path ...]
 
 positional arguments:
@@ -1040,26 +736,20 @@ options:
 
 Global Options:
   --debug               Debug mode
-  --note-field field    Specify the field in the notes to read/write. Defaults
-                        to 'notes' or $NOTEFILE_NOTEFIELD environment
-                        variable. With `mod`, `--note-field FIELD --note TEXT`
-                        is equivalent to `--field-note FIELD TEXT`
+  --note-field field    Specify the field in the notes to read/write. Defaults to 'notes' or $NOTEFILE_NOTEFIELD environment variable. With `mod`,
+                        `--note-field FIELD --note TEXT` is equivalent to `--field-note FIELD TEXT`
   --version             show program's version number and exit
 
 find Options:
   Flags for finding notes
 
-  -p PATH, --path PATH  Specify path(s). Can specify multiple. Directories
-                        will recurse and follow exclusions, etc. Specified
-                        files will not. If not specified, will be '.'. If any
-                        path is specified, will ONLY use those paths.
-  --exclude EXCLUDE     Specify a glob pattern to exclude when looking for
-                        notes. Directories are also matched with a trailing
-                        '/'. Can specify multiple times.
+  -p, --path PATH       Specify path(s). Can specify multiple. Directories will recurse and follow exclusions, etc. Specified files will not. If
+                        not specified, will be '.'. If any path is specified, will ONLY use those paths.
+  --exclude EXCLUDE     Specify a glob pattern to exclude when looking for notes. Directories are also matched with a trailing '/'. Can specify
+                        multiple times.
   --exclude-links       Do not include symlinked notefiles
   --match-exclude-case  Match case on exclude patterns
-  --max-depth N         Specify the maximum depth to search for notes. The
-                        current directory is 0
+  --max-depth N         Specify the maximum depth to search for notes. The current directory is 0
   -x, --one-file-system
                         Do not cross filesystem boundaries
   --type {dir,file,both}
@@ -1069,67 +759,42 @@ Create/Modify Options:
   Flags for creating and saving notes. Not all flags are always applicable!
 
   --link {source,symlink,both}
-                        ['both'] Specify how to handle symlinks. If 'source',
-                        will add the notefile to the source only (non-
-                        recursively). If 'symlink', will add the notefile to
-                        *just* the symlink file. If 'both', will add the
-                        notefile the source (non-recursivly) and then symlink
-                        to that notefile.
-  -H, --hidden          Make new notes hidden. NOT default unless set with
-                        $NOTEFILE_HIDDEN environment variable
-  -V, --visible         Make new notes visible. Default unless set with
-                        $NOTEFILE_HIDDEN environment variable
+                        ['both'] Specify how to handle symlinks. If 'source', will add the notefile to the source only (non-recursively). If
+                        'symlink', will add the notefile to *just* the symlink file. If 'both', will add the notefile the source (non-recursivly)
+                        and then symlink to that notefile.
+  -H, --hidden          Make new notes hidden. NOT default unless set with $NOTEFILE_HIDDEN environment variable
+  -V, --visible         Make new notes visible. Default unless set with $NOTEFILE_HIDDEN environment variable
   -S, --subdir, --no-subdir
-                        Make new notes in a subdir. NOT default unless set
-                        with $NOTEFILE_SUBDIR environment variable. When using
-                        --subdir with --hidden, will store in '.notefiles' and
-                        when using --subdir with --visible, will store in
-                        '_notefiles'. Default False
-  --no-hash             Do *not* compute the SHA256 of the file. Will not be
-                        able to repair orphaned notes
-  --no-refresh          Do not refresh/repair file metadata when a notefile is
-                        modified
-  --format {json,yaml}  Note format for writing NEW notes. Will not change the
-                        format for existing notes unless --rewrite-format is
-                        set. Default is 'yaml' unless set with
-                        $NOTEFILE_FORMAT environment variable. Currently not
-                        set.
-  --rewrite-format      Change to the specified format (see '--format')
-                        regardless of current format.
+                        Make new notes in a subdir. NOT default unless set with $NOTEFILE_SUBDIR environment variable. When using --subdir with
+                        --hidden, will store in '.notefiles' and when using --subdir with --visible, will store in '_notefiles'. Default False
+  --no-hash             Do *not* compute the SHA256 of the file. Will not be able to repair orphaned notes
+  --no-refresh          Do not refresh/repair file metadata when a notefile is modified
+  --format {json,yaml}  Note format for writing NEW notes. Will not change the format for existing notes unless --rewrite-format is set. Default
+                        is 'yaml' unless set with $NOTEFILE_FORMAT environment variable. Currently not set.
+  --rewrite-format      Change to the specified format (see '--format') regardless of current format.
 
 Repair Options:
   --dry-run             Do not make any changes
 
 Repair orphaned options:
   --match {size,mtime,hash,name}
-                        Specify how to search for matches. Specify multiple as
-                        needed. 'size' is ALWAYS implied but is the only
-                        attribute if '--match size' is the sole flag. Default
-                        is '--match mtime --match hash' (with '--match size'
-                        implied). Specifying '--match name' means the the
-                        moved file must have the same name (aka leaf). Note:
-                        will ONLY match if there is only a single candidate so
-                        more requirements is also more likely to match. Use
-                        --dry-run if needed to test!
+                        Specify how to search for matches. Specify multiple as needed. 'size' is ALWAYS implied but is the only attribute if '--
+                        match size' is the sole flag. Default is '--match mtime --match hash' (with '--match size' implied). Specifying '--match
+                        name' means the the moved file must have the same name (aka leaf). Note: will ONLY match if there is only a single
+                        candidate so more requirements is also more likely to match. Use --dry-run if needed to test!
   --search-path SEARCH_PATH
-                        Specify path(s). Can specify multiple. Directories
-                        will recurse and follow exclusions, etc. Specified
-                        files will not. If not specified, will be --path (or
-                        parent if a file). If *any* path is specified, will
-                        ONLY use those paths and not --path
+                        Specify path(s). Can specify multiple. Directories will recurse and follow exclusions, etc. Specified files will not. If
+                        not specified, will be --path (or parent if a file). If *any* path is specified, will ONLY use those paths and not --path
   --search-exclude SEARCH_EXCLUDE
-                        Specify a glob pattern to exclude when looking for
-                        files. Directories are also matched with a trailing
-                        '/'. Can specify multiple times.
+                        Specify a glob pattern to exclude when looking for files. Directories are also matched with a trailing '/'. Can specify
+                        multiple times.
   --search-exclude-links
                         Do not include symlinked files
   --search-match-exclude-case
                         Match case on exclude patterns
-  --search-max-depth N  Specify the maximum depth to search for files. The
-                        current directory is 0
+  --search-max-depth N  Specify the maximum depth to search for files. The current directory is 0
   --search-one-file-system
-                        Do not cross filesystem boundaries when searching for
-                        a file
+                        Do not cross filesystem boundaries when searching for a file
 
 ```
 
@@ -1137,24 +802,20 @@ Repair orphaned options:
 
 
 ```text
-usage: notefile cat [-h] [--debug] [--note-field field] [--version] [-f] [-t]
-                    file
+usage: notefile cat [-h] [--debug] [--note-field field] [--version] [-f] [-t] file
 
 positional arguments:
   file                Specify file to cat
 
 options:
   -h, --help          show this help message and exit
-  -f, --full          Display the full YAML note rather than just the note
-                      text
+  -f, --full          Display the full YAML note rather than just the note text
   -t, --tags          Display the tags
 
 Global Options:
   --debug             Debug mode
-  --note-field field  Specify the field in the notes to read/write. Defaults
-                      to 'notes' or $NOTEFILE_NOTEFIELD environment variable.
-                      With `mod`, `--note-field FIELD --note TEXT` is
-                      equivalent to `--field-note FIELD TEXT`
+  --note-field field  Specify the field in the notes to read/write. Defaults to 'notes' or $NOTEFILE_NOTEFIELD environment variable. With `mod`,
+                      `--note-field FIELD --note TEXT` is equivalent to `--field-note FIELD TEXT`
   --version           show program's version number and exit
 
 ```
@@ -1163,41 +824,30 @@ Global Options:
 
 
 ```text
-usage: notefile find [-h] [--debug] [--note-field field] [--version] [-p PATH]
-                     [--exclude EXCLUDE] [--exclude-links]
-                     [--match-exclude-case] [--max-depth N] [-x]
-                     [--type {dir,file,both}] [-0] [--export]
-                     [--export-format {yaml,json,jsonl}] [--tag-mode]
-                     [--tag-counts] [--tag-count-order] [-o FILE]
-                     [--symlink DIR] [--orphaned]
+usage: notefile find [-h] [--debug] [--note-field field] [--version] [-p PATH] [--exclude EXCLUDE] [--exclude-links] [--match-exclude-case]
+                     [--max-depth N] [-x] [--type {dir,file,both}] [-0] [--export] [--export-format {yaml,json,jsonl}] [--tag-mode] [--tag-counts]
+                     [--tag-count-order] [-o FILE] [--symlink DIR] [--orphaned]
 
 options:
   -h, --help            show this help message and exit
-  --orphaned            Find orphaned notes only. Does not repair. See repair-
-                        orphaned to repair
+  --orphaned            Find orphaned notes only. Does not repair. See repair-orphaned to repair
 
 Global Options:
   --debug               Debug mode
-  --note-field field    Specify the field in the notes to read/write. Defaults
-                        to 'notes' or $NOTEFILE_NOTEFIELD environment
-                        variable. With `mod`, `--note-field FIELD --note TEXT`
-                        is equivalent to `--field-note FIELD TEXT`
+  --note-field field    Specify the field in the notes to read/write. Defaults to 'notes' or $NOTEFILE_NOTEFIELD environment variable. With `mod`,
+                        `--note-field FIELD --note TEXT` is equivalent to `--field-note FIELD TEXT`
   --version             show program's version number and exit
 
 find Options:
   Flags for finding notes
 
-  -p PATH, --path PATH  Specify path(s). Can specify multiple. Directories
-                        will recurse and follow exclusions, etc. Specified
-                        files will not. If not specified, will be '.'. If any
-                        path is specified, will ONLY use those paths.
-  --exclude EXCLUDE     Specify a glob pattern to exclude when looking for
-                        notes. Directories are also matched with a trailing
-                        '/'. Can specify multiple times.
+  -p, --path PATH       Specify path(s). Can specify multiple. Directories will recurse and follow exclusions, etc. Specified files will not. If
+                        not specified, will be '.'. If any path is specified, will ONLY use those paths.
+  --exclude EXCLUDE     Specify a glob pattern to exclude when looking for notes. Directories are also matched with a trailing '/'. Can specify
+                        multiple times.
   --exclude-links       Do not include symlinked notefiles
   --match-exclude-case  Match case on exclude patterns
-  --max-depth N         Specify the maximum depth to search for notes. The
-                        current directory is 0
+  --max-depth N         Specify the maximum depth to search for notes. The current directory is 0
   -x, --one-file-system
                         Do not cross filesystem boundaries
   --type {dir,file,both}
@@ -1206,26 +856,17 @@ find Options:
 Display Options:
   Some flags will be ignored and/or are mutually exclusive
 
-  -0, --print0          Terminate names with a null byte. For use with `xargs
-                        -0` when filenames have space
+  -0, --print0          Terminate names with a null byte. For use with `xargs -0` when filenames have space
   --export              Export notes rather than printing names or tags
   --export-format {yaml,json,jsonl}
-                        [yaml] Export format. For jsonl, will be a list of
-                        dicts with the filename as '__filename' (to avoid
-                        accidentally clobbering a 'filename' key) and a
-                        metadata entry. The other formats are dictionaries
-  --tag-mode            Displays results in terms of *all* tags present in the
-                        results
-  --tag-counts          Displays results with the counts of *all* tags present
-                        in the results. Implies --tag-mode
-  --tag-count-order     Orders the results by number of tags. Implies --tag-
-                        mode
-  -o FILE, --output FILE
-                        Write results to FILE instead of stdout
-  --symlink DIR         Create symlinks in DIR to the found files. If used in
-                        --tag-mode, will also have subdirs with the name (or
-                        filter). If there are name conflicts, will add `.N` to
-                        the filename and print a warning to stderr
+                        [yaml] Export format. For jsonl, will be a list of dicts with the filename as '__filename' (to avoid accidentally
+                        clobbering a 'filename' key) and a metadata entry. The other formats are dictionaries
+  --tag-mode            Displays results in terms of *all* tags present in the results
+  --tag-counts          Displays results with the counts of *all* tags present in the results. Implies --tag-mode
+  --tag-count-order     Orders the results by number of tags. Implies --tag-mode
+  -o, --output FILE     Write results to FILE instead of stdout
+  --symlink DIR         Create symlinks in DIR to the found files. If used in --tag-mode, will also have subdirs with the name (or filter). If
+                        there are name conflicts, will add `.N` to the filename and print a warning to stderr
 
 ```
 
@@ -1233,13 +874,9 @@ Display Options:
 
 
 ```text
-usage: notefile export [-h] [--debug] [--note-field field] [--version]
-                       [-p PATH] [--exclude EXCLUDE] [--exclude-links]
-                       [--match-exclude-case] [--max-depth N] [-x]
-                       [--type {dir,file,both}] [-0] [--export]
-                       [--export-format {yaml,json,jsonl}] [--tag-mode]
-                       [--tag-counts] [--tag-count-order] [-o FILE]
-                       [--symlink DIR]
+usage: notefile export [-h] [--debug] [--note-field field] [--version] [-p PATH] [--exclude EXCLUDE] [--exclude-links] [--match-exclude-case]
+                       [--max-depth N] [-x] [--type {dir,file,both}] [-0] [--export] [--export-format {yaml,json,jsonl}] [--tag-mode]
+                       [--tag-counts] [--tag-count-order] [-o FILE] [--symlink DIR]
                        [path ...]
 
 positional arguments:
@@ -1250,26 +887,20 @@ options:
 
 Global Options:
   --debug               Debug mode
-  --note-field field    Specify the field in the notes to read/write. Defaults
-                        to 'notes' or $NOTEFILE_NOTEFIELD environment
-                        variable. With `mod`, `--note-field FIELD --note TEXT`
-                        is equivalent to `--field-note FIELD TEXT`
+  --note-field field    Specify the field in the notes to read/write. Defaults to 'notes' or $NOTEFILE_NOTEFIELD environment variable. With `mod`,
+                        `--note-field FIELD --note TEXT` is equivalent to `--field-note FIELD TEXT`
   --version             show program's version number and exit
 
 find Options:
   Flags for finding notes
 
-  -p PATH, --path PATH  Specify path(s). Can specify multiple. Directories
-                        will recurse and follow exclusions, etc. Specified
-                        files will not. If not specified, will be '.'. If any
-                        path is specified, will ONLY use those paths.
-  --exclude EXCLUDE     Specify a glob pattern to exclude when looking for
-                        notes. Directories are also matched with a trailing
-                        '/'. Can specify multiple times.
+  -p, --path PATH       Specify path(s). Can specify multiple. Directories will recurse and follow exclusions, etc. Specified files will not. If
+                        not specified, will be '.'. If any path is specified, will ONLY use those paths.
+  --exclude EXCLUDE     Specify a glob pattern to exclude when looking for notes. Directories are also matched with a trailing '/'. Can specify
+                        multiple times.
   --exclude-links       Do not include symlinked notefiles
   --match-exclude-case  Match case on exclude patterns
-  --max-depth N         Specify the maximum depth to search for notes. The
-                        current directory is 0
+  --max-depth N         Specify the maximum depth to search for notes. The current directory is 0
   -x, --one-file-system
                         Do not cross filesystem boundaries
   --type {dir,file,both}
@@ -1278,26 +909,17 @@ find Options:
 Display Options:
   Some flags will be ignored and/or are mutually exclusive
 
-  -0, --print0          Terminate names with a null byte. For use with `xargs
-                        -0` when filenames have space
+  -0, --print0          Terminate names with a null byte. For use with `xargs -0` when filenames have space
   --export              Export notes rather than printing names or tags
   --export-format {yaml,json,jsonl}
-                        [yaml] Export format. For jsonl, will be a list of
-                        dicts with the filename as '__filename' (to avoid
-                        accidentally clobbering a 'filename' key) and a
-                        metadata entry. The other formats are dictionaries
-  --tag-mode            Displays results in terms of *all* tags present in the
-                        results
-  --tag-counts          Displays results with the counts of *all* tags present
-                        in the results. Implies --tag-mode
-  --tag-count-order     Orders the results by number of tags. Implies --tag-
-                        mode
-  -o FILE, --output FILE
-                        Write results to FILE instead of stdout
-  --symlink DIR         Create symlinks in DIR to the found files. If used in
-                        --tag-mode, will also have subdirs with the name (or
-                        filter). If there are name conflicts, will add `.N` to
-                        the filename and print a warning to stderr
+                        [yaml] Export format. For jsonl, will be a list of dicts with the filename as '__filename' (to avoid accidentally
+                        clobbering a 'filename' key) and a metadata entry. The other formats are dictionaries
+  --tag-mode            Displays results in terms of *all* tags present in the results
+  --tag-counts          Displays results with the counts of *all* tags present in the results. Implies --tag-mode
+  --tag-count-order     Orders the results by number of tags. Implies --tag-mode
+  -o, --output FILE     Write results to FILE instead of stdout
+  --symlink DIR         Create symlinks in DIR to the found files. If used in --tag-mode, will also have subdirs with the name (or filter). If
+                        there are name conflicts, will add `.N` to the filename and print a warning to stderr
 
 ```
 
@@ -1305,16 +927,10 @@ Display Options:
 
 
 ```text
-usage: notefile search [-h] [--debug] [--note-field field] [--version]
-                       [-p PATH] [--exclude EXCLUDE] [--exclude-links]
-                       [--match-exclude-case] [--max-depth N] [-x]
-                       [--type {dir,file,both}] [--all] [--grep expr]
-                       [--fixed-strings] [--full-note] [--full-word]
-                       [--match-expr-case] [--query expr] [-e] [-t TAG]
-                       [--tag-all] [-0] [--export]
-                       [--export-format {yaml,json,jsonl}] [--tag-mode]
-                       [--tag-counts] [--tag-count-order] [-o FILE]
-                       [--symlink DIR]
+usage: notefile search [-h] [--debug] [--note-field field] [--version] [-p PATH] [--exclude EXCLUDE] [--exclude-links] [--match-exclude-case]
+                       [--max-depth N] [-x] [--type {dir,file,both}] [--all] [--grep expr] [--fixed-strings] [--full-note] [--full-word]
+                       [--match-expr-case] [--query expr] [-e] [-t TAG] [--tag-all] [-0] [--export] [--export-format {yaml,json,jsonl}]
+                       [--tag-mode] [--tag-counts] [--tag-count-order] [-o FILE] [--symlink DIR]
 
 options:
   -h, --help            show this help message and exit
@@ -1322,26 +938,20 @@ options:
 
 Global Options:
   --debug               Debug mode
-  --note-field field    Specify the field in the notes to read/write. Defaults
-                        to 'notes' or $NOTEFILE_NOTEFIELD environment
-                        variable. With `mod`, `--note-field FIELD --note TEXT`
-                        is equivalent to `--field-note FIELD TEXT`
+  --note-field field    Specify the field in the notes to read/write. Defaults to 'notes' or $NOTEFILE_NOTEFIELD environment variable. With `mod`,
+                        `--note-field FIELD --note TEXT` is equivalent to `--field-note FIELD TEXT`
   --version             show program's version number and exit
 
 find Options:
   Flags for finding notes
 
-  -p PATH, --path PATH  Specify path(s). Can specify multiple. Directories
-                        will recurse and follow exclusions, etc. Specified
-                        files will not. If not specified, will be '.'. If any
-                        path is specified, will ONLY use those paths.
-  --exclude EXCLUDE     Specify a glob pattern to exclude when looking for
-                        notes. Directories are also matched with a trailing
-                        '/'. Can specify multiple times.
+  -p, --path PATH       Specify path(s). Can specify multiple. Directories will recurse and follow exclusions, etc. Specified files will not. If
+                        not specified, will be '.'. If any path is specified, will ONLY use those paths.
+  --exclude EXCLUDE     Specify a glob pattern to exclude when looking for notes. Directories are also matched with a trailing '/'. Can specify
+                        multiple times.
   --exclude-links       Do not include symlinked notefiles
   --match-exclude-case  Match case on exclude patterns
-  --max-depth N         Specify the maximum depth to search for notes. The
-                        current directory is 0
+  --max-depth N         Specify the maximum depth to search for notes. The current directory is 0
   -x, --one-file-system
                         Do not cross filesystem boundaries
   --type {dir,file,both}
@@ -1350,54 +960,39 @@ find Options:
 grep options:
   Search for string matches
 
-  --grep expr           Search for text. Follows python regex patterns unless
-                        --fixed-strings. May need to escape them for bash
-                        parsing. Can specify multiple. If note contents are
-                        not strings, will use the `str()` representation
-  --fixed-strings       Match the string literally without regex patterns for
-                        grep expression
+  --grep expr           Search for text. Follows python regex patterns unless --fixed-strings. May need to escape them for bash parsing. Can
+                        specify multiple. If note contents are not strings, will use the `str()` representation
+  --fixed-strings       Match the string literally without regex patterns for grep expression
   --full-note           grep the full note, not just the notes
-  --full-word           Matches the full word(s) of the grep expression. (adds
-                        \b)
+  --full-word           Matches the full word(s) of the grep expression. (adds \b)
   --match-expr-case     Match case on grep expression
 
 query options:
   Advanced Python queries. See 'query -h' for details.
 
-  --query expr          Query expression. Can be multiple lines delineated by
-                        \n or ';' but the last line must evaluate to True or
-                        False as the query. Set as `-` to read stdin
+  --query expr          Query expression. Can be multiple lines delineated by \n or ';' but the last line must evaluate to True or False as the
+                        query. Set as `-` to read stdin
   -e, --allow-exception
-                        Allow exceptions in the query. Still prints a warning
-                        to stderr for each one
+                        Allow exceptions in the query. Still prints a warning to stderr for each one
 
 tag search options:
-  -t TAG, --tag TAG     Specify tag to find
+  -t, --tag TAG         Specify tag to find
   --tag-all             Match all specified tags
 
 Display Options:
   Some flags will be ignored and/or are mutually exclusive
 
-  -0, --print0          Terminate names with a null byte. For use with `xargs
-                        -0` when filenames have space
+  -0, --print0          Terminate names with a null byte. For use with `xargs -0` when filenames have space
   --export              Export notes rather than printing names or tags
   --export-format {yaml,json,jsonl}
-                        [yaml] Export format. For jsonl, will be a list of
-                        dicts with the filename as '__filename' (to avoid
-                        accidentally clobbering a 'filename' key) and a
-                        metadata entry. The other formats are dictionaries
-  --tag-mode            Displays results in terms of *all* tags present in the
-                        results
-  --tag-counts          Displays results with the counts of *all* tags present
-                        in the results. Implies --tag-mode
-  --tag-count-order     Orders the results by number of tags. Implies --tag-
-                        mode
-  -o FILE, --output FILE
-                        Write results to FILE instead of stdout
-  --symlink DIR         Create symlinks in DIR to the found files. If used in
-                        --tag-mode, will also have subdirs with the name (or
-                        filter). If there are name conflicts, will add `.N` to
-                        the filename and print a warning to stderr
+                        [yaml] Export format. For jsonl, will be a list of dicts with the filename as '__filename' (to avoid accidentally
+                        clobbering a 'filename' key) and a metadata entry. The other formats are dictionaries
+  --tag-mode            Displays results in terms of *all* tags present in the results
+  --tag-counts          Displays results with the counts of *all* tags present in the results. Implies --tag-mode
+  --tag-count-order     Orders the results by number of tags. Implies --tag-mode
+  -o, --output FILE     Write results to FILE instead of stdout
+  --symlink DIR         Create symlinks in DIR to the found files. If used in --tag-mode, will also have subdirs with the name (or filter). If
+                        there are name conflicts, will add `.N` to the filename and print a warning to stderr
 
 ```
 
@@ -1405,16 +1000,10 @@ Display Options:
 
 
 ```text
-usage: notefile grep [-h] [--debug] [--note-field field] [--version] [-p PATH]
-                     [--exclude EXCLUDE] [--exclude-links]
-                     [--match-exclude-case] [--max-depth N] [-x]
-                     [--type {dir,file,both}] [--all] [--grep expr]
-                     [--fixed-strings] [--full-note] [--full-word]
-                     [--match-expr-case] [--query expr] [-e] [-t TAG]
-                     [--tag-all] [-0] [--export]
-                     [--export-format {yaml,json,jsonl}] [--tag-mode]
-                     [--tag-counts] [--tag-count-order] [-o FILE]
-                     [--symlink DIR]
+usage: notefile grep [-h] [--debug] [--note-field field] [--version] [-p PATH] [--exclude EXCLUDE] [--exclude-links] [--match-exclude-case]
+                     [--max-depth N] [-x] [--type {dir,file,both}] [--all] [--grep expr] [--fixed-strings] [--full-note] [--full-word]
+                     [--match-expr-case] [--query expr] [-e] [-t TAG] [--tag-all] [-0] [--export] [--export-format {yaml,json,jsonl}] [--tag-mode]
+                     [--tag-counts] [--tag-count-order] [-o FILE] [--symlink DIR]
                      [grep ...]
 
 positional arguments:
@@ -1426,26 +1015,20 @@ options:
 
 Global Options:
   --debug               Debug mode
-  --note-field field    Specify the field in the notes to read/write. Defaults
-                        to 'notes' or $NOTEFILE_NOTEFIELD environment
-                        variable. With `mod`, `--note-field FIELD --note TEXT`
-                        is equivalent to `--field-note FIELD TEXT`
+  --note-field field    Specify the field in the notes to read/write. Defaults to 'notes' or $NOTEFILE_NOTEFIELD environment variable. With `mod`,
+                        `--note-field FIELD --note TEXT` is equivalent to `--field-note FIELD TEXT`
   --version             show program's version number and exit
 
 find Options:
   Flags for finding notes
 
-  -p PATH, --path PATH  Specify path(s). Can specify multiple. Directories
-                        will recurse and follow exclusions, etc. Specified
-                        files will not. If not specified, will be '.'. If any
-                        path is specified, will ONLY use those paths.
-  --exclude EXCLUDE     Specify a glob pattern to exclude when looking for
-                        notes. Directories are also matched with a trailing
-                        '/'. Can specify multiple times.
+  -p, --path PATH       Specify path(s). Can specify multiple. Directories will recurse and follow exclusions, etc. Specified files will not. If
+                        not specified, will be '.'. If any path is specified, will ONLY use those paths.
+  --exclude EXCLUDE     Specify a glob pattern to exclude when looking for notes. Directories are also matched with a trailing '/'. Can specify
+                        multiple times.
   --exclude-links       Do not include symlinked notefiles
   --match-exclude-case  Match case on exclude patterns
-  --max-depth N         Specify the maximum depth to search for notes. The
-                        current directory is 0
+  --max-depth N         Specify the maximum depth to search for notes. The current directory is 0
   -x, --one-file-system
                         Do not cross filesystem boundaries
   --type {dir,file,both}
@@ -1454,54 +1037,39 @@ find Options:
 grep options:
   Search for string matches
 
-  --grep expr           Search for text. Follows python regex patterns unless
-                        --fixed-strings. May need to escape them for bash
-                        parsing. Can specify multiple. If note contents are
-                        not strings, will use the `str()` representation
-  --fixed-strings       Match the string literally without regex patterns for
-                        grep expression
+  --grep expr           Search for text. Follows python regex patterns unless --fixed-strings. May need to escape them for bash parsing. Can
+                        specify multiple. If note contents are not strings, will use the `str()` representation
+  --fixed-strings       Match the string literally without regex patterns for grep expression
   --full-note           grep the full note, not just the notes
-  --full-word           Matches the full word(s) of the grep expression. (adds
-                        \b)
+  --full-word           Matches the full word(s) of the grep expression. (adds \b)
   --match-expr-case     Match case on grep expression
 
 query options:
   Advanced Python queries. See 'query -h' for details.
 
-  --query expr          Query expression. Can be multiple lines delineated by
-                        \n or ';' but the last line must evaluate to True or
-                        False as the query. Set as `-` to read stdin
+  --query expr          Query expression. Can be multiple lines delineated by \n or ';' but the last line must evaluate to True or False as the
+                        query. Set as `-` to read stdin
   -e, --allow-exception
-                        Allow exceptions in the query. Still prints a warning
-                        to stderr for each one
+                        Allow exceptions in the query. Still prints a warning to stderr for each one
 
 tag search options:
-  -t TAG, --tag TAG     Specify tag to find
+  -t, --tag TAG         Specify tag to find
   --tag-all             Match all specified tags
 
 Display Options:
   Some flags will be ignored and/or are mutually exclusive
 
-  -0, --print0          Terminate names with a null byte. For use with `xargs
-                        -0` when filenames have space
+  -0, --print0          Terminate names with a null byte. For use with `xargs -0` when filenames have space
   --export              Export notes rather than printing names or tags
   --export-format {yaml,json,jsonl}
-                        [yaml] Export format. For jsonl, will be a list of
-                        dicts with the filename as '__filename' (to avoid
-                        accidentally clobbering a 'filename' key) and a
-                        metadata entry. The other formats are dictionaries
-  --tag-mode            Displays results in terms of *all* tags present in the
-                        results
-  --tag-counts          Displays results with the counts of *all* tags present
-                        in the results. Implies --tag-mode
-  --tag-count-order     Orders the results by number of tags. Implies --tag-
-                        mode
-  -o FILE, --output FILE
-                        Write results to FILE instead of stdout
-  --symlink DIR         Create symlinks in DIR to the found files. If used in
-                        --tag-mode, will also have subdirs with the name (or
-                        filter). If there are name conflicts, will add `.N` to
-                        the filename and print a warning to stderr
+                        [yaml] Export format. For jsonl, will be a list of dicts with the filename as '__filename' (to avoid accidentally
+                        clobbering a 'filename' key) and a metadata entry. The other formats are dictionaries
+  --tag-mode            Displays results in terms of *all* tags present in the results
+  --tag-counts          Displays results with the counts of *all* tags present in the results. Implies --tag-mode
+  --tag-count-order     Orders the results by number of tags. Implies --tag-mode
+  -o, --output FILE     Write results to FILE instead of stdout
+  --symlink DIR         Create symlinks in DIR to the found files. If used in --tag-mode, will also have subdirs with the name (or filter). If
+                        there are name conflicts, will add `.N` to the filename and print a warning to stderr
 
 ```
 
@@ -1509,16 +1077,10 @@ Display Options:
 
 
 ```text
-usage: notefile query [-h] [--debug] [--note-field field] [--version]
-                      [-p PATH] [--exclude EXCLUDE] [--exclude-links]
-                      [--match-exclude-case] [--max-depth N] [-x]
-                      [--type {dir,file,both}] [--all] [--grep expr]
-                      [--fixed-strings] [--full-note] [--full-word]
-                      [--match-expr-case] [--query expr] [-e] [-t TAG]
-                      [--tag-all] [-0] [--export]
-                      [--export-format {yaml,json,jsonl}] [--tag-mode]
-                      [--tag-counts] [--tag-count-order] [-o FILE]
-                      [--symlink DIR]
+usage: notefile query [-h] [--debug] [--note-field field] [--version] [-p PATH] [--exclude EXCLUDE] [--exclude-links] [--match-exclude-case]
+                      [--max-depth N] [-x] [--type {dir,file,both}] [--all] [--grep expr] [--fixed-strings] [--full-note] [--full-word]
+                      [--match-expr-case] [--query expr] [-e] [-t TAG] [--tag-all] [-0] [--export] [--export-format {yaml,json,jsonl}]
+                      [--tag-mode] [--tag-counts] [--tag-count-order] [-o FILE] [--symlink DIR]
                       [query ...]
 
 positional arguments:
@@ -1530,26 +1092,20 @@ options:
 
 Global Options:
   --debug               Debug mode
-  --note-field field    Specify the field in the notes to read/write. Defaults
-                        to 'notes' or $NOTEFILE_NOTEFIELD environment
-                        variable. With `mod`, `--note-field FIELD --note TEXT`
-                        is equivalent to `--field-note FIELD TEXT`
+  --note-field field    Specify the field in the notes to read/write. Defaults to 'notes' or $NOTEFILE_NOTEFIELD environment variable. With `mod`,
+                        `--note-field FIELD --note TEXT` is equivalent to `--field-note FIELD TEXT`
   --version             show program's version number and exit
 
 find Options:
   Flags for finding notes
 
-  -p PATH, --path PATH  Specify path(s). Can specify multiple. Directories
-                        will recurse and follow exclusions, etc. Specified
-                        files will not. If not specified, will be '.'. If any
-                        path is specified, will ONLY use those paths.
-  --exclude EXCLUDE     Specify a glob pattern to exclude when looking for
-                        notes. Directories are also matched with a trailing
-                        '/'. Can specify multiple times.
+  -p, --path PATH       Specify path(s). Can specify multiple. Directories will recurse and follow exclusions, etc. Specified files will not. If
+                        not specified, will be '.'. If any path is specified, will ONLY use those paths.
+  --exclude EXCLUDE     Specify a glob pattern to exclude when looking for notes. Directories are also matched with a trailing '/'. Can specify
+                        multiple times.
   --exclude-links       Do not include symlinked notefiles
   --match-exclude-case  Match case on exclude patterns
-  --max-depth N         Specify the maximum depth to search for notes. The
-                        current directory is 0
+  --max-depth N         Specify the maximum depth to search for notes. The current directory is 0
   -x, --one-file-system
                         Do not cross filesystem boundaries
   --type {dir,file,both}
@@ -1558,54 +1114,39 @@ find Options:
 grep options:
   Search for string matches
 
-  --grep expr           Search for text. Follows python regex patterns unless
-                        --fixed-strings. May need to escape them for bash
-                        parsing. Can specify multiple. If note contents are
-                        not strings, will use the `str()` representation
-  --fixed-strings       Match the string literally without regex patterns for
-                        grep expression
+  --grep expr           Search for text. Follows python regex patterns unless --fixed-strings. May need to escape them for bash parsing. Can
+                        specify multiple. If note contents are not strings, will use the `str()` representation
+  --fixed-strings       Match the string literally without regex patterns for grep expression
   --full-note           grep the full note, not just the notes
-  --full-word           Matches the full word(s) of the grep expression. (adds
-                        \b)
+  --full-word           Matches the full word(s) of the grep expression. (adds \b)
   --match-expr-case     Match case on grep expression
 
 query options:
   Advanced Python queries. See 'query -h' for details.
 
-  --query expr          Query expression. Can be multiple lines delineated by
-                        \n or ';' but the last line must evaluate to True or
-                        False as the query. Set as `-` to read stdin
+  --query expr          Query expression. Can be multiple lines delineated by \n or ';' but the last line must evaluate to True or False as the
+                        query. Set as `-` to read stdin
   -e, --allow-exception
-                        Allow exceptions in the query. Still prints a warning
-                        to stderr for each one
+                        Allow exceptions in the query. Still prints a warning to stderr for each one
 
 tag search options:
-  -t TAG, --tag TAG     Specify tag to find
+  -t, --tag TAG         Specify tag to find
   --tag-all             Match all specified tags
 
 Display Options:
   Some flags will be ignored and/or are mutually exclusive
 
-  -0, --print0          Terminate names with a null byte. For use with `xargs
-                        -0` when filenames have space
+  -0, --print0          Terminate names with a null byte. For use with `xargs -0` when filenames have space
   --export              Export notes rather than printing names or tags
   --export-format {yaml,json,jsonl}
-                        [yaml] Export format. For jsonl, will be a list of
-                        dicts with the filename as '__filename' (to avoid
-                        accidentally clobbering a 'filename' key) and a
-                        metadata entry. The other formats are dictionaries
-  --tag-mode            Displays results in terms of *all* tags present in the
-                        results
-  --tag-counts          Displays results with the counts of *all* tags present
-                        in the results. Implies --tag-mode
-  --tag-count-order     Orders the results by number of tags. Implies --tag-
-                        mode
-  -o FILE, --output FILE
-                        Write results to FILE instead of stdout
-  --symlink DIR         Create symlinks in DIR to the found files. If used in
-                        --tag-mode, will also have subdirs with the name (or
-                        filter). If there are name conflicts, will add `.N` to
-                        the filename and print a warning to stderr
+                        [yaml] Export format. For jsonl, will be a list of dicts with the filename as '__filename' (to avoid accidentally
+                        clobbering a 'filename' key) and a metadata entry. The other formats are dictionaries
+  --tag-mode            Displays results in terms of *all* tags present in the results
+  --tag-counts          Displays results with the counts of *all* tags present in the results. Implies --tag-mode
+  --tag-count-order     Orders the results by number of tags. Implies --tag-mode
+  -o, --output FILE     Write results to FILE instead of stdout
+  --symlink DIR         Create symlinks in DIR to the found files. If used in --tag-mode, will also have subdirs with the name (or filter). If
+                        there are name conflicts, will add `.N` to the filename and print a warning to stderr
 
 Queries:
 --------
@@ -1705,16 +1246,10 @@ NOTEFILE_SAFE_QUERY=false. Or use the Note.unsafe_query(...) APIs.
 
 
 ```text
-usage: notefile tags [-h] [--debug] [--note-field field] [--version] [-p PATH]
-                     [--exclude EXCLUDE] [--exclude-links]
-                     [--match-exclude-case] [--max-depth N] [-x]
-                     [--type {dir,file,both}] [--all] [--grep expr]
-                     [--fixed-strings] [--full-note] [--full-word]
-                     [--match-expr-case] [--query expr] [-e] [-t TAG]
-                     [--tag-all] [-0] [--export]
-                     [--export-format {yaml,json,jsonl}] [--tag-mode]
-                     [--tag-counts] [--tag-count-order] [-o FILE]
-                     [--symlink DIR]
+usage: notefile tags [-h] [--debug] [--note-field field] [--version] [-p PATH] [--exclude EXCLUDE] [--exclude-links] [--match-exclude-case]
+                     [--max-depth N] [-x] [--type {dir,file,both}] [--all] [--grep expr] [--fixed-strings] [--full-note] [--full-word]
+                     [--match-expr-case] [--query expr] [-e] [-t TAG] [--tag-all] [-0] [--export] [--export-format {yaml,json,jsonl}] [--tag-mode]
+                     [--tag-counts] [--tag-count-order] [-o FILE] [--symlink DIR]
                      [tag ...]
 
 positional arguments:
@@ -1726,26 +1261,20 @@ options:
 
 Global Options:
   --debug               Debug mode
-  --note-field field    Specify the field in the notes to read/write. Defaults
-                        to 'notes' or $NOTEFILE_NOTEFIELD environment
-                        variable. With `mod`, `--note-field FIELD --note TEXT`
-                        is equivalent to `--field-note FIELD TEXT`
+  --note-field field    Specify the field in the notes to read/write. Defaults to 'notes' or $NOTEFILE_NOTEFIELD environment variable. With `mod`,
+                        `--note-field FIELD --note TEXT` is equivalent to `--field-note FIELD TEXT`
   --version             show program's version number and exit
 
 find Options:
   Flags for finding notes
 
-  -p PATH, --path PATH  Specify path(s). Can specify multiple. Directories
-                        will recurse and follow exclusions, etc. Specified
-                        files will not. If not specified, will be '.'. If any
-                        path is specified, will ONLY use those paths.
-  --exclude EXCLUDE     Specify a glob pattern to exclude when looking for
-                        notes. Directories are also matched with a trailing
-                        '/'. Can specify multiple times.
+  -p, --path PATH       Specify path(s). Can specify multiple. Directories will recurse and follow exclusions, etc. Specified files will not. If
+                        not specified, will be '.'. If any path is specified, will ONLY use those paths.
+  --exclude EXCLUDE     Specify a glob pattern to exclude when looking for notes. Directories are also matched with a trailing '/'. Can specify
+                        multiple times.
   --exclude-links       Do not include symlinked notefiles
   --match-exclude-case  Match case on exclude patterns
-  --max-depth N         Specify the maximum depth to search for notes. The
-                        current directory is 0
+  --max-depth N         Specify the maximum depth to search for notes. The current directory is 0
   -x, --one-file-system
                         Do not cross filesystem boundaries
   --type {dir,file,both}
@@ -1754,54 +1283,39 @@ find Options:
 grep options:
   Search for string matches
 
-  --grep expr           Search for text. Follows python regex patterns unless
-                        --fixed-strings. May need to escape them for bash
-                        parsing. Can specify multiple. If note contents are
-                        not strings, will use the `str()` representation
-  --fixed-strings       Match the string literally without regex patterns for
-                        grep expression
+  --grep expr           Search for text. Follows python regex patterns unless --fixed-strings. May need to escape them for bash parsing. Can
+                        specify multiple. If note contents are not strings, will use the `str()` representation
+  --fixed-strings       Match the string literally without regex patterns for grep expression
   --full-note           grep the full note, not just the notes
-  --full-word           Matches the full word(s) of the grep expression. (adds
-                        \b)
+  --full-word           Matches the full word(s) of the grep expression. (adds \b)
   --match-expr-case     Match case on grep expression
 
 query options:
   Advanced Python queries. See 'query -h' for details.
 
-  --query expr          Query expression. Can be multiple lines delineated by
-                        \n or ';' but the last line must evaluate to True or
-                        False as the query. Set as `-` to read stdin
+  --query expr          Query expression. Can be multiple lines delineated by \n or ';' but the last line must evaluate to True or False as the
+                        query. Set as `-` to read stdin
   -e, --allow-exception
-                        Allow exceptions in the query. Still prints a warning
-                        to stderr for each one
+                        Allow exceptions in the query. Still prints a warning to stderr for each one
 
 tag search options:
-  -t TAG, --tag TAG     Specify tag to find
+  -t, --tag TAG         Specify tag to find
   --tag-all             Match all specified tags
 
 Display Options:
   Some flags will be ignored and/or are mutually exclusive
 
-  -0, --print0          Terminate names with a null byte. For use with `xargs
-                        -0` when filenames have space
+  -0, --print0          Terminate names with a null byte. For use with `xargs -0` when filenames have space
   --export              Export notes rather than printing names or tags
   --export-format {yaml,json,jsonl}
-                        [yaml] Export format. For jsonl, will be a list of
-                        dicts with the filename as '__filename' (to avoid
-                        accidentally clobbering a 'filename' key) and a
-                        metadata entry. The other formats are dictionaries
-  --tag-mode            Displays results in terms of *all* tags present in the
-                        results
-  --tag-counts          Displays results with the counts of *all* tags present
-                        in the results. Implies --tag-mode
-  --tag-count-order     Orders the results by number of tags. Implies --tag-
-                        mode
-  -o FILE, --output FILE
-                        Write results to FILE instead of stdout
-  --symlink DIR         Create symlinks in DIR to the found files. If used in
-                        --tag-mode, will also have subdirs with the name (or
-                        filter). If there are name conflicts, will add `.N` to
-                        the filename and print a warning to stderr
+                        [yaml] Export format. For jsonl, will be a list of dicts with the filename as '__filename' (to avoid accidentally
+                        clobbering a 'filename' key) and a metadata entry. The other formats are dictionaries
+  --tag-mode            Displays results in terms of *all* tags present in the results
+  --tag-counts          Displays results with the counts of *all* tags present in the results. Implies --tag-mode
+  --tag-count-order     Orders the results by number of tags. Implies --tag-mode
+  -o, --output FILE     Write results to FILE instead of stdout
+  --symlink DIR         Create symlinks in DIR to the found files. If used in --tag-mode, will also have subdirs with the name (or filter). If
+                        there are name conflicts, will add `.N` to the filename and print a warning to stderr
 
 ```
 
@@ -1809,57 +1323,39 @@ Display Options:
 
 
 ```text
-usage: notefile note-path [-h] [--debug] [--note-field field] [--version]
-                          [--link {source,symlink,both}] [-H] [-V]
-                          [-S | --subdir | --no-subdir] [--no-hash]
-                          [--no-refresh] [--format {json,yaml}]
-                          [--rewrite-format]
-                          path [path ...]
+usage: notefile note-path [-h] [--debug] [--note-field field] [--version] [--link {source,symlink,both}] [-H] [-V] [-S | --subdir | --no-subdir]
+                          [--no-hash] [--no-refresh] [--format {json,yaml}] [--rewrite-format] [--candidate]
+                          path
 
 positional arguments:
-  path                  Specify path(s). Will print in order
+  path                  Specify the target path
 
 options:
   -h, --help            show this help message and exit
+  --candidate           Print the candidate notefile path even when the note does not exist
 
 Global Options:
   --debug               Debug mode
-  --note-field field    Specify the field in the notes to read/write. Defaults
-                        to 'notes' or $NOTEFILE_NOTEFIELD environment
-                        variable. With `mod`, `--note-field FIELD --note TEXT`
-                        is equivalent to `--field-note FIELD TEXT`
+  --note-field field    Specify the field in the notes to read/write. Defaults to 'notes' or $NOTEFILE_NOTEFIELD environment variable. With `mod`,
+                        `--note-field FIELD --note TEXT` is equivalent to `--field-note FIELD TEXT`
   --version             show program's version number and exit
 
 Create/Modify Options:
   Flags for creating and saving notes. Not all flags are always applicable!
 
   --link {source,symlink,both}
-                        ['both'] Specify how to handle symlinks. If 'source',
-                        will add the notefile to the source only (non-
-                        recursively). If 'symlink', will add the notefile to
-                        *just* the symlink file. If 'both', will add the
-                        notefile the source (non-recursivly) and then symlink
-                        to that notefile.
-  -H, --hidden          Make new notes hidden. NOT default unless set with
-                        $NOTEFILE_HIDDEN environment variable
-  -V, --visible         Make new notes visible. Default unless set with
-                        $NOTEFILE_HIDDEN environment variable
+                        ['both'] Specify how to handle symlinks. If 'source', will add the notefile to the source only (non-recursively). If
+                        'symlink', will add the notefile to *just* the symlink file. If 'both', will add the notefile the source (non-recursivly)
+                        and then symlink to that notefile.
+  -H, --hidden          Make new notes hidden. NOT default unless set with $NOTEFILE_HIDDEN environment variable
+  -V, --visible         Make new notes visible. Default unless set with $NOTEFILE_HIDDEN environment variable
   -S, --subdir, --no-subdir
-                        Make new notes in a subdir. NOT default unless set
-                        with $NOTEFILE_SUBDIR environment variable. When using
-                        --subdir with --hidden, will store in '.notefiles' and
-                        when using --subdir with --visible, will store in
-                        '_notefiles'. Default False
-  --no-hash             Do *not* compute the SHA256 of the file. Will not be
-                        able to repair orphaned notes
-  --no-refresh          Do not refresh/repair file metadata when a notefile is
-                        modified
-  --format {json,yaml}  Note format for writing NEW notes. Will not change the
-                        format for existing notes unless --rewrite-format is
-                        set. Default is 'yaml' unless set with
-                        $NOTEFILE_FORMAT environment variable. Currently not
-                        set.
-  --rewrite-format      Change to the specified format (see '--format')
-                        regardless of current format.
+                        Make new notes in a subdir. NOT default unless set with $NOTEFILE_SUBDIR environment variable. When using --subdir with
+                        --hidden, will store in '.notefiles' and when using --subdir with --visible, will store in '_notefiles'. Default False
+  --no-hash             Do *not* compute the SHA256 of the file. Will not be able to repair orphaned notes
+  --no-refresh          Do not refresh/repair file metadata when a notefile is modified
+  --format {json,yaml}  Note format for writing NEW notes. Will not change the format for existing notes unless --rewrite-format is set. Default
+                        is 'yaml' unless set with $NOTEFILE_FORMAT environment variable. Currently not set.
+  --rewrite-format      Change to the specified format (see '--format') regardless of current format.
 
 ```

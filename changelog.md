@@ -2,6 +2,11 @@
 
 (**_newest_** on *top*)
 
+## 0.12.0 (2026-06-21)
+
+* *Potentially Breaking*: `notefile note-path` now (a) only takes a single argument and (b) shows nothing and exits non-zero if the note does not exist. The `--candidate` flag shows the candidate path and exits 0, but still only accepts one path.
+* Fix for unallowed YAML. It checks and escapes it.
+
 ## 0.11.3 (2026-05-13)
 
 * Added printing the modified note on the CLI

@@ -7,6 +7,9 @@ import sys
 
 os.chdir(os.path.dirname(__file__))
 
+# Keep argparse wrapping stable across terminals and Python 3.12+ platforms.
+HELP_COLUMNS = "148"
+
 commands = """\
 mod
 edit
@@ -55,15 +58,15 @@ for command in commands:
         cmd.append(command)
     cmd.append("--help")
 
-    help_text = subprocess.check_output(cmd).decode()
+    env = os.environ.copy()
+    env["COLUMNS"] = HELP_COLUMNS
+    help_text = subprocess.check_output(cmd, env=env, text=True, encoding="utf-8")
     help_text = help_text.replace("usage: cli.py", "usage: notefile")
 
-    helpmd.append(
-        f"""
+    helpmd.append(f"""
 ```text
 {help_text}
-```"""
-    )
+```""")
 
 with open("CLI_help.md", "wt") as f:
     f.write("\n\n".join(helpmd))

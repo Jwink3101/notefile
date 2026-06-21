@@ -1338,6 +1338,23 @@ def test_load_yaml_rejects_python_object_tags():
     os.chdir(TESTDIR)
 
 
+def test_yamltxt_escapes_multiline_control_chars():
+    os.chdir(TESTDIR)
+    dirpath = TESTDIR / "yaml_control_chars"
+    cleanmkdir(dirpath)
+    os.chdir(dirpath)
+
+    note_text = "LINK\nTALK\n2\n70\x02F"
+    txt = notefile.nfyaml.yamltxt({"notes": note_text})
+
+    assert "notes: |-" in txt
+    assert "\x02" not in txt
+    assert "\\x02" in txt
+    assert notefile.nfyaml.load_yaml(txt) == {"notes": "LINK\nTALK\n2\n70\\x02F"}
+
+    os.chdir(TESTDIR)
+
+
 def test_unsafe_query_paths():
     os.chdir(TESTDIR)
     dirpath = TESTDIR / "unsafe_query"
@@ -1561,24 +1578,41 @@ def test_notepath():
     call("mod -t note file1.txt")
     call("mod -t tag sub/file2.txt --hidden")
 
-    # These shouldn't be affected by vis or hide
-    o0, _ = call("note-path file1.txt sub/file2.txt", capture=True)
-    oH, _ = call("note-path file1.txt sub/file2.txt -H", capture=True)
-    oV, _ = call("note-path file1.txt sub/file2.txt -V", capture=True)
-    assert o0 == oH == oV == "file1.txt.notes.yaml\nsub/.file2.txt.notes.yaml\n"
+    # Existing notes are returned regardless of vis or hide
+    o0, _ = call("note-path file1.txt", capture=True)
+    oH, _ = call("note-path file1.txt -H", capture=True)
+    oV, _ = call("note-path file1.txt -V", capture=True)
+    assert o0 == oH == oV == "file1.txt.notes.yaml\n"
 
-    # These *do* care. file3.txt exisst but no note.
-    oV, _ = call("note-path file3.txt ss/nofile.no -V", capture=True)
-    oH, _ = call("note-path file3.txt ss/nofile.no -H", capture=True)
-    assert oV == "file3.txt.notes.yaml\nss/nofile.no.notes.yaml\n"
-    assert oH == ".file3.txt.notes.yaml\nss/.nofile.no.notes.yaml\n"
+    o0, _ = call("note-path sub/file2.txt", capture=True)
+    oH, _ = call("note-path sub/file2.txt -H", capture=True)
+    oV, _ = call("note-path sub/file2.txt -V", capture=True)
+    assert o0 == oH == oV == "sub/.file2.txt.notes.yaml\n"
+
+    # Missing notes do not print by default, but --candidate prints the path.
+    with pytest.raises(SysExitError):
+        call("note-path file3.txt", capture=True)
+
+    oV, _ = call("note-path --candidate file3.txt -V", capture=True)
+    oH, _ = call("note-path --candidate file3.txt -H", capture=True)
+    assert oV == "file3.txt.notes.yaml\n"
+    assert oH == ".file3.txt.notes.yaml\n"
+
+    oV, _ = call("note-path --candidate ss/nofile.no -V", capture=True)
+    oH, _ = call("note-path --candidate ss/nofile.no -H", capture=True)
+    assert oV == "ss/nofile.no.notes.yaml\n"
+    assert oH == "ss/.nofile.no.notes.yaml\n"
 
     Path("somedir").mkdir()
+    call("mod -n note somedir/")
     oD, _ = call("note-path somedir/", capture=True)
     assert oD == "somedir.notes.yaml\n"
 
-    oMD, _ = call("note-path missingdir/", capture=True)
+    oMD, _ = call("note-path --candidate missingdir/", capture=True)
     assert oMD == "missingdir.notes.yaml\n"
+
+    with pytest.raises(SysExitError):
+        call("note-path file1.txt file3.txt")
 
     os.chdir(TESTDIR)
 
